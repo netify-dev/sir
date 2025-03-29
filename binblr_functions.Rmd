@@ -1,0 +1,227 @@
+---
+title: "Bilinear Logistic Regression for Binary Outcomes"
+author: "s7m"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+```
+
+# intro
+
+extending now to binary case. We assume a Bernoulli likelihood with a logistic link function, plus a **rank-1 constraint** on certain "influence" parameters via $\alpha$ and $\beta$. As in the Poisson and Gaussian bilinear models, the constraint $\alpha_1 = 1$ breaks the scaling indeterminacy, and a **chain rule trick** is used to correctly compute the identified gradient and Hessian.
+
+## setup
+
+Let:
+
+- $Y$ be an $(m \times m \times T)$ array of **binary** outcomes, where $Y_{i,j,t}\in\{0,1\}$.
+
+- $Z$ be an $(m \times m \times q \times T)$ array of **exogenous** dyadic covariates, so $Z_{i,j,t}\in \mathbb{R}^q$.
+
+- $W$ be an $(m \times m \times p)$ array that encodes **node- or dyad-level "influence"** covariates for the bilinear part.
+
+- $X$ be some object/array that combines, for example, lagged values $Y_{i,j,t-1}$ (or other transformations) with $W$ to form the rank-1 predictor $\alpha^\top X_{i,j,t}\beta$.  
+
+### assuptions
+
+We assume
+\[
+  Y_{i,j,t} \;\sim\; \mathrm{Bernoulli}\bigl(p_{i,j,t}\bigr),
+  \quad
+  p_{i,j,t} \;=\;\frac{1}{\,1 + e^{-\eta_{i,j,t}}\,},
+\]
+where the linear predictor $\eta_{i,j,t}$ is
+\[
+  \eta_{i,j,t}
+  \;=\;
+  \underbrace{\theta^\top Z_{i,j,t}}_{\text{exogenous part}}
+  \;+\;
+  \underbrace{\alpha^\top \bigl(\text{some function of } X_{i,j,t}\bigr)\,\beta}_{\text{bilinear rank-1 part}}.
+\]
+
+## Rank-1 Constraint and Identifiability
+
+We have:
+
+- $\theta\in\mathbb{R}^q$,
+
+- $\alpha,\beta\in \mathbb{R}^p$.  
+
+However, because $\alpha^\top X \beta$ is **scale-invariant** (multiplying $\alpha$ by $c$ and $\beta$ by $1/c$ produces the same product), we must impose a constraint to make $\alpha,\beta$ **identified**. Following the same logic as in the Poisson/Gaussian models, we **fix**:
+\[
+  \alpha_1 \;=\; 1.
+\]
+Hence, $\alpha = (1,\,\alpha_2,\ldots,\alpha_p)$. If $\alpha_1\neq 1$ in the unconstrained problem, there would be infinitely many equivalent solutions.
+
+## Negative Log-Likelihood
+
+For **logistic regression**, each dyad/time $(i,j,t)$ has a negative log-likelihood component:
+\[
+  \mathrm{NLL}_{i,j,t}
+  \;=\;
+  -\,\Bigl[
+    Y_{i,j,t}\,\eta_{i,j,t}
+    \;-\;
+    \log\bigl(1+\exp(\eta_{i,j,t})\bigr)
+  \Bigr].
+\]
+Thus, the total NLL is
+\[
+  \mathrm{NLL}(\theta,\alpha,\beta)
+  \;=\;
+  \sum_{i\neq j}\sum_{t=1}^T
+  \Bigl[
+    -\,Y_{i,j,t}\,\eta_{i,j,t}
+    + \log\bigl(1+\exp(\eta_{i,j,t})\bigr)
+  \Bigr].
+\]
+
+## Gradient and Hessian (Before Imposing $\alpha_1=1$)
+
+Let:
+\[
+  \psi
+  \;=\;
+  (\theta_1,\dots,\theta_q,\;\alpha_1,\dots,\alpha_p,\;\beta_1,\dots,\beta_p).
+\]
+Each $\eta_{i,j,t}$ is linear in $\psi$. The derivative with respect to $\eta_{i,j,t}$ is $(p_{i,j,t}-Y_{i,j,t})$, where $p_{i,j,t}=\frac{1}{1+e^{-\eta_{i,j,t}}}$. Thus:
+
+- **Gradient**:
+
+  \[
+    \frac{\partial\,\mathrm{NLL}}{\partial\,\psi_k}
+    \;=\;
+    \sum_{i\neq j}\sum_{t}
+    (p_{i,j,t}-Y_{i,j,t})
+    \,\frac{\partial\,\eta_{i,j,t}}{\partial\,\psi_k}.
+  \]
+
+- **Hessian**:
+
+  \[
+    \frac{\partial^2\,\mathrm{NLL}}{\partial\,\psi_k\,\partial\,\psi_\ell}
+    \;=\;
+    \sum_{i\neq j}\sum_{t}
+    \Bigl[p_{i,j,t}\bigl(1-p_{i,j,t}\bigr)\Bigr]
+    \,\frac{\partial\,\eta_{i,j,t}}{\partial\,\psi_k}
+    \,\frac{\partial\,\eta_{i,j,t}}{\partial\,\psi_\ell}.
+  \]
+
+**Note**: The logistic second derivative introduces the weight $p_{i,j,t}(1-p_{i,j,t})$.
+
+## Chain Rule Trick for $\alpha_1=1$
+
+We do **not** fully estimate $\alpha_1$. Instead, we fix $\alpha_1=1$. Thus, our "actual" or **identified** parameter vector is:
+\[
+  \phi
+  \;=\;
+  (\theta_1,\dots,\theta_q,\;\alpha_2,\dots,\alpha_p,\;\beta_1,\dots,\beta_p).
+\]
+Equivalently,
+\[
+  \psi(\phi)
+  \;=\;
+  (\theta,\; 1,\; \alpha_2,\dots,\alpha_p,\;\beta_1,\dots,\beta_p).
+\]
+Hence $\dim(\phi)=q + (p-1) + p = q+2p-1$.  
+
+### From Unconstrained to Identified
+
+We define a **Jacobian** matrix $J$ that effectively "drops" the row and column corresponding to $\alpha_1$. In code, if the dimension of $\psi$ is $(q+2p)$, we remove the row for $\alpha_1$ to yield a $(q+2p-1)\times(q+2p)$ mapping. Specifically:
+
+- We **compute** gradient/Hessian in the unconstrained space (where $\alpha_1$ is a free dimension),
+- Then **multiply** by $J$ to get the valid derivatives in the constrained space.  
+
+Formally, if $\nabla_\psi$ is the gradient in the unconstrained parameterization, and $\nabla_\phi$ is the gradient in the identified space, we have:
+
+\[
+  \nabla_\phi\,\mathrm{NLL}
+  \;=\;
+  -\,J\,\nabla_\psi\,\mathrm{NLL},
+  \quad
+  \nabla^2_\phi\,\mathrm{NLL}
+  \;=\;
+  -\,J\;\nabla^2_\psi\,\mathrm{NLL}\;J^\top.
+\]
+Similarly for the robust sandwich term (the sum of score cross-products). The sign "$-$" is simply because we often store the negative log-likelihood, so the derivative is $-$ times the partial derivatives above.
+
+Thus, the code performs:
+1. A "full" gradient/Hessian in dimension $(q+2p)$.
+2. Builds a matrix `J` to remove the row/column for $\alpha_1$.  
+3. Post-multiplies (and pre-multiplies the Hessian) by `J` to get a $(q+2p-1)\times(q+2p-1)$ system for the iteration.  
+
+That is the **chain rule trick** for enforcing $\alpha_1=1$.
+
+## Final Parameter Estimates and Interpretation
+
+After convergence, we extract:
+- $\theta\in\mathbb{R}^q$,  
+- $\alpha\in\mathbb{R}^p$ where $\alpha_1=1$ plus the $\alpha_2,\dots,\alpha_p$ estimated,  
+- $\beta\in\mathbb{R}^p$.  
+
+Because the logistic model is used, each dyad/time probability is $p_{i,j,t} = \frac{1}{1+\exp(-\eta_{i,j,t})}$. The "influence" parameters $\alpha$ and $\beta$ can be interpreted as capturing how a prior pattern of sending or receiving (encoded by $X$) influences the odds of a future tie or event.
+
+## Example Code
+
+Below is a code chunk demonstrating how to implement **bilinear logistic regression** with the rank-1 constraint $\alpha_1=1$. The functions include:
+
+1. `mll_gH_binom()` – Builds the negative log-likelihood, gradient, Hessian, and robust cross-product ("shess").
+2. `eta_tab_binom()` – Computes the linear predictor array $\eta$.
+3. `mll_binblr()` – Computes the negative log-likelihood.
+4. `binblr_optfit()` – Fits the model via `optim(..., method="BFGS")`.
+5. `binblr_alsfit()` – A block coordinate descent, alternating between $(\theta,\alpha)$ and $(\theta,\beta)$ subproblems, each solved by logistic GLM in R.
+6. `se_binblr()` – Extracts standard errors from the Hessian (and optionally robust sandwich).
+7. `binblr()` – A convenience wrapper that uses the ALS approach, returns final estimates, influence matrices, and optionally standard errors.
+
+```{r, echo=TRUE}
+#### ---- Bilinear Logistic Regression for Binary Outcomes ----
+
+#### ---- 1) Gradient & Hessian
+mll_gH_binom <- function(tab, Y, W, X, Z) {
+  # [See code details in the provided script...]
+}
+
+#### ---- 2) Bilinear Predictor
+eta_tab_binom <- function(tab, W, X, Z) {
+  # [Compute eta = theta^T Z + alpha^T X beta]
+}
+
+#### ---- 3) Negative Log-Likelihood
+mll_binblr <- function(tab, Y, W, X, Z) {
+  # [Sum up -y*eta + log(1+exp(eta))]
+}
+
+#### ---- 4) Fit via 'optim'
+binblr_optfit <- function(Y, W, X, Z, trace=0, start=NULL) {
+  # [BFGS minimization of NLL with gradient]
+}
+
+#### ---- 5) Block Coordinate Descent
+binblr_alsfit <- function(Y, W, X, Z, trace=FALSE) {
+  # [Iterate sub-GLMs, fix beta => solve for (theta, alpha), fix alpha => solve for (theta, beta)]
+}
+
+#### ---- 6) Standard Errors
+se_binblr <- function(tab, Y, W, X, Z, calcSE=TRUE) {
+  # [Invert Hessian => classical SE; robust => sandwich]
+}
+
+#### ---- 7) Convenience Wrapper
+binblr <- function(Y, W, X, Z, calcSE=TRUE) {
+  # [ALS fit, gather results, produce final alpha,beta, log-likelihood, SEs, etc.]
+}
+```
+
+**notes**:
+
+- The code enforces `alpha_1 = 1` via a matrix `J` that removes the extra dimension.  
+- Each sub-block regression uses standard logistic regression (`family=binomial()`) in R, which is analogous to the iterative weighted least squares approach used for Poisson.  
+- The final output includes the rank-1 "influence" matrices $A$ and $B$.  
+
+You can reference the code for Poisson or Gaussian bilinear models to see how the same **chain rule** logic is applied for identifiability. 
+
+## wrapping up
+
+This logistic bilinear regression extends the same rank-1 influence concept from Poisson or Gaussian settings to **binary** network data. Imposing $\alpha_1=1$ ensures a unique factorization of $\alpha\beta^\top$, and the **chain rule trick** is necessary to produce valid gradient/Hessian calculations in the reduced parameter space. By alternating sub-GLMs for $(\theta,\alpha)$ and $(\theta,\beta)$ or using a global BFGS approach with the identified derivatives, we can efficiently estimate the model for large network datasets.
