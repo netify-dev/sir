@@ -1,0 +1,9 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^README\.Rmd$
+^\.github$
+^\.gitignore$
+^\.git$
+^.*\.o$
+^.*\.so$
+^.*\.dll$

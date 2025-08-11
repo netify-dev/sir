@@ -1,0 +1,31 @@
+Package: sir
+Type: Package
+Title: Social Influence Regression Models
+Version: 0.1.0
+Date: 2025-08-11
+Authors@R: c(
+    person("Shahryar", "Minhas", email = "shahryar.minhas@gmail.com", role = c("aut", "cre")),
+    person("Peter", "Hoff", email = "peter.hoff@duke.edu", role = "aut"))
+Description: Implements Social Influence Regression (SIR) models for analyzing 
+    network data with social influence effects. The package provides efficient 
+    methods for fitting models with bilinear effects using either Alternating 
+    Least Squares (ALS) or direct optimization approaches. Supports Poisson, 
+    Normal, and Binomial outcome distributions.
+License: GPL (>= 3)
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    R (>= 3.5.0)
+Imports: 
+    Rcpp (>= 1.0.0),
+    stats,
+    MASS,
+    reshape2,
+    speedglm
+Suggests:
+    testthat (>= 3.0.0)
+LinkingTo: 
+    Rcpp,
+    RcppArmadillo
+RoxygenNote: 7.3.2
+Config/testthat/edition: 3
