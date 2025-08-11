@@ -2,16 +2,25 @@
 % Please edit documentation in R/utils.R
 \name{flatten_Y}
 \alias{flatten_Y}
-\title{Flatten Y for GLM input}
+\title{Flatten Y Array for GLM Input}
 \usage{
 flatten_Y(Y)
 }
 \arguments{
-\item{Y}{(m x m x T) array.}
+\item{Y}{Three-dimensional array (m x m x T) of network outcomes.}
 }
 \value{
-Vectorized Y (column-major).
+Numeric vector of length m*m*T containing flattened outcomes.
 }
 \description{
-Flatten Y for GLM input
+Converts a 3D network outcome array into a vector suitable for GLM estimation.
+Uses column-major ordering (R's default) to ensure consistency with design matrices.
+}
+\details{
+The flattening follows R's column-major convention:
+\itemize{
+  \item Elements are ordered: Y[1,1,1], Y[2,1,1], ..., Y[m,1,1], Y[1,2,1], ...
+  \item This matches how design matrices are constructed
+  \item Preserves the correspondence between outcomes and covariates
+}
 }

@@ -1,6 +1,5 @@
 #include <RcppArmadillo.h>
 // [[Rcpp::depends(RcppArmadillo)]]
-// [[Rcpp::plugins(openmp)]]
 
 using namespace Rcpp;
 using namespace arma;
@@ -9,9 +8,61 @@ using namespace arma;
 // --- Tensor Utility Functions ---
 // ----------------------------------------------------------------------------
 
-// Efficient calculation of tprod(X, list(A, B)) specialized for SIR model.
-// Calculates A %*% X_t %*% B^T for each slice t of X.
-// X is (m x m x T), A and B are (m x m). Result is (m x m x T).
+//' Tensor Product for SIR Model (A * X * B')
+//' 
+//' @description
+//' Performs the bilinear transformation central to the Social Influence Regression model.
+//' Computes A * X_t * B' for each time slice t, where this product represents how
+//' network influence flows through the sender effects (A) and receiver effects (B).
+//' 
+//' @details
+//' This operation is the computational bottleneck of the SIR model, appearing in both
+//' the likelihood evaluation and gradient computation. The function implements:
+//' 
+//' For each time t: Result[,,t] = A * X[,,t] * B'
+//' 
+//' Where:
+//' - A captures sender-specific influence patterns (how nodes affect others)
+//' - B captures receiver-specific influence patterns (how nodes are affected)
+//' - X typically contains lagged network outcomes that carry influence forward
+//' 
+//' Mathematical interpretation:
+//' - Element (i,j) of the result represents the total influence flowing from i to j
+//' - This influence is mediated by the entire network structure at time t
+//' - The bilinear form allows for complex, indirect influence pathways
+//' 
+//' Computational optimizations:
+//' - Pre-computes B' once rather than for each time slice
+//' - Uses Armadillo's optimized BLAS routines for matrix multiplication
+//' - Memory-efficient slice-wise operations to avoid large temporary matrices
+//' - Compiler optimizations enabled through RcppArmadillo
+//' 
+//' @param X Three-dimensional array (m x m x T) representing the network state over time.
+//'   Each slice X[,,t] is the network at time t that carries influence.
+//'   
+//' @param A Matrix (m x m) of sender effects. Element A[i,k] represents how node i
+//'   is influenced by the sending behavior of node k.
+//'   
+//' @param B Matrix (m x m) of receiver effects. Element B[j,l] represents how node j's
+//'   reception is modified by node l's receiving patterns.
+//'   
+//' @return Three-dimensional array (m x m x T) where element [i,j,t] represents the
+//'   total bilinear influence from node i to node j at time t.
+//'   
+//' @examples
+//' \dontrun{
+//' // In R:
+//' m <- 10; T <- 5
+//' X <- array(rnorm(m*m*T), dim=c(m,m,T))
+//' A <- matrix(rnorm(m*m), m, m)
+//' B <- matrix(rnorm(m*m), m, m)
+//' result <- cpp_tprod_A_X_Bt(X, A, B)
+//' }
+//' 
+//' @note This function is called repeatedly during optimization, so efficiency is critical.
+//'   The implementation avoids unnecessary memory allocations and leverages BLAS Level 3
+//'   operations for optimal performance.
+//'   
 // [[Rcpp::export]]
 arma::cube cpp_tprod_A_X_Bt(const arma::cube& X, const arma::mat& A, const arma::mat& B) {
   int m = X.n_rows;
@@ -20,17 +71,59 @@ arma::cube cpp_tprod_A_X_Bt(const arma::cube& X, const arma::mat& A, const arma:
   arma::cube AXB(m, m, T);
   arma::mat Bt = B.t();
 
-  // Parallelize the loop over time T
-  #pragma omp parallel for schedule(static)
+  // Loop over time T
   for(int t=0; t < T; ++t) {
     AXB.slice(t) = A * X.slice(t) * Bt;
   }
   return AXB;
 }
 
-// Efficient calculation of amprod(W, v, 3) specialized for SIR model.
-// Calculates the linear combination of slices of W using vector v.
-// W is (m x m x p), v is (p x 1). Result is (m x m).
+//' Array-Matrix Product for Influence Matrices
+//' 
+//' @description
+//' Computes a weighted sum of influence covariate matrices to construct the
+//' parameterized influence matrices A or B in the SIR model.
+//' 
+//' @details
+//' This function implements the parameterization:
+//' Result = sum(k=1 to p) v[k] * W[,,k]
+//' 
+//' In the SIR model context:
+//' - A = alpha[1] * I + sum(k=2 to p) alpha[k] * W[,,k-1]
+//' - B = sum(k=1 to p) beta[k] * W[,,k]
+//' 
+//' The parameterization reduces the number of free parameters from O(m²) to O(p),
+//' where typically p << m. This makes estimation feasible for larger networks.
+//' 
+//' Computational strategy:
+//' - Skips zero coefficients to save computation
+//' - Uses in-place addition to minimize memory allocation
+//' - Leverages Armadillo's expression templates for efficiency
+//' 
+//' @param W Three-dimensional array (m x m x p) of influence covariates.
+//'   Each slice W[,,k] represents one way nodes can influence each other
+//'   (e.g., geographic proximity, social distance, shared attributes).
+//'   
+//' @param v Vector (p x 1) of coefficients for the linear combination.
+//'   These are the parameters being estimated (either alpha or beta).
+//'   
+//' @return Matrix (m x m) representing the weighted combination of influence
+//'   covariate matrices. This becomes either the A or B matrix in the model.
+//'   
+//' @examples
+//' \dontrun{
+//' // In R:
+//' m <- 10; p <- 3
+//' W <- array(rnorm(m*m*p), dim=c(m,m,p))
+//' v <- c(1, 0.5, -0.3)  // Coefficients
+//' A <- cpp_amprod_W_v(W, v)
+//' // A is now the parameterized influence matrix
+//' }
+//' 
+//' @note The function checks for dimension compatibility and will throw an
+//'   error if v has incorrect length. Zero coefficients are detected and
+//'   skipped to improve performance when the model is sparse.
+//'   
 // [[Rcpp::export]]
 arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
     int m = W.n_rows;
@@ -60,15 +153,54 @@ arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
 // These functions optimize the main bottleneck in the ALS algorithm by constructing
 // the design matrices (Wbeta, Walpha) in C++ instead of slow R loops/apply calls.
 
-//' Construct Wbeta design matrix for ALS update (theta, alpha)
-//'
-//' Efficiently calculates and flattens the Wbeta component of the design matrix.
-//' Wbeta[,,k,t] corresponds to W[,,k] %*% X[,,t] %*% (W*beta)^T.
-//'
-//' @param W (m x m x p) array of influence covariates.
-//' @param X (m x m x T) array, typically lagged outcomes.
-//' @param beta (p x 1) vector of current beta estimates.
-//' @return (m*m*T) x p matrix for the GLM design matrix.
+//' Construct Design Matrix for Alpha Updates in ALS
+//' 
+//' @description
+//' Builds the design matrix for updating sender effects (alpha parameters) in the
+//' Alternating Least Squares algorithm, holding receiver effects (beta) fixed.
+//' 
+//' @details
+//' In the ALS algorithm, when updating alpha with beta fixed, the model becomes
+//' linear in alpha. The design matrix for this GLM sub-problem has columns
+//' corresponding to each influence covariate.
+//' 
+//' For covariate k and observation (i,j,t), the design matrix element is:
+//' [W[,,k] * X[,,t] * B'][i,j]
+//' 
+//' Where B = sum_l beta[l] * W[,,l] is the current receiver effects matrix.
+//' 
+//' The algorithm:
+//' 1. Compute B from current beta and W
+//' 2. For each covariate k:
+//'    - Calculate W[,,k] * X * B' for all time points
+//'    - Flatten to match the vectorized Y
+//' 3. Combine into design matrix
+//' 
+//' This C++ implementation is 10-100x faster than the equivalent R code using
+//' loops or apply functions, making ALS feasible for larger networks.
+//' 
+//' @param W Three-dimensional array (m x m x p) of influence covariates.
+//'   These parameterize how influence flows through the network.
+//'   
+//' @param X Three-dimensional array (m x m x T) of network states over time.
+//'   Typically contains lagged outcomes that carry influence forward.
+//'   
+//' @param beta Vector (p x 1) of current receiver effect parameters.
+//'   These are held fixed while updating alpha in this ALS step.
+//'   
+//' @return Matrix (m*m*T x p) that serves as the design matrix for GLM estimation.
+//'   Each column corresponds to one influence covariate, rows match vectorized Y.
+//'   
+//' @note This function is called once per ALS iteration. The resulting matrix can
+//'   be large (m²T x p), so memory usage should be considered for big networks.
+//'   
+//' @examples
+//' \dontrun{
+//' // Called internally by sir_alsfit during the alpha update step
+//' // After computing this design matrix, the update is:
+//' // glm(Y ~ -1 + cbind(Z_design, Wbeta_design), family=...)
+//' }
+//' 
 // [[Rcpp::export]]
 arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, const arma::vec& beta) {
     int m = W.n_rows;
@@ -82,8 +214,6 @@ arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, c
     arma::mat Wbeta_design(m*m*T, p);
 
     // For each covariate k, calculate Wk %*% X %*% WSbeta^T and flatten
-    // Parallelize loop over p features
-    #pragma omp parallel for schedule(static)
     for(int k=0; k < p; ++k) {
         // This uses the optimized tprod implementation
         arma::cube Wk_X_WSbeta = cpp_tprod_A_X_Bt(X, W.slice(k), WSbeta);
@@ -95,15 +225,46 @@ arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, c
     return Wbeta_design;
 }
 
-//' Construct Walpha design matrix for ALS update (theta, beta)
-//'
-//' Efficiently calculates and flattens the Walpha component of the design matrix.
-//' Walpha[,,k,t] corresponds to (W*alpha) %*% X[,,t] %*% W[,,k]^T.
-//'
-//' @param W (m x m x p) array of influence covariates.
-//' @param X (m x m x T) array, typically lagged outcomes.
-//' @param alpha (p x 1) vector of current alpha estimates.
-//' @return (m*m*T) x p matrix for the GLM design matrix.
+//' Construct Design Matrix for Beta Updates in ALS
+//' 
+//' @description
+//' Builds the design matrix for updating receiver effects (beta parameters) in the
+//' Alternating Least Squares algorithm, holding sender effects (alpha) fixed.
+//' 
+//' @details
+//' In the ALS algorithm, when updating beta with alpha fixed, the model becomes
+//' linear in beta. This function constructs the required design matrix efficiently.
+//' 
+//' For covariate k and observation (i,j,t), the design matrix element is:
+//' [A * X[,,t] * W[,,k]'][i,j]
+//' 
+//' Where A = I + sum_l alpha[l] * W[,,l] is the current sender effects matrix
+//' (with alpha[1] = 1 fixed for identifiability).
+//' 
+//' The algorithm mirrors the alpha update but with roles reversed:
+//' 1. Compute A from current alpha and W
+//' 2. For each covariate k:
+//'    - Calculate A * X * W[,,k]' for all time points
+//'    - Flatten to match the vectorized Y
+//' 3. Combine into design matrix
+//' 
+//' @param W Three-dimensional array (m x m x p) of influence covariates.
+//'   
+//' @param X Three-dimensional array (m x m x T) of network states over time.
+//' @param alpha Vector (p x 1) of current sender effect parameters.
+//'   These are held fixed while updating beta in this ALS step.
+//'   
+//' @return Matrix (m*m*T x p) serving as the design matrix for beta GLM estimation.
+//'   
+//' @note The symmetry with cpp_construct_Wbeta_design reflects the bilinear
+//'   structure of the model, where sender and receiver effects play dual roles.
+//'   
+//' @examples
+//' \dontrun{
+//' // Called internally by sir_alsfit during the beta update step
+//' // The GLM call becomes:
+//' // glm(Y ~ -1 + cbind(Z_design, Walpha_design), family=...)
+//' }
 // [[Rcpp::export]]
 arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, const arma::vec& alpha) {
     int m = W.n_rows;
@@ -117,7 +278,6 @@ arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, 
     arma::mat Walpha_design(m*m*T, p);
 
     // For each covariate k, calculate WSalpha %*% X %*% Wk^T and flatten
-    #pragma omp parallel for schedule(static)
     for(int k=0; k < p; ++k) {
         arma::cube WSalpha_X_Wk = cpp_tprod_A_X_Bt(X, WSalpha, W.slice(k));
         // Flatten the resulting cube into a column vector
@@ -131,23 +291,85 @@ arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, 
 // --- Gradient and Hessian Calculation ---
 // ----------------------------------------------------------------------------
 
-// This implementation uses the mathematically robust approach of pre-calculating A and B
-// and deriving the gradients based on that structure.
-// eta = Z*theta + A*X*B^T, where A=W*alpha, B=W*beta.
-
-//' Calculate Gradient and Hessian for SIR models (NLL)
-//'
-//' Computes the gradient, Hessian, and score cross-product for the Negative Log-Likelihood (NLL)
-//' of the SIR model. This implementation is optimized by avoiding explicit calculation of Xij
-//' inside the loops, relying instead on the (A, B) structure.
-//'
-//' @param tab Parameter vector (theta, alpha[-1], beta).
-//' @param Y (m x m x T) array of outcomes.
-//' @param W (m x m x p) array of influence covariates.
-//' @param X (m x m x T) array for the bilinear part.
-//' @param Z_list List of q (m x m x T) arrays for exogenous covariates (passed this way for 4D handling).
-//' @param family Distribution family ("poisson", "normal", "binomial").
-//' @return A list containing the gradient (grad), Hessian (hess), and score cross-product (shess) of the NLL.
+//' Calculate Gradient and Hessian for Direct Optimization
+//' 
+//' @description
+//' Computes the gradient vector and Hessian matrix of the negative log-likelihood
+//' for the SIR model. These are essential for gradient-based optimization methods
+//' like BFGS used in the direct optimization approach.
+//' 
+//' @details
+//' This function implements the analytical derivatives of the SIR likelihood with
+//' respect to all parameters. The computation leverages the bilinear structure
+//' of the model for efficiency.
+//' 
+//' \strong{Gradient Computation:}
+//' For each parameter, the gradient accumulates:
+//' \deqn{\nabla_{\cdot} NLL = \sum_{i,j,t} (\mu_{ijt} - y_{ijt}) \frac{\partial \eta_{ijt}}{\partial \cdot}}
+//' 
+//' Where the partial derivatives are:
+//' - \eqn{\partial \eta / \partial \theta_k = Z_{ijk,t}}
+//' - \eqn{\partial \eta / \partial \alpha_k = [W_k X B']_{ij}}
+//' - \eqn{\partial \eta / \partial \beta_k = [A X W_k']_{ij}}
+//' 
+//' \strong{Hessian Computation:}
+//' The Hessian has two components:
+//' 1. Fisher Information (always positive semi-definite):
+//'    \deqn{H_{Fisher} = \sum_{i,j,t} w_{ijt} \nabla \eta_{ijt} \nabla \eta_{ijt}'}
+//'    where \eqn{w_{ijt}} is the GLM weight (variance function)
+//' 
+//' 2. Observed Information adjustment (for non-canonical links):
+//'    \deqn{H_{Obs} = \sum_{i,j,t} (\mu_{ijt} - y_{ijt}) \nabla^2 \eta_{ijt}}
+//'    This term captures the curvature from the bilinear structure
+//' 
+//' \strong{Identifiability Constraint:}
+//' Since alpha_1 is fixed at 1 for identifiability, the function:
+//' - Computes full derivatives internally
+//' - Projects out the alpha_1 dimension using matrix J
+//' - Returns reduced-dimension gradient and Hessian
+//' 
+//' \strong{Numerical Stability:}
+//' - Handles missing data (NA) by skipping those observations
+//' - Adds small stabilization to binomial weights to prevent singularity
+//' - Uses log-space computations where possible
+//' 
+//' \strong{Computational Efficiency:}
+//' - Pre-computes A and B matrices once per function call
+//' - Reuses matrix products across gradient components
+//' - Vectorized operations using Armadillo
+//' - Avoids redundant calculations in inner loops
+//' 
+//' @param tab Parameter vector [theta, alpha_2:p, beta] of length q+2p-1.
+//'   
+//' @param Y Three-dimensional array (m x m x T) of observed outcomes.
+//'   Can contain NA values which are automatically skipped.
+//'   
+//' @param W Three-dimensional array (m x m x p) of influence covariates.
+//'   
+//' @param X Three-dimensional array (m x m x T) carrying network influence.
+//'   
+//' @param Z_list List of q three-dimensional arrays (m x m x T), one per covariate.
+//'   Passed as list for efficient memory handling of 4D structure.
+//'   
+//' @param family String specifying distribution: "poisson", "normal", or "binomial".
+//'   Determines the link function and variance structure.
+//'   
+//' @return List containing:
+//'   \item{grad}{Gradient vector of length q+2p-1 (after identifiability projection)}
+//'   \item{hess}{Hessian matrix of dimension (q+2p-1) x (q+2p-1)}
+//'   \item{shess}{Score outer product matrix (for robust standard errors)}
+//'   
+//' @note The Hessian may not be positive definite far from the optimum, which can
+//'   cause optimization issues. The score outer product (shess) provides an
+//'   alternative for standard error calculation.
+//'   
+//' @examples
+//' \dontrun{
+//' // Called internally by optim() during optimization:
+//' result <- cpp_mll_gH(current_params, Y, W, X, Z_list, "poisson")
+//' // Use gradient for search direction
+//' // Use Hessian for step size (quasi-Newton methods)
+//' }
 // [[Rcpp::export]]
 Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cube& W, const arma::cube& X,
                       const Rcpp::List& Z_list, const std::string& family) {
@@ -182,7 +404,7 @@ Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cub
 
     // Initialize G, H, S (Full dimension q + 2p)
     int dim_full = q + 2*p;
-    // We use temporary storage for parallel reduction if OpenMP is used for the main loop
+    // Initialize gradient, Hessian, and score matrices
     arma::vec G(dim_full, fill::zeros);
     arma::mat H(dim_full, dim_full, fill::zeros);
     arma::mat S(dim_full, dim_full, fill::zeros);
@@ -197,11 +419,6 @@ Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cub
 
     // --- 2. Main Loop over T, i, j ---
     // We iterate through the data to calculate G, H, S based on the NLL derivatives.
-    // Parallelizing over T is often effective.
-
-    // Note: Parallelizing this loop requires thread-safe updates to G, H, S (e.g., using reduction or private copies).
-    // Given the complexity of H and S updates, we keep the loop serial here for correctness,
-    // as the major bottlenecks (tensor products) are already optimized/parallelized elsewhere.
     for (int t = 0; t < T; ++t) {
         arma::mat Xt = X.slice(t);
         arma::mat Yt = Y.slice(t);

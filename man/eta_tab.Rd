@@ -2,23 +2,79 @@
 % Please edit documentation in R/utils.R
 \name{eta_tab}
 \alias{eta_tab}
-\title{Calculate the bilinear predictor (eta)}
+\title{Calculate Linear Predictor (eta) for SIR Model}
 \usage{
 eta_tab(tab, W, X, Z)
 }
 \arguments{
-\item{tab}{Parameter vector (theta, alpha[-1], beta).}
+\item{tab}{Numeric vector of parameters ordered as [theta, alpha_2:p, beta_1:p].
+Length must equal q + 2p - 1, where q is number of exogenous covariates
+and p is number of influence covariates.}
 
-\item{W}{(m x m x p) array of influence covariates.}
+\item{W}{Three-dimensional array (m x m x p) of influence covariates.
+Each slice W[,,r] parameterizes the influence structure.
+If NULL or p=0, no network influence is included.}
 
-\item{X}{(m x m x T) array for the bilinear part.}
+\item{X}{Three-dimensional array (m x m x T) carrying network influence.
+Typically lagged outcomes. Required even if W is NULL (can be zeros).}
 
-\item{Z}{(m x m x q x T) array of exogenous covariates.}
+\item{Z}{Array of exogenous covariates. Can be:
+\itemize{
+  \item NULL or q=0: No exogenous effects
+  \item 3D array (m x m x T): Single covariate
+  \item 4D array (m x m x q x T): Multiple covariates
+}}
 }
 \value{
-An (m x m x T) array of linear predictors.
+Three-dimensional array (m x m x T) of linear predictors.
+  Each element eta[i,j,t] is the linear predictor for outcome Y[i,j,t]
+  before applying the link function.
 }
 \description{
-Computes eta_{i,j,t} = Z_{i,j,t}^T theta + alpha^T X_{i,j,t} beta.
-Uses optimized C++ functions for tensor products.
+Computes the linear predictor for the Social Influence Regression model,
+combining exogenous effects and network influence through bilinear terms.
+}
+\details{
+The linear predictor has two components:
+
+\deqn{\eta_{i,j,t} = \theta^T z_{i,j,t} + \sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}}
+
+Where:
+\itemize{
+  \item First term: Linear effect of exogenous covariates
+  \item Second term: Bilinear network influence effect
+}
+
+The influence matrices are parameterized as:
+\itemize{
+  \item \eqn{A = I + \sum_{r=1}^{p-1} \alpha_r W_r} (sender effects)
+  \item \eqn{B = \beta_0 I + \sum_{r=1}^{p} \beta_r W_r} (receiver effects)
+}
+
+Note: The first alpha is fixed at 1 for identifiability.
+
+\strong{Computational Strategy:}
+\itemize{
+  \item Uses optimized C++ routines for matrix products
+  \item Exploits sparsity when present
+  \item Minimizes memory allocation through in-place operations
+}
+}
+\examples{
+\dontrun{
+# Setup
+m <- 10; T <- 5; p <- 2; q <- 1
+W <- array(rnorm(m*m*p), dim=c(m,m,p))
+X <- array(rnorm(m*m*T), dim=c(m,m,T))
+Z <- array(rnorm(m*m*q*T), dim=c(m,m,q,T))
+
+# Parameter vector
+tab <- c(0.5,      # theta (q=1)
+         0.2,      # alpha_2 (alpha_1=1 fixed)
+         0.3, 0.4) # beta_1, beta_2
+         
+# Compute linear predictor
+eta <- eta_tab(tab, W, X, Z)
+dim(eta)  # Returns c(10, 10, 5)
+}
 }

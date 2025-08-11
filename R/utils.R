@@ -6,13 +6,51 @@ NULL
 
 # ---- Helper functions for data handling ----
 
-#' Helper to prepare Z (4D array) for C++ consumption
+#' Prepare Z Array for C++ Consumption
 #'
-#' C++ (RcppArmadillo) handles 4D arrays best when passed as a list of 3D cubes.
-#' We convert Z (m x m x q x T) into a list of q (m x m x T) cubes.
+#' @description
+#' Converts a 4D array of exogenous covariates into a format optimized for C++ processing.
+#' RcppArmadillo handles 4D arrays most efficiently when decomposed into a list of 3D cubes.
 #'
-#' @param Z The 4D array of exogenous covariates.
-#' @return A list of 3D arrays.
+#' @details
+#' This function handles the dimensional restructuring needed for efficient computation
+#' in the C++ backend. The transformation preserves the covariate structure while
+#' enabling vectorized operations in Armadillo.
+#' 
+#' Input dimensions:
+#' \itemize{
+#'   \item 3D array (m x m x T): Interpreted as single covariate (q=1)
+#'   \item 4D array (m x m x q x T): Multiple covariates
+#' }
+#' 
+#' Output structure:
+#' \itemize{
+#'   \item List of length q
+#'   \item Each element is an (m x m x T) array for one covariate
+#' }
+#'
+#' @param Z Array of exogenous covariates. Can be:
+#'   \itemize{
+#'     \item NULL: Returns empty list
+#'     \item 3D array (m x m x T): Single time-varying covariate
+#'     \item 4D array (m x m x q x T): Multiple covariates
+#'   }
+#'   
+#' @return List of 3D arrays, where each element corresponds to one covariate
+#'   across all time periods. Length equals q (number of covariates).
+#'   
+#' @examples
+#' \dontrun{
+#' # Single covariate
+#' Z_single <- array(rnorm(10*10*5), dim=c(10,10,5))
+#' Z_list <- prepare_Z_list(Z_single)
+#' length(Z_list)  # Returns 1
+#' 
+#' # Multiple covariates  
+#' Z_multi <- array(rnorm(10*10*3*5), dim=c(10,10,3,5))
+#' Z_list <- prepare_Z_list(Z_multi)
+#' length(Z_list)  # Returns 3
+#' }
 prepare_Z_list <- function(Z) {
   if (is.null(Z) || length(dim(Z)) == 0) {
     return(list())
@@ -53,19 +91,57 @@ prepare_Z_list <- function(Z) {
   return(Z_list)
 }
 
-#' Flatten Y for GLM input
-#' @param Y (m x m x T) array.
-#' @return Vectorized Y (column-major).
+#' Flatten Y Array for GLM Input
+#' 
+#' @description
+#' Converts a 3D network outcome array into a vector suitable for GLM estimation.
+#' Uses column-major ordering (R's default) to ensure consistency with design matrices.
+#' 
+#' @details
+#' The flattening follows R's column-major convention:
+#' \itemize{
+#'   \item Elements are ordered: Y[1,1,1], Y[2,1,1], ..., Y[m,1,1], Y[1,2,1], ...
+#'   \item This matches how design matrices are constructed
+#'   \item Preserves the correspondence between outcomes and covariates
+#' }
+#' 
+#' @param Y Three-dimensional array (m x m x T) of network outcomes.
+#'   
+#' @return Numeric vector of length m*m*T containing flattened outcomes.
 flatten_Y <- function(Y) {
     return(c(Y))
 }
 
-#' Flatten Z for GLM input
+#' Flatten Z Array for GLM Input
 #'
-#' Converts Z (m x m x q x T) into a (m*m*T) x q matrix, matching the flattening of Y.
+#' @description
+#' Converts a 4D covariate array into a design matrix compatible with flattened Y.
+#' Ensures proper alignment between outcomes and covariates for GLM estimation.
 #'
-#' @param Z (m x m x q x T) array.
-#' @return (m*m*T) x q matrix.
+#' @details
+#' The flattening process maintains the correspondence between each Y[i,j,t] and
+#' its associated covariates Z[i,j,:,t]. The resulting matrix has:
+#' \itemize{
+#'   \item Rows: One for each outcome observation (m*m*T total)
+#'   \item Columns: One for each covariate (q total)
+#'   \item Order: Matches the flattening of Y (column-major)
+#' }
+#' 
+#' Special handling for 3D input (single covariate):
+#' \itemize{
+#'   \item Automatically detected and converted to column matrix
+#'   \item Preserves any dimension names for interpretability
+#' }
+#'
+#' @param Z Covariate array. Can be:
+#'   \itemize{
+#'     \item NULL: Returns NULL
+#'     \item 3D array (m x m x T): Converted to (m*m*T) x 1 matrix
+#'     \item 4D array (m x m x q x T): Converted to (m*m*T) x q matrix
+#'   }
+#'   
+#' @return Design matrix with dimensions (m*m*T) x q, or NULL if Z is NULL.
+#'   Column names are preserved from dimension names or auto-generated.
 flatten_Z <- function(Z) {
     if (is.null(Z)) return(NULL)
 
@@ -94,16 +170,77 @@ flatten_Z <- function(Z) {
 
 # ---- Core Model Components (R wrappers using Cpp) ----
 
-#' Calculate the bilinear predictor (eta)
+#' Calculate Linear Predictor (eta) for SIR Model
 #'
-#' Computes eta_{i,j,t} = Z_{i,j,t}^T theta + alpha^T X_{i,j,t} beta.
-#' Uses optimized C++ functions for tensor products.
+#' @description
+#' Computes the linear predictor for the Social Influence Regression model,
+#' combining exogenous effects and network influence through bilinear terms.
 #'
-#' @param tab Parameter vector (theta, alpha[-1], beta).
-#' @param W (m x m x p) array of influence covariates.
-#' @param X (m x m x T) array for the bilinear part.
-#' @param Z (m x m x q x T) array of exogenous covariates.
-#' @return An (m x m x T) array of linear predictors.
+#' @details
+#' The linear predictor has two components:
+#' 
+#' \deqn{\eta_{i,j,t} = \theta^T z_{i,j,t} + \sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}}
+#' 
+#' Where:
+#' \itemize{
+#'   \item First term: Linear effect of exogenous covariates
+#'   \item Second term: Bilinear network influence effect
+#' }
+#' 
+#' The influence matrices are parameterized as:
+#' \itemize{
+#'   \item \eqn{A = I + \sum_{r=1}^{p-1} \alpha_r W_r} (sender effects)
+#'   \item \eqn{B = \beta_0 I + \sum_{r=1}^{p} \beta_r W_r} (receiver effects)
+#' }
+#' 
+#' Note: The first alpha is fixed at 1 for identifiability.
+#' 
+#' \strong{Computational Strategy:}
+#' \itemize{
+#'   \item Uses optimized C++ routines for matrix products
+#'   \item Exploits sparsity when present
+#'   \item Minimizes memory allocation through in-place operations
+#' }
+#'
+#' @param tab Numeric vector of parameters ordered as [theta, alpha_2:p, beta_1:p].
+#'   Length must equal q + 2p - 1, where q is number of exogenous covariates
+#'   and p is number of influence covariates.
+#'   
+#' @param W Three-dimensional array (m x m x p) of influence covariates.
+#'   Each slice W[,,r] parameterizes the influence structure.
+#'   If NULL or p=0, no network influence is included.
+#'   
+#' @param X Three-dimensional array (m x m x T) carrying network influence.
+#'   Typically lagged outcomes. Required even if W is NULL (can be zeros).
+#'   
+#' @param Z Array of exogenous covariates. Can be:
+#'   \itemize{
+#'     \item NULL or q=0: No exogenous effects
+#'     \item 3D array (m x m x T): Single covariate
+#'     \item 4D array (m x m x q x T): Multiple covariates
+#'   }
+#'   
+#' @return Three-dimensional array (m x m x T) of linear predictors.
+#'   Each element eta[i,j,t] is the linear predictor for outcome Y[i,j,t]
+#'   before applying the link function.
+#'   
+#' @examples
+#' \dontrun{
+#' # Setup
+#' m <- 10; T <- 5; p <- 2; q <- 1
+#' W <- array(rnorm(m*m*p), dim=c(m,m,p))
+#' X <- array(rnorm(m*m*T), dim=c(m,m,T))
+#' Z <- array(rnorm(m*m*q*T), dim=c(m,m,q,T))
+#' 
+#' # Parameter vector
+#' tab <- c(0.5,      # theta (q=1)
+#'          0.2,      # alpha_2 (alpha_1=1 fixed)
+#'          0.3, 0.4) # beta_1, beta_2
+#'          
+#' # Compute linear predictor
+#' eta <- eta_tab(tab, W, X, Z)
+#' dim(eta)  # Returns c(10, 10, 5)
+#' }
 #' @export
 eta_tab <- function(tab, W, X, Z) {
   p <- if (is.null(W)) 0 else dim(W)[3]
@@ -162,15 +299,72 @@ eta_tab <- function(tab, W, X, Z) {
   ZT + AXB
 }
 
-#' Calculate Negative Log-Likelihood
+#' Calculate Negative Log-Likelihood for SIR Model
 #'
-#' @param tab Parameter vector.
-#' @param Y Outcome array.
-#' @param W Influence covariates.
-#' @param X Bilinear covariates.
-#' @param Z Exogenous covariates.
-#' @param family Distribution family.
-#' @return The negative log-likelihood value.
+#' @description
+#' Computes the negative log-likelihood for the Social Influence Regression model
+#' under the specified distributional family. Used as the objective function
+#' for parameter estimation.
+#'
+#' @details
+#' The likelihood depends on the distributional family:
+#' 
+#' \strong{Poisson:} For count outcomes
+#' \deqn{L = \prod_{i,j,t} \frac{e^{-\lambda_{ijt}} \lambda_{ijt}^{y_{ijt}}}{y_{ijt}!}}
+#' where \eqn{\lambda_{ijt} = \exp(\eta_{ijt})}
+#' 
+#' \strong{Normal:} For continuous outcomes
+#' \deqn{L = \prod_{i,j,t} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(-\frac{(y_{ijt} - \mu_{ijt})^2}{2\sigma^2}\right)}
+#' where \eqn{\mu_{ijt} = \eta_{ijt}} (identity link)
+#' 
+#' \strong{Binomial:} For binary outcomes
+#' \deqn{L = \prod_{i,j,t} p_{ijt}^{y_{ijt}} (1-p_{ijt})^{1-y_{ijt}}}
+#' where \eqn{p_{ijt} = \frac{1}{1 + \exp(-\eta_{ijt})}} (logit link)
+#' 
+#' \strong{Numerical Stability:}
+#' \itemize{
+#'   \item Uses log-space computations to avoid underflow
+#'   \item Bounds probabilities away from 0 and 1 for binomial
+#'   \item Caps extreme values of lambda for Poisson
+#'   \item Handles NA values by exclusion from likelihood
+#' }
+#'
+#' @param tab Numeric vector of parameters [theta, alpha_2:p, beta_1:p].
+#'   
+#' @param Y Three-dimensional array (m x m x T) of observed outcomes.
+#'   Can contain NA values which are automatically excluded.
+#'   
+#' @param W Three-dimensional array (m x m x p) of influence covariates,
+#'   or NULL for no network influence.
+#'   
+#' @param X Three-dimensional array (m x m x T) carrying network influence.
+#'   
+#' @param Z Array of exogenous covariates (3D or 4D), or NULL.
+#'   
+#' @param family Character string specifying the distribution:
+#'   \itemize{
+#'     \item "poisson": Count data with log link
+#'     \item "normal": Continuous data with identity link (assumes sigma=1)
+#'     \item "binomial": Binary data with logit link
+#'   }
+#'   
+#' @return Numeric scalar giving the negative log-likelihood.
+#'   Lower values indicate better fit. Used for optimization.
+#'   
+#' @note The normal family assumes unit variance (sigma=1) for simplicity.
+#'   The actual variance is estimated separately if needed.
+#'   
+#' @examples
+#' \dontrun{
+#' # Poisson example
+#' Y <- array(rpois(1000, 2), dim=c(10,10,10))
+#' nll <- mll_sir(tab, Y, W, X, Z, "poisson")
+#' 
+#' # Binomial example with missing data
+#' Y_binary <- array(rbinom(1000, 1, 0.3), dim=c(10,10,10))
+#' Y_binary[1,1,1] <- NA  # Missing value
+#' nll <- mll_sir(tab, Y_binary, W, X, Z, "binomial")
+#' }
 #' @export
 mll_sir <- function(tab, Y, W, X, Z, family) {
   ETA <- eta_tab(tab, W, X, Z)
@@ -287,7 +481,84 @@ tprod<-function(A,B,modes=1:length(B))
 
 # ---- Functions from mltrHelpers.R (Data Prep) ----
 
-#' Cast directed dyadic variable into array
+#' Cast Directed Dyadic Data into Array Format
+#' 
+#' @description
+#' Transforms long-format dyadic data (edge list) into a 3D array suitable for
+#' SIR model analysis. Handles both dyadic and monadic variables with proper
+#' placement in the network structure.
+#' 
+#' @details
+#' This function converts network data from "long" format (one row per edge/time)
+#' to "array" format (3D array indexed by sender, receiver, time).
+#' 
+#' \strong{Expected Input Format:}
+#' Data frame with columns:
+#' \itemize{
+#'   \item i: Sender node identifier
+#'   \item j: Receiver node identifier  
+#'   \item t: Time period
+#'   \item var: The variable value for this edge
+#' }
+#' 
+#' \strong{Monadic Variables:}
+#' When monadic=TRUE, the function treats the variable as node-level rather than
+#' edge-level. The values are placed on the diagonal of each time slice:
+#' \itemize{
+#'   \item row=TRUE: Uses sender (i) attributes
+#'   \item row=FALSE: Uses receiver (j) attributes
+#' }
+#' 
+#' \strong{Missing Data:}
+#' Missing edges in the input are filled with zeros in the output array.
+#' This assumes that absence of an edge means zero interaction.
+#' 
+#' @param dyadData Data frame in long format with columns i, j, t, and the
+#'   value variable specified by var parameter.
+#'   
+#' @param var Character string naming the column containing the values to
+#'   be placed in the array.
+#'   
+#' @param monadic Logical indicating whether the variable is monadic (node-level)
+#'   rather than dyadic (edge-level). Default is FALSE.
+#'   
+#' @param row Logical, only used when monadic=TRUE. If TRUE, uses sender
+#'   attributes; if FALSE, uses receiver attributes. Default is FALSE.
+#'   
+#' @return Three-dimensional array (m x m x T) where:
+#'   \itemize{
+#'     \item First dimension: Sender nodes (i)
+#'     \item Second dimension: Receiver nodes (j)
+#'     \item Third dimension: Time periods (t)
+#'   }
+#'   Missing edges are filled with zeros.
+#'   
+#' @examples
+#' \dontrun{
+#' # Create example dyadic data
+#' dyad_data <- data.frame(
+#'   i = c(1,1,2,2,3,3),
+#'   j = c(2,3,1,3,1,2),
+#'   t = c(1,1,1,1,1,1),
+#'   trade = c(100,150,80,120,90,110)
+#' )
+#' 
+#' # Convert to array
+#' trade_array <- castArray(dyad_data, "trade")
+#' dim(trade_array)  # 3 x 3 x 1
+#' 
+#' # Monadic example (node GDP)
+#' node_data <- data.frame(
+#'   i = rep(1:3, each=3),
+#'   j = rep(1:3, 3),
+#'   t = 1,
+#'   gdp = rep(c(1000,2000,1500), each=3)
+#' )
+#' 
+#' gdp_array <- castArray(node_data, "gdp", monadic=TRUE, row=TRUE)
+#' diag(gdp_array[,,1])  # Shows node GDPs on diagonal
+#' }
+#' 
 #' @importFrom reshape2 acast
 #' @export
 castArray = function(dyadData, var, monadic=FALSE, row=FALSE){

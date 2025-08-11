@@ -16,30 +16,185 @@ sir(
 )
 }
 \arguments{
-\item{Y}{(m x m x T) array of outcomes.}
+\item{Y}{A three-dimensional array of dimensions (m x m x T) containing the network 
+outcomes. Y[i,j,t] represents the directed outcome from node i to node j at time t.
+Can contain NA values for missing observations. The diagonal (self-loops) can be 
+included or excluded depending on the application.}
 
-\item{W}{(m x m x p) array of influence covariates.}
+\item{W}{Optional three-dimensional array of dimensions (m x m x p) containing 
+influence covariates used to parameterize the A and B matrices. W[i,j,r] represents
+the r-th influence covariate for the edge from i to j. Common choices include:
+\itemize{
+  \item Graph Laplacians or adjacency matrices from other networks
+  \item Geographic or social distance matrices
+  \item Node-level covariates expanded to edge-level
+}
+If NULL or p=0, the model uses only identity matrices (no network influence structure).}
 
-\item{X}{(m x m x T) array, typically lagged outcomes for the bilinear part.}
+\item{X}{Optional three-dimensional array of dimensions (m x m x T) representing the 
+network state that carries influence. Typically this is a lagged version of Y 
+(e.g., X[,,t] = Y[,,t-1]). If NULL and W is provided, an error is thrown.
+X determines which network patterns influence future outcomes.}
 
-\item{Z}{(m x m x q x T) or (m x m x T) array of exogenous covariates.}
+\item{Z}{Optional array of exogenous covariates. Can be either:
+\itemize{
+  \item 3D array (m x m x T): Single covariate varying across edges and time
+  \item 4D array (m x m x q x T): Multiple (q) covariates
+}
+Examples include dyadic covariates (trade agreements, geographic distance) or
+node-level attributes (GDP, population) expanded to edge-level.}
 
-\item{family}{Distribution family ("poisson", "normal", "binomial").}
+\item{family}{Character string specifying the distribution family and link function.
+Must be one of "poisson", "normal", or "binomial". The choice depends on the
+nature of your outcome variable.}
 
-\item{method}{Fitting method ("ALS" or "optim"). ALS is generally recommended for stability.}
+\item{method}{Character string specifying the estimation method. Either "ALS" 
+(Alternating Least Squares) or "optim" (direct optimization via BFGS).
+Default is "ALS" which is generally more stable.}
 
-\item{calcSE}{Logical, whether to calculate standard errors.}
+\item{calcSE}{Logical indicating whether to calculate standard errors for the
+parameters. Standard errors are computed using the observed information matrix.
+Setting to FALSE speeds up computation when uncertainty quantification is not needed.}
 
-\item{...}{Additional arguments passed to the fitting function (e.g., trace, tol, max_iter).}
+\item{...}{Additional arguments passed to the fitting functions:
+\itemize{
+  \item \code{trace}: Logical or integer controlling output verbosity
+  \item \code{tol}: Convergence tolerance (default 1e-6)
+  \item \code{max_iter}: Maximum iterations (default 100 for ALS, 1000 for optim)
+  \item \code{init_method}: Initialization method ("smart" or "random")
+}}
 }
 \value{
-An object of class "sir" containing the estimates, standard errors, influence matrices (A, B), and fit statistics.
+An object of class "sir" containing:
+  \item{A}{The m x m sender effects matrix}
+  \item{B}{The m x m receiver effects matrix}
+  \item{theta}{Coefficients for exogenous covariates Z}
+  \item{alpha}{Coefficients for sender influence covariates W}
+  \item{beta}{Coefficients for receiver influence covariates W}
+  \item{summ}{Summary table with coefficients and standard errors}
+  \item{ll}{Log-likelihood at convergence}
+  \item{AIC}{Akaike Information Criterion}
+  \item{BIC}{Bayesian Information Criterion}
+  \item{convergence}{Logical indicating successful convergence}
+  \item{iterations}{Number of iterations until convergence}
+  \item{history}{Iteration history of parameters and deviance (if trace=TRUE)}
+  \item{call}{The matched call}
 }
 \description{
-Main function to fit the SIR model. It supports Poisson, Normal, and Binary outcomes.
-Estimation is performed using optimized C++ routines for speed.
+Fits a Social Influence Regression model for network data with social influence effects.
+The SIR model captures how network connections influence outcomes through bilinear 
+interaction terms, allowing for both sender and receiver effects in directed networks.
+
+The model decomposes network influence into two components:
+\itemize{
+  \item \strong{Sender effects (A matrix)}: How much influence node i exerts on others
+  \item \strong{Receiver effects (B matrix)}: How susceptible node j is to influence from others
+}
 }
 \details{
-This implements the model described in the paper:
-mu_{i,j,t} = theta^T z_{i,j,t} + alpha^T X_{i,j,t} beta
+The SIR model specifies the expected outcome for the directed edge from node i to node j 
+at time t as:
+
+\deqn{\mu_{i,j,t} = \theta^T z_{i,j,t} + \sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}}
+
+Where:
+\itemize{
+  \item \eqn{\mu_{i,j,t}} is the expected value of the outcome Y_ijt
+  \item \eqn{\theta} is a q-dimensional vector of coefficients for exogenous covariates
+  \item \eqn{z_{i,j,t}} is a q-dimensional vector of exogenous covariates
+  \item \eqn{X_{k,l,t}} represents the network state (often lagged Y) that carries influence
+  \item \eqn{A_{i,k}} represents how node i is influenced by the behavior of node k
+  \item \eqn{B_{j,l}} represents how node j's reception is affected by node l's position
+}
+
+The bilinear term \eqn{\sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}} captures network influence
+and can be parameterized using influence covariates W through:
+\itemize{
+  \item \eqn{A = \alpha_0 I + \sum_{r=1}^{p} \alpha_r W_r} (sender effects)
+  \item \eqn{B = \beta_0 I + \sum_{r=1}^{p} \beta_r W_r} (receiver effects)
+}
+
+This parameterization reduces the number of parameters from O(m²) to O(p), where p << m.
+}
+\section{Estimation Methods}{
+
+
+\strong{Alternating Least Squares (ALS):}
+\itemize{
+  \item Iteratively optimizes A given B, then B given A
+  \item Generally more stable for high-dimensional problems
+  \item Better for sparse networks or when p is large
+  \item May converge to local optima
+}
+
+\strong{Direct Optimization (optim):}
+\itemize{
+  \item Uses BFGS to optimize all parameters simultaneously
+  \item Can be faster for small problems
+  \item May provide better solutions when good starting values are available
+  \item More prone to numerical issues in high dimensions
+}
+}
+
+\section{Distribution Families}{
+
+
+\strong{Poisson:} For count data (e.g., number of interactions)
+\itemize{
+  \item Link function: log
+  \item Variance function: V(μ) = μ
+  \item Use when: Y_ijt represents counts
+}
+
+\strong{Normal:} For continuous data (e.g., trade volumes, distances)
+\itemize{
+  \item Link function: identity
+  \item Variance function: V(μ) = σ²
+  \item Use when: Y_ijt is continuous and approximately normal
+}
+
+\strong{Binomial:} For binary data (e.g., presence/absence of ties)
+\itemize{
+  \item Link function: logit
+  \item Variance function: V(μ) = μ(1-μ)
+  \item Use when: Y_ijt is binary (0/1)
+}
+}
+
+\examples{
+\dontrun{
+# Generate example network data
+set.seed(123)
+m <- 20  # number of nodes
+T <- 10  # number of time periods
+
+# Create synthetic network with influence
+Y <- array(rpois(m*m*T, lambda=2), dim=c(m,m,T))
+
+# Use lagged Y as influence carrier
+X <- array(0, dim=c(m,m,T))
+X[,,2:T] <- Y[,,1:(T-1)]
+
+# Create influence covariates (e.g., based on node attributes)
+W <- array(rnorm(m*m*2), dim=c(m,m,2))
+
+# Fit SIR model with Poisson family
+model <- sir(Y=Y, W=W, X=X, family="poisson", method="ALS")
+
+# View results
+summary(model)
+plot(model)
+
+# Extract influence matrices
+A_matrix <- model$A  # Sender effects
+B_matrix <- model$B  # Receiver effects
+}
+
+}
+\references{
+Minhas, S., Hoff, P. D., & Ward, M. D. (2019). Inferential approaches for 
+network analysis: AMEN for latent factor models. Political Analysis, 27(2), 208-222.
+
+Hoff, P. D. (2021). Additive and multiplicative effects network models. 
+Statistical Science, 36(1), 34-50.
 }

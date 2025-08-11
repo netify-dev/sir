@@ -2,16 +2,38 @@
 % Please edit documentation in R/utils.R
 \name{flatten_Z}
 \alias{flatten_Z}
-\title{Flatten Z for GLM input}
+\title{Flatten Z Array for GLM Input}
 \usage{
 flatten_Z(Z)
 }
 \arguments{
-\item{Z}{(m x m x q x T) array.}
+\item{Z}{Covariate array. Can be:
+\itemize{
+  \item NULL: Returns NULL
+  \item 3D array (m x m x T): Converted to (m*m*T) x 1 matrix
+  \item 4D array (m x m x q x T): Converted to (m*m*T) x q matrix
+}}
 }
 \value{
-(m*m*T) x q matrix.
+Design matrix with dimensions (m*m*T) x q, or NULL if Z is NULL.
+  Column names are preserved from dimension names or auto-generated.
 }
 \description{
-Converts Z (m x m x q x T) into a (m*m*T) x q matrix, matching the flattening of Y.
+Converts a 4D covariate array into a design matrix compatible with flattened Y.
+Ensures proper alignment between outcomes and covariates for GLM estimation.
+}
+\details{
+The flattening process maintains the correspondence between each Y[i,j,t] and
+its associated covariates Z[i,j,:,t]. The resulting matrix has:
+\itemize{
+  \item Rows: One for each outcome observation (m*m*T total)
+  \item Columns: One for each covariate (q total)
+  \item Order: Matches the flattening of Y (column-major)
+}
+
+Special handling for 3D input (single covariate):
+\itemize{
+  \item Automatically detected and converted to column matrix
+  \item Preserves any dimension names for interpretability
+}
 }

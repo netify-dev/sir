@@ -2,31 +2,138 @@
 % Please edit documentation in R/fit_als.R
 \name{sir_alsfit}
 \alias{sir_alsfit}
-\title{Fit SIR model via Alternating Least Squares (Block Coordinate Descent)}
+\title{Fit SIR Model via Alternating Least Squares (ALS)}
 \usage{
 sir_alsfit(Y, W, X, Z, family, trace = FALSE, tol = 1e-08, max_iter = 100)
 }
 \arguments{
-\item{Y}{(m x m x T) outcome array.}
+\item{Y}{Three-dimensional array (m x m x T) of network outcomes.
+Missing values (NA) are automatically handled by excluding them from the likelihood.
+The algorithm uses complete case analysis within each GLM step.}
 
-\item{W}{(m x m x p) influence covariates.}
+\item{W}{Three-dimensional array (m x m x p) of influence covariates used to 
+parameterize the influence matrices A and B. Each slice W[,,r] represents one
+influence covariate. If NULL or p=0, only identity matrices are used (no influence).}
 
-\item{X}{(m x m x T) bilinear covariates (e.g., lagged Y).}
+\item{X}{Three-dimensional array (m x m x T) representing the network state that
+carries influence, typically lagged outcomes. Must be provided if W is non-NULL.
+This determines which network patterns affect future outcomes.}
 
-\item{Z}{(m x m x q x T) exogenous covariates.}
+\item{Z}{Four-dimensional array (m x m x q x T) of exogenous covariates, or NULL.
+These are covariates that directly affect outcomes but don't interact with the
+network influence structure. Examples include dyadic attributes or time trends.}
 
-\item{family}{Distribution family ("poisson", "normal", "binomial").}
+\item{family}{Character string specifying the GLM family: "poisson", "normal", or "binomial".
+This determines the link function and variance structure used in each GLM step.}
 
-\item{trace}{Logical, whether to print iteration details.}
+\item{trace}{Logical or integer controlling verbosity:
+\itemize{
+  \item FALSE/0: No output
+  \item TRUE/1: Progress bar and convergence message
+  \item 2: Detailed iteration information including deviance
+}}
 
-\item{tol}{Convergence tolerance.}
+\item{tol}{Numeric convergence tolerance. The algorithm stops when the relative change
+in deviance is less than this value. Default is 1e-8. Smaller values give more
+accurate results but require more iterations.}
 
-\item{max_iter}{Maximum number of iterations.}
+\item{max_iter}{Integer maximum number of ALS iterations. Default is 100.
+Each iteration consists of one A-step and one B-step. Increase for difficult
+problems or when starting far from the optimum.}
 }
 \value{
-A list containing the estimated parameters and iteration history.
+A list with class "sir_als_fit" containing:
+  \item{tab}{Vector of all parameters [θ, α, β] in order}
+  \item{A}{The m x m sender effects matrix}
+  \item{B}{The m x m receiver effects matrix}
+  \item{deviance}{Final deviance (−2 × log-likelihood + constant)}
+  \item{iterations}{Number of iterations until convergence}
+  \item{converged}{Logical indicating successful convergence}
+  \item{THETA}{Matrix tracking θ parameters across iterations (if trace > 0)}
+  \item{ALPHA}{Matrix tracking α parameters across iterations (if trace > 0)}
+  \item{BETA}{Matrix tracking β parameters across iterations (if trace > 0)}
+  \item{DEV}{Matrix tracking deviance across iterations (if trace > 0)}
+  \item{glm_alpha}{Final GLM object from the A-step}
+  \item{glm_beta}{Final GLM object from the B-step}
 }
 \description{
-Iteratively updates (theta, alpha) and (theta, beta) using GLMs.
-This implementation uses optimized C++ functions to construct the design matrices.
+Implements the Alternating Least Squares algorithm (also known as Block Coordinate Descent) 
+for fitting Social Influence Regression models. This method alternates between optimizing 
+the sender effects (A matrix) and receiver effects (B matrix) while holding the other fixed,
+leveraging the bilinear structure of the model for computational efficiency.
+}
+\details{
+The ALS algorithm exploits the fact that the SIR model is linear in A when B is fixed, 
+and linear in B when A is fixed. This allows us to use standard GLM solvers in each step.
+
+\strong{Algorithm Overview:}
+\enumerate{
+  \item Initialize B matrix (typically as identity)
+  \item Repeat until convergence:
+    \enumerate{
+      \item \strong{A-step}: Fix B, optimize (θ, α) by solving:
+        \deqn{Y \sim GLM(θ^T Z + vec(XB^T)^T (I ⊗ W) α)}
+      \item \strong{B-step}: Fix A, optimize (θ, β) by solving:
+        \deqn{Y \sim GLM(θ^T Z + vec(A^T X)^T (W ⊗ I) β)}
+      \item Check convergence based on change in deviance
+    }
+}
+
+\strong{Computational Efficiency:}
+\itemize{
+  \item Uses optimized C++ routines for matrix operations via RcppArmadillo
+  \item Constructs sparse design matrices efficiently using Kronecker products
+  \item Optionally uses speedglm for faster GLM fitting on large datasets
+  \item Vectorized operations minimize memory allocations
+}
+
+\strong{Convergence Criteria:}
+The algorithm converges when one of the following is met:
+\itemize{
+  \item Relative change in deviance < tol: |D_new - D_old|/|D_old| < tol
+  \item Maximum iterations reached
+  \item Deviance increases (indicating numerical issues)
+}
+
+\strong{Advantages of ALS:}
+\itemize{
+  \item More stable than direct optimization for high-dimensional problems
+  \item Each sub-problem is convex (though overall problem is non-convex)
+  \item Natural handling of constraints (e.g., non-negativity)
+  \item Parallelizable sub-problems (future enhancement)
+}
+
+\strong{Limitations:}
+\itemize{
+  \item May converge to local optima (depends on initialization)
+  \item Convergence can be slow near the optimum
+  \item Requires good initialization for best results
+}
+}
+\examples{
+\dontrun{
+# Example with simulated network data
+m <- 15
+T <- 20
+p <- 2
+
+# Generate network with influence
+Y <- array(rpois(m*m*T, 3), dim=c(m,m,T))
+X <- array(0, dim=c(m,m,T))
+X[,,2:T] <- Y[,,1:(T-1)]  # Lagged Y
+
+# Influence covariates (e.g., distance-based)
+W <- array(rnorm(m*m*p), dim=c(m,m,p))
+
+# Fit using ALS
+fit <- sir_alsfit(Y, W, X, Z=NULL, family="poisson", 
+                  trace=TRUE, tol=1e-6, max_iter=50)
+
+# Examine convergence
+plot(fit$DEV[,2], type="l", ylab="Deviance", xlab="Iteration")
+
+# Extract influence matrices
+A_matrix <- fit$A
+B_matrix <- fit$B
+}
 }

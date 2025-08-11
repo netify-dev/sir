@@ -21,9 +21,17 @@ Imports:
     stats,
     MASS,
     reshape2,
-    speedglm
+    speedglm,
+    cli,
+    crayon,
+    ggplot2,
+    patchwork,
+    tidyr,
+    viridis
 Suggests:
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    igraph,
+    ggraph
 LinkingTo: 
     Rcpp,
     RcppArmadillo

@@ -2,26 +2,75 @@
 % Please edit documentation in R/utils.R
 \name{mll_sir}
 \alias{mll_sir}
-\title{Calculate Negative Log-Likelihood}
+\title{Calculate Negative Log-Likelihood for SIR Model}
 \usage{
 mll_sir(tab, Y, W, X, Z, family)
 }
 \arguments{
-\item{tab}{Parameter vector.}
+\item{tab}{Numeric vector of parameters [theta, alpha_2:p, beta_1:p].}
 
-\item{Y}{Outcome array.}
+\item{Y}{Three-dimensional array (m x m x T) of observed outcomes.
+Can contain NA values which are automatically excluded.}
 
-\item{W}{Influence covariates.}
+\item{W}{Three-dimensional array (m x m x p) of influence covariates,
+or NULL for no network influence.}
 
-\item{X}{Bilinear covariates.}
+\item{X}{Three-dimensional array (m x m x T) carrying network influence.}
 
-\item{Z}{Exogenous covariates.}
+\item{Z}{Array of exogenous covariates (3D or 4D), or NULL.}
 
-\item{family}{Distribution family.}
+\item{family}{Character string specifying the distribution:
+\itemize{
+  \item "poisson": Count data with log link
+  \item "normal": Continuous data with identity link (assumes sigma=1)
+  \item "binomial": Binary data with logit link
+}}
 }
 \value{
-The negative log-likelihood value.
+Numeric scalar giving the negative log-likelihood.
+  Lower values indicate better fit. Used for optimization.
 }
 \description{
-Calculate Negative Log-Likelihood
+Computes the negative log-likelihood for the Social Influence Regression model
+under the specified distributional family. Used as the objective function
+for parameter estimation.
+}
+\details{
+The likelihood depends on the distributional family:
+
+\strong{Poisson:} For count outcomes
+\deqn{L = \prod_{i,j,t} \frac{e^{-\lambda_{ijt}} \lambda_{ijt}^{y_{ijt}}}{y_{ijt}!}}
+where \eqn{\lambda_{ijt} = \exp(\eta_{ijt})}
+
+\strong{Normal:} For continuous outcomes
+\deqn{L = \prod_{i,j,t} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(-\frac{(y_{ijt} - \mu_{ijt})^2}{2\sigma^2}\right)}
+where \eqn{\mu_{ijt} = \eta_{ijt}} (identity link)
+
+\strong{Binomial:} For binary outcomes
+\deqn{L = \prod_{i,j,t} p_{ijt}^{y_{ijt}} (1-p_{ijt})^{1-y_{ijt}}}
+where \eqn{p_{ijt} = \frac{1}{1 + \exp(-\eta_{ijt})}} (logit link)
+
+\strong{Numerical Stability:}
+\itemize{
+  \item Uses log-space computations to avoid underflow
+  \item Bounds probabilities away from 0 and 1 for binomial
+  \item Caps extreme values of lambda for Poisson
+  \item Handles NA values by exclusion from likelihood
+}
+}
+\note{
+The normal family assumes unit variance (sigma=1) for simplicity.
+  The actual variance is estimated separately if needed.
+}
+\examples{
+\dontrun{
+# Poisson example
+Y <- array(rpois(1000, 2), dim=c(10,10,10))
+nll <- mll_sir(tab, Y, W, X, Z, "poisson")
+
+# Binomial example with missing data
+Y_binary <- array(rbinom(1000, 1, 0.3), dim=c(10,10,10))
+Y_binary[1,1,1] <- NA  # Missing value
+nll <- mll_sir(tab, Y_binary, W, X, Z, "binomial")
+}
 }

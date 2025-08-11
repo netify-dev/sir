@@ -2,28 +2,88 @@
 % Please edit documentation in R/RcppExports.R
 \name{cpp_mll_gH}
 \alias{cpp_mll_gH}
-\title{Calculate Gradient and Hessian for SIR models (NLL)}
+\title{Calculate Gradient and Hessian for Direct Optimization}
 \usage{
 cpp_mll_gH(tab, Y, W, X, Z_list, family)
 }
 \arguments{
-\item{tab}{Parameter vector (theta, alpha[-1], beta).}
+\item{tab}{Parameter vector [theta, alpha_2:p, beta] of length q+2p-1.}
 
-\item{Y}{(m x m x T) array of outcomes.}
+\item{Y}{Three-dimensional array (m x m x T) of observed outcomes.
+Can contain NA values which are automatically skipped.}
 
-\item{W}{(m x m x p) array of influence covariates.}
+\item{W}{Three-dimensional array (m x m x p) of influence covariates.}
 
-\item{X}{(m x m x T) array for the bilinear part.}
+\item{X}{Three-dimensional array (m x m x T) carrying network influence.}
 
-\item{Z_list}{List of q (m x m x T) arrays for exogenous covariates (passed this way for 4D handling).}
+\item{Z_list}{List of q three-dimensional arrays (m x m x T), one per covariate.
+Passed as list for efficient memory handling of 4D structure.}
 
-\item{family}{Distribution family ("poisson", "normal", "binomial").}
+\item{family}{String specifying distribution: "poisson", "normal", or "binomial".
+Determines the link function and variance structure.}
 }
 \value{
-A list containing the gradient (grad), Hessian (hess), and score cross-product (shess) of the NLL.
+List containing:
+  \item{grad}{Gradient vector of length q+2p-1 (after identifiability projection)}
+  \item{hess}{Hessian matrix of dimension (q+2p-1) x (q+2p-1)}
+  \item{shess}{Score outer product matrix (for robust standard errors)}
 }
 \description{
-Computes the gradient, Hessian, and score cross-product for the Negative Log-Likelihood (NLL)
-of the SIR model. This implementation is optimized by avoiding explicit calculation of Xij
-inside the loops, relying instead on the (A, B) structure.
+Computes the gradient vector and Hessian matrix of the negative log-likelihood
+for the SIR model. These are essential for gradient-based optimization methods
+like BFGS used in the direct optimization approach.
+}
+\details{
+This function implements the analytical derivatives of the SIR likelihood with
+respect to all parameters. The computation leverages the bilinear structure
+of the model for efficiency.
+
+\strong{Gradient Computation:}
+For each parameter, the gradient accumulates:
+\deqn{\nabla_{\cdot} NLL = \sum_{i,j,t} (\mu_{ijt} - y_{ijt}) \frac{\partial \eta_{ijt}}{\partial \cdot}}
+
+Where the partial derivatives are:
+- \eqn{\partial \eta / \partial \theta_k = Z_{ijk,t}}
+- \eqn{\partial \eta / \partial \alpha_k = [W_k X B']_{ij}}
+- \eqn{\partial \eta / \partial \beta_k = [A X W_k']_{ij}}
+
+\strong{Hessian Computation:}
+The Hessian has two components:
+1. Fisher Information (always positive semi-definite):
+   \deqn{H_{Fisher} = \sum_{i,j,t} w_{ijt} \nabla \eta_{ijt} \nabla \eta_{ijt}'}
+   where \eqn{w_{ijt}} is the GLM weight (variance function)
+
+2. Observed Information adjustment (for non-canonical links):
+   \deqn{H_{Obs} = \sum_{i,j,t} (\mu_{ijt} - y_{ijt}) \nabla^2 \eta_{ijt}}
+   This term captures the curvature from the bilinear structure
+
+\strong{Identifiability Constraint:}
+Since alpha_1 is fixed at 1 for identifiability, the function:
+- Computes full derivatives internally
+- Projects out the alpha_1 dimension using matrix J
+- Returns reduced-dimension gradient and Hessian
+
+\strong{Numerical Stability:}
+- Handles missing data (NA) by skipping those observations
+- Adds small stabilization to binomial weights to prevent singularity
+- Uses log-space computations where possible
+
+\strong{Computational Efficiency:}
+- Pre-computes A and B matrices once per function call
+- Reuses matrix products across gradient components
+- Vectorized operations using Armadillo
+- Avoids redundant calculations in inner loops
+}
+\note{
+The Hessian may not be positive definite far from the optimum, which can
+  cause optimization issues. The score outer product (shess) provides an
+  alternative for standard error calculation.
+}
+\examples{
+\dontrun{
+// Called internally by optim() during optimization:
+result <- cpp_mll_gH(current_params, Y, W, X, Z_list, "poisson")
+// Use gradient for search direction
+// Use Hessian for step size (quasi-Newton methods)
+}
 }

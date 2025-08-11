@@ -2,17 +2,53 @@
 % Please edit documentation in R/utils.R
 \name{prepare_Z_list}
 \alias{prepare_Z_list}
-\title{Helper to prepare Z (4D array) for C++ consumption}
+\title{Prepare Z Array for C++ Consumption}
 \usage{
 prepare_Z_list(Z)
 }
 \arguments{
-\item{Z}{The 4D array of exogenous covariates.}
+\item{Z}{Array of exogenous covariates. Can be:
+\itemize{
+  \item NULL: Returns empty list
+  \item 3D array (m x m x T): Single time-varying covariate
+  \item 4D array (m x m x q x T): Multiple covariates
+}}
 }
 \value{
-A list of 3D arrays.
+List of 3D arrays, where each element corresponds to one covariate
+  across all time periods. Length equals q (number of covariates).
 }
 \description{
-C++ (RcppArmadillo) handles 4D arrays best when passed as a list of 3D cubes.
-We convert Z (m x m x q x T) into a list of q (m x m x T) cubes.
+Converts a 4D array of exogenous covariates into a format optimized for C++ processing.
+RcppArmadillo handles 4D arrays most efficiently when decomposed into a list of 3D cubes.
+}
+\details{
+This function handles the dimensional restructuring needed for efficient computation
+in the C++ backend. The transformation preserves the covariate structure while
+enabling vectorized operations in Armadillo.
+
+Input dimensions:
+\itemize{
+  \item 3D array (m x m x T): Interpreted as single covariate (q=1)
+  \item 4D array (m x m x q x T): Multiple covariates
+}
+
+Output structure:
+\itemize{
+  \item List of length q
+  \item Each element is an (m x m x T) array for one covariate
+}
+}
+\examples{
+\dontrun{
+# Single covariate
+Z_single <- array(rnorm(10*10*5), dim=c(10,10,5))
+Z_list <- prepare_Z_list(Z_single)
+length(Z_list)  # Returns 1
+
+# Multiple covariates  
+Z_multi <- array(rnorm(10*10*3*5), dim=c(10,10,3,5))
+Z_list <- prepare_Z_list(Z_multi)
+length(Z_list)  # Returns 3
+}
 }

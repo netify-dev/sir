@@ -2,21 +2,50 @@
 % Please edit documentation in R/RcppExports.R
 \name{cpp_construct_Walpha_design}
 \alias{cpp_construct_Walpha_design}
-\title{Construct Walpha design matrix for ALS update (theta, beta)}
+\title{Construct Design Matrix for Beta Updates in ALS}
 \usage{
 cpp_construct_Walpha_design(W, X, alpha)
 }
 \arguments{
-\item{W}{(m x m x p) array of influence covariates.}
+\item{W}{Three-dimensional array (m x m x p) of influence covariates.}
 
-\item{X}{(m x m x T) array, typically lagged outcomes.}
+\item{X}{Three-dimensional array (m x m x T) of network states over time.}
 
-\item{alpha}{(p x 1) vector of current alpha estimates.}
+\item{alpha}{Vector (p x 1) of current sender effect parameters.
+These are held fixed while updating beta in this ALS step.}
 }
 \value{
-(m*m*T) x p matrix for the GLM design matrix.
+Matrix (m*m*T x p) serving as the design matrix for beta GLM estimation.
 }
 \description{
-Efficiently calculates and flattens the Walpha component of the design matrix.
-Walpha[,,k,t] corresponds to (W*alpha) %*% X[,,t] %*% W[,,k]^T.
+Builds the design matrix for updating receiver effects (beta parameters) in the
+Alternating Least Squares algorithm, holding sender effects (alpha) fixed.
+}
+\details{
+In the ALS algorithm, when updating beta with alpha fixed, the model becomes
+linear in beta. This function constructs the required design matrix efficiently.
+
+For covariate k and observation (i,j,t), the design matrix element is:
+[A * X[,,t] * W[,,k]'][i,j]
+
+Where A = I + sum_l alpha[l] * W[,,l] is the current sender effects matrix
+(with alpha[1] = 1 fixed for identifiability).
+
+The algorithm mirrors the alpha update but with roles reversed:
+1. Compute A from current alpha and W
+2. For each covariate k:
+   - Calculate A * X * W[,,k]' for all time points
+   - Flatten to match the vectorized Y
+3. Combine into design matrix
+}
+\note{
+The symmetry with cpp_construct_Wbeta_design reflects the bilinear
+  structure of the model, where sender and receiver effects play dual roles.
+}
+\examples{
+\dontrun{
+// Called internally by sir_alsfit during the beta update step
+// The GLM call becomes:
+// glm(Y ~ -1 + cbind(Z_design, Walpha_design), family=...)
+}
 }
