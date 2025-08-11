@@ -1,13 +1,54 @@
+# R and RStudio files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
-*.o
-*.so
-*.dll
-.DS_Store
+*.Rproj
+
+# Package build artifacts
+*.tar.gz
+*.tgz
+*.zip
+sir.Rcheck/
+sir_*.tar.gz
+sir_*.tgz
+sir_*.zip
+
+# Compiled files
 src/*.o
 src/*.so
 src/*.dll
-sir.Rcheck/
-*.tar.gz
+src-i386/
+src-x64/
+
+# macOS
+.DS_Store
+
+# Documentation
+man/*.Rd~
+vignettes/*.html
+vignettes/*.pdf
+inst/doc
+
+# Temporary files
+*~
+*.swp
+*.swo
+.~lock.*
+
+# RStudio project files
+*.Rproj
+
+# pkgdown site
+docs/
+pkgdown/
+
+# Coverage reports
+coverage.html
+lib/
+
+# Hidden directories (except .github)
+.claude/
+.vscode/
+.idea/
+EOF < /dev/null

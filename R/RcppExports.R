@@ -27,7 +27,7 @@
 #' Computational optimizations:
 #' - Pre-computes B' once rather than for each time slice
 #' - Uses Armadillo's optimized BLAS routines for matrix multiplication
-#' - Memory-efficient slice-wise operations to avoid large temporary matrices
+#' - Memory-aware slice-wise operations to avoid large temporary matrices
 #' - Compiler optimizations enabled through RcppArmadillo
 #' 
 #' @param X Three-dimensional array (m x m x T) representing the network state over time.
@@ -264,7 +264,7 @@ cpp_construct_Walpha_design <- function(W, X, alpha) {
 #' @param X Three-dimensional array (m x m x T) carrying network influence.
 #'   
 #' @param Z_list List of q three-dimensional arrays (m x m x T), one per covariate.
-#'   Passed as list for efficient memory handling of 4D structure.
+#'   Passed as list for memory handling of 4D structure.
 #'   
 #' @param family String specifying distribution: "poisson", "normal", or "binomial".
 #'   Determines the link function and variance structure.

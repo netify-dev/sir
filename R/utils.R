@@ -13,7 +13,7 @@ NULL
 #' RcppArmadillo handles 4D arrays most efficiently when decomposed into a list of 3D cubes.
 #'
 #' @details
-#' This function handles the dimensional restructuring needed for efficient computation
+#' This function handles the dimensional restructuring needed for computation
 #' in the C++ backend. The transformation preserves the covariate structure while
 #' enabling vectorized operations in Armadillo.
 #' 

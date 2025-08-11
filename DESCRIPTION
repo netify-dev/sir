@@ -11,7 +11,7 @@ Description: Implements Social Influence Regression (SIR) models for analyzing
     methods for fitting models with bilinear effects using either Alternating 
     Least Squares (ALS) or direct optimization approaches. Supports Poisson, 
     Normal, and Binomial outcome distributions.
-License: GPL (>= 3)
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Depends: 
