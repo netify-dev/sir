@@ -18,7 +18,7 @@ jobs:
             label: macos-arm64
           - os: macos-latest
             label: macos-latest
-          - os: windows-latest
+          - os: windows-2022
             label: windows
 
     steps:
@@ -34,12 +34,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
 
-      - name: Install system dependencies (Windows)
+      - name: Setup Rtools (Windows)
         if: runner.os == 'Windows'
-        run: |
-          choco install rtools -y --no-progress
-          echo "C:\rtools43\usr\bin;C:\rtools43\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        shell: powershell
+        uses: r-lib/actions/setup-rtools@v2
 
       - name: Install dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
