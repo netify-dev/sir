@@ -7,7 +7,7 @@
 #'
 #' @importFrom cli cli_h1 cli_h2 cli_text cli_ul cli_alert_success cli_alert_warning cli_rule
 #' @importFrom crayon blue green red yellow bold
-#' @importFrom stats printCoefmat AIC BIC logLik deviance fitted residuals quantile pnorm symnum
+#' @importFrom stats printCoefmat deviance quantile pnorm symnum AIC BIC logLik fitted residuals
 
 #' Extract Model Coefficients
 #' @param object A sir object

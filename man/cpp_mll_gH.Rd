@@ -17,7 +17,7 @@ Can contain NA values which are automatically skipped.}
 \item{X}{Three-dimensional array (m x m x T) carrying network influence.}
 
 \item{Z_list}{List of q three-dimensional arrays (m x m x T), one per covariate.
-Passed as list for memory handling of 4D structure.}
+Passed as list for efficient memory handling of 4D structure.}
 
 \item{family}{String specifying distribution: "poisson", "normal", or "binomial".
 Determines the link function and variance structure.}

@@ -44,7 +44,7 @@ Mathematical interpretation:
 Computational optimizations:
 - Pre-computes B' once rather than for each time slice
 - Uses Armadillo's optimized BLAS routines for matrix multiplication
-- Memory-aware slice-wise operations to avoid large temporary matrices
+- Memory-efficient slice-wise operations to avoid large temporary matrices
 - Compiler optimizations enabled through RcppArmadillo
 }
 \note{
