@@ -200,6 +200,12 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
       if (any(dimsY[1:2] != dim(W)[1:2]) || any(dimsY != dim(X))) {
           stop("Dimensions of Y (m x m x T), W (m x m x p), and X (m x m x T) must align.")
       }
+      # Replace NAs in X with 0: X enters the bilinear term A*X*B' via
+      # matrix multiplication, where NAs propagate and corrupt the result.
+      # Self-ties (diagonal) are typically NA but should carry zero influence.
+      if (anyNA(X)) {
+          X[is.na(X)] <- 0
+      }
   } else {
       p <- 0
       # Create dummy empty arrays for Cpp functions if p=0.
@@ -304,6 +310,20 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
   # mll_sir calculates NLL (assuming sigma=1 for normal).
   NLL <- mll_sir(tab, Y, W, X, Z, family)
   ll <- -NLL
+
+  # Compute fitted values on response scale
+  eta <- eta_tab(tab, W, X, Z)
+  if (family == "poisson") {
+      fitted_values <- exp(eta)
+  } else if (family == "binomial") {
+      prob <- 1 / (1 + exp(-eta))
+      prob[prob < 1e-15] <- 1e-15
+      prob[prob > 1 - 1e-15] <- 1 - 1e-15
+      fitted_values <- prob
+  } else {
+      fitted_values <- eta
+  }
+
   sigma2_est <- 1.0 # Default
 
   if (family == "normal") {
@@ -325,6 +345,8 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
 
   # ---- Standard Errors ----
   summ <- data.frame(coef=tab)
+  vcov_mat <- NULL
+  vcov_robust <- NULL
   if(calcSE){
     # Use the Rcpp backend for Hessian calculation (Hessian of NLL)
     Z_list <- prepare_Z_list(Z)
@@ -363,8 +385,11 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
 
         # Robust (Sandwich) SE
         # Sandwich = H_inv %*% S %*% H_inv
+        vcov_mat <- H_inv
+        vcov_robust <- tryCatch(H_inv %*% S %*% H_inv, error = function(e) NULL)
+
         rse <- tryCatch({
-            rse_diag <- diag(H_inv %*% S %*% H_inv)
+            rse_diag <- diag(vcov_robust)
             rse_diag[rse_diag < 0] <- NA
             sqrt(rse_diag)
         }, error = function(e) {
@@ -394,6 +419,44 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
 
   rownames(summ) <- c(theta_names, alpha_names, beta_names)
 
+  # Apply names to vcov matrices
+  param_names <- rownames(summ)
+  if (!is.null(vcov_mat)) {
+      rownames(vcov_mat) <- colnames(vcov_mat) <- param_names
+  }
+  if (!is.null(vcov_robust)) {
+      rownames(vcov_robust) <- colnames(vcov_robust) <- param_names
+  }
+
+  # Compute residuals
+  response_resid <- Y - fitted_values
+
+  pearson_resid <- response_resid
+  if (family == "poisson") {
+      pearson_resid <- response_resid / sqrt(fitted_values)
+  } else if (family == "binomial") {
+      pearson_resid <- response_resid / sqrt(fitted_values * (1 - fitted_values))
+  } else if (family == "normal") {
+      pearson_resid <- response_resid / sqrt(sigma2_est)
+  }
+
+  deviance_resid <- response_resid
+  if (family == "poisson") {
+      dev_contrib <- 2 * (ifelse(Y > 0, Y * log(Y / fitted_values), 0) - (Y - fitted_values))
+      dev_contrib[dev_contrib < 0] <- 0
+      deviance_resid <- sign(response_resid) * sqrt(dev_contrib)
+  } else if (family == "binomial") {
+      dev_contrib <- 2 * (ifelse(Y > 0, Y * log(Y / fitted_values), 0) +
+                          ifelse(Y < 1, (1 - Y) * log((1 - Y) / (1 - fitted_values)), 0))
+      dev_contrib[dev_contrib < 0] <- 0
+      deviance_resid <- sign(response_resid) * sqrt(dev_contrib)
+  }
+
+  resid_list <- list(
+      response = response_resid,
+      pearson = pearson_resid,
+      deviance = deviance_resid
+  )
 
   # Count observations
   N_obs <- sum(!is.na(Y))
@@ -407,18 +470,26 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
     NLL  = NLL,
     family = family,
     method = method,
-    tab = tab,  # Store full parameter vector
+    tab = tab,
     theta = theta,
     alpha = alpha,
     beta = beta,
-    p = p,  # Number of influence covariates
-    q = q,  # Number of exogenous covariates
-    T = T_len,  # Number of time periods
-    nobs = N_obs,  # Number of observations
+    p = p,
+    q = q,
+    T = T_len,
+    nobs = N_obs,
+    fitted.values = fitted_values,
+    residuals = resid_list,
+    vcov = vcov_mat,
+    vcov_robust = vcov_robust,
+    Y = Y,
+    W = W,
+    X = X,
+    Z = Z,
     iterations = if (!is.null(mod$iterations)) mod$iterations else NA,
     history = list(ALPHA=mod$ALPHA, BETA=mod$BETA, THETA=mod$THETA, DEV=mod$DEV),
-    convergence = if (method=="optim") mod$convergence == 0 else (mod$iterations < 100), # Simplified convergence check
-    call = match.call()  # Store the call
+    convergence = if (method=="optim") mod$convergence == 0 else (mod$iterations < 100),
+    call = match.call()
   )
 
   if (family == "normal") {

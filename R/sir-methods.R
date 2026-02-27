@@ -22,14 +22,7 @@ coef.sir <- function(object, ...) {
 #' @param ... Additional arguments (unused)
 #' @export
 fitted.sir <- function(object, ...) {
-  # Store the data used in fitting for fitted value calculation
-  if (!is.null(object$fitted.values)) {
-    return(object$fitted.values)
-  }
-  
-  # If not stored, return NULL with message
-  cli::cli_alert_warning("Fitted values not stored in model object. Refit with `return.data = TRUE`")
-  return(NULL)
+  object$fitted.values
 }
 
 #' Extract Model Residuals
@@ -39,19 +32,8 @@ fitted.sir <- function(object, ...) {
 #' @export
 residuals.sir <- function(object, type = c("deviance", "pearson", "response"), ...) {
   type <- match.arg(type)
-  
-  if (!is.null(object$residuals)) {
-    if (type == "deviance" && !is.null(object$residuals$deviance)) {
-      return(object$residuals$deviance)
-    } else if (type == "pearson" && !is.null(object$residuals$pearson)) {
-      return(object$residuals$pearson)
-    } else if (type == "response" && !is.null(object$residuals$response)) {
-      return(object$residuals$response)
-    }
-  }
-  
-  cli::cli_alert_warning("Residuals not stored in model object. Refit with `return.data = TRUE`")
-  return(NULL)
+  if (is.null(object$residuals)) return(NULL)
+  object$residuals[[type]]
 }
 
 #' Extract Log-Likelihood
@@ -297,45 +279,42 @@ predict.sir <- function(object, newdata = NULL,
     # Extract components from newdata
     Y_new <- newdata$Y
     W_new <- if (!is.null(newdata$W)) newdata$W else object$W
-    X_new <- if (!is.null(newdata$X)) newdata$X else newdata$Y  # Use Y as X if not provided
+    X_new <- if (!is.null(newdata$X)) newdata$X else newdata$Y
     Z_new <- newdata$Z
-    
+
     # Calculate linear predictor
     eta <- eta_tab(object$tab, W_new, X_new, Z_new)
-    
+
     if (type == "response") {
-      # Transform based on family
       if (object$family == "poisson") {
         return(exp(eta))
       } else if (object$family == "binomial") {
         return(1 / (1 + exp(-eta)))
       } else {
-        return(eta)  # Normal family
+        return(eta)
       }
     } else {
-      return(eta)  # Link scale
+      return(eta)
     }
   } else {
-    cli::cli_alert_warning("Prediction requires newdata")
-    return(NULL)
+    # Return predictions from training data
+    if (type == "response") {
+        return(object$fitted.values)
+    } else {
+        return(eta_tab(object$tab, object$W, object$X, object$Z))
+    }
   }
 }
 
 #' Extract Variance-Covariance Matrix
 #' @param object A sir object
+#' @param type Type of vcov: "classical" (Hessian-based) or "robust" (sandwich)
 #' @param ... Additional arguments (unused)
 #' @export
-vcov.sir <- function(object, ...) {
-  if (!is.null(object$vcov)) {
-    return(object$vcov)
+vcov.sir <- function(object, type = c("classical", "robust"), ...) {
+  type <- match.arg(type)
+  if (type == "robust") {
+      return(object$vcov_robust)
   }
-  
-  # If not stored, try to compute from Hessian
-  if (!is.null(object$hessian)) {
-    vcov_mat <- solve(object$hessian)
-    return(vcov_mat)
-  }
-  
-  cli::cli_alert_warning("Variance-covariance matrix not available")
-  return(NULL)
+  object$vcov
 }
