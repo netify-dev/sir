@@ -4,10 +4,12 @@
 \alias{vcov.sir}
 \title{Extract Variance-Covariance Matrix}
 \usage{
-\method{vcov}{sir}(object, ...)
+\method{vcov}{sir}(object, type = c("classical", "robust"), ...)
 }
 \arguments{
 \item{object}{A sir object}
+
+\item{type}{Type of vcov: "classical" (Hessian-based) or "robust" (sandwich)}
 
 \item{...}{Additional arguments (unused)}
 }

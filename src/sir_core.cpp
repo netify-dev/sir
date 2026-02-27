@@ -532,7 +532,7 @@ Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cub
                 // The adjustment term is only strictly required for the Observed Information Hessian.
                 // It was included in the original R Poisson script but omitted for Normal/Binomial.
                 // We include it here for Poisson as in the original script.
-                if (family == "poisson" && p > 0) {
+                if (p > 0) {
                     // d^2(eta)/d(alpha_k)d(beta_l) = (W_k X W_l^T)_{ij}
 
                     // Calculate the p x p matrix of second derivatives H_ab

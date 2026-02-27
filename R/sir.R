@@ -206,6 +206,28 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
       if (anyNA(X)) {
           X[is.na(X)] <- 0
       }
+
+      # Warn about W collinearity (can cause singular Hessian)
+      if (p > 2) {
+          W_vecs <- matrix(NA, m * (m - 1), p)
+          for (k in 1:p) {
+              wk <- W[,,k]
+              W_vecs[, k] <- wk[row(wk) != col(wk)]
+          }
+          # Only scale columns with nonzero variance
+          W_sd <- apply(W_vecs, 2, sd, na.rm = TRUE)
+          W_vecs_use <- W_vecs[, W_sd > 0, drop = FALSE]
+          if (ncol(W_vecs_use) > 1) {
+              W_svd <- svd(scale(W_vecs_use))$d
+              W_cond <- W_svd[1] / max(W_svd[length(W_svd)], .Machine$double.eps)
+              if (W_cond > 100) {
+                  warning(sprintf(
+                      paste0("W covariates have high collinearity (condition number: %.1f). ",
+                             "This may cause singular Hessian and unreliable SEs."),
+                      W_cond))
+              }
+          }
+      }
   } else {
       p <- 0
       # Create dummy empty arrays for Cpp functions if p=0.
@@ -368,13 +390,36 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
 
 
     # Check if Hessian is invertible (should be positive definite for NLL minimum)
-    H_inv <- tryCatch(solve(H), error = function(e) {
-        warning("Hessian matrix is singular at the optimum, trying generalized inverse (MASS::ginv). Standard errors might be unreliable.")
-        tryCatch(MASS::ginv(H), error = function(e2) {
-            warning("Generalized inverse failed. Cannot compute standard errors.")
-            return(NULL)
+    # Use eigendecomposition for diagnostics and potential regularization
+    H_eig <- eigen(H, symmetric = TRUE)
+    min_eig <- min(H_eig$values)
+    max_eig <- max(H_eig$values)
+    cond_num <- max_eig / max(max(min_eig, .Machine$double.eps), .Machine$double.eps)
+
+    if (min_eig <= 0 || cond_num > 1e10) {
+        warning(sprintf(
+            paste0("Hessian is ill-conditioned (min eigenvalue: %.2e, ",
+                   "condition number: %.2e). Applying ridge regularization. ",
+                   "Consider bootstrap SEs via boot_sir() for reliable inference."),
+            min_eig, cond_num))
+        # Ridge regularization: add lambda*I to ensure positive definiteness
+        lambda <- max_eig * 1e-6
+        H_reg <- H + lambda * diag(nrow(H))
+        H_inv <- tryCatch(solve(H_reg), error = function(e) {
+            warning("Regularized Hessian inversion failed. Using ginv.")
+            tryCatch(MASS::ginv(H), error = function(e2) {
+                warning("Generalized inverse also failed. Cannot compute standard errors.")
+                return(NULL)
+            })
         })
-    })
+    } else {
+        H_inv <- tryCatch(solve(H), error = function(e) {
+            warning("Hessian inversion failed unexpectedly. Using ginv.")
+            tryCatch(MASS::ginv(H), error = function(e2) {
+                return(NULL)
+            })
+        })
+    }
 
     if (!is.null(H_inv)) {
         # Classical SE
