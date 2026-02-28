@@ -12,6 +12,8 @@ sir(
   family,
   method = "ALS",
   calcSE = TRUE,
+  fix_receiver = FALSE,
+  kron_mode = FALSE,
   ...
 )
 }
@@ -55,6 +57,18 @@ Default is "ALS" which is generally more stable.}
 \item{calcSE}{Logical indicating whether to calculate standard errors for the
 parameters. Standard errors are computed using the observed information matrix.
 Setting to FALSE speeds up computation when uncertainty quantification is not needed.}
+
+\item{fix_receiver}{Logical. If TRUE, fixes B = I (identity matrix) and
+estimates only (theta, alpha). This eliminates the bilinear identification
+problem (scaling ambiguity between A and B) by removing the receiver
+influence channel. The model becomes a standard GLM, yielding proper
+standard errors. Appropriate when receiver effects are negligible.
+Default is FALSE.}
+
+\item{kron_mode}{Logical. If TRUE, replaces separate (alpha, beta) with a
+single p x p coefficient matrix C, where C[r,s] is the weight on
+W_r X W_s'. This is a general fix for the bilinear identification problem.
+Not yet implemented. Default is FALSE.}
 
 \item{...}{Additional arguments passed to the fitting functions:
 \itemize{

@@ -117,7 +117,19 @@
 #' @param calcSE Logical indicating whether to calculate standard errors for the
 #'   parameters. Standard errors are computed using the observed information matrix.
 #'   Setting to FALSE speeds up computation when uncertainty quantification is not needed.
-#'   
+#'
+#' @param fix_receiver Logical. If TRUE, fixes B = I (identity matrix) and
+#'   estimates only (theta, alpha). This eliminates the bilinear identification
+#'   problem (scaling ambiguity between A and B) by removing the receiver
+#'   influence channel. The model becomes a standard GLM, yielding proper
+#'   standard errors. Appropriate when receiver effects are negligible.
+#'   Default is FALSE.
+#'
+#' @param kron_mode Logical. If TRUE, replaces separate (alpha, beta) with a
+#'   single p x p coefficient matrix C, where C[r,s] is the weight on
+#'   W_r X W_s'. This is a general fix for the bilinear identification problem.
+#'   Not yet implemented. Default is FALSE.
+#'
 #' @param ... Additional arguments passed to the fitting functions:
 #'   \itemize{
 #'     \item \code{trace}: Logical or integer controlling output verbosity
@@ -179,7 +191,8 @@
 #' 
 #' @importFrom MASS ginv
 #' @export
-sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ...) {
+sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE,
+                fix_receiver=FALSE, kron_mode=FALSE, ...) {
 
   if (!family %in% c("poisson", "normal", "binomial")) {
       stop("Invalid family specified.")
@@ -205,6 +218,12 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
       # Self-ties (diagonal) are typically NA but should carry zero influence.
       if (anyNA(X)) {
           X[is.na(X)] <- 0
+      }
+
+      # Replace NAs in W with 0: W enters matrix products W_k*X*B' and A*X*W_k'.
+      # Diagonal NAs (self-ties) propagate through matrix multiplication.
+      if (anyNA(W)) {
+          W[is.na(W)] <- 0
       }
 
       # Warn about W collinearity (can cause singular Hessian)
@@ -263,8 +282,14 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
 
 
   # ---- Fitting ----
+  if (fix_receiver && method == "optim") {
+    warning("fix_receiver=TRUE forces ALS method (single GLM step).")
+    method <- "ALS"
+  }
+
   if (method == "ALS") {
-    mod <- sir_alsfit(Y, W, X, Z, family, ...)
+    mod <- sir_alsfit(Y, W, X, Z, family,
+                      fix_receiver=fix_receiver, kron_mode=kron_mode, ...)
   } else if (method == "optim") {
     mod <- sir_optfit(Y, W, X, Z, family, ...)
   } else {
@@ -276,32 +301,54 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
   # ---- Post-processing ----
 
   # Reconstruct final alpha, beta
-  if (q > 0) {
-      theta <- tab[1:q]
-  } else {
-      theta <- numeric(0)
-  }
-
-  if (p > 0) {
-      if (p > 1) {
-          a_start = q + 1
-          a_end = q + p - 1
-          a <- tab[a_start:a_end]
-          alpha <- c(1, a)
-      } else {
-          a <- numeric(0)
-          alpha <- c(1)
-      }
-      b_start = q + p
-      beta <- tab[b_start:length(tab)]
-  } else {
-      alpha <- numeric(0)
+  if (fix_receiver && p > 0) {
+      # fix_receiver: tab = [theta, alpha_1:p], no beta
+      if (q > 0) theta <- tab[1:q] else theta <- numeric(0)
+      alpha <- tab[(q+1):(q+p)]
       beta <- numeric(0)
+  } else {
+      if (q > 0) {
+          theta <- tab[1:q]
+      } else {
+          theta <- numeric(0)
+      }
+
+      if (p > 0) {
+          if (p > 1) {
+              a_start = q + 1
+              a_end = q + p - 1
+              a <- tab[a_start:a_end]
+              alpha <- c(1, a)
+          } else {
+              a <- numeric(0)
+              alpha <- c(1)
+          }
+          b_start = q + p
+          beta <- tab[b_start:length(tab)]
+      } else {
+          alpha <- numeric(0)
+          beta <- numeric(0)
+      }
   }
 
 
   # Influence matrices A, B (using Cpp optimized functions)
-  if (p > 0) {
+  if (fix_receiver && p > 0) {
+      A <- cpp_amprod_W_v(W, alpha)
+      B <- diag(m)
+
+      # Normalize A sign
+      diag_A_mean <- mean(diag(A), na.rm=TRUE)
+      if (!is.na(diag_A_mean) && diag_A_mean != 0) {
+        A <- A * sign(diag_A_mean)
+      }
+      diag(A) <- 0
+
+      if (!is.null(rownames(Y))) {
+        rownames(A) <- colnames(A) <- rownames(Y)
+        rownames(B) <- colnames(B) <- rownames(Y)
+      }
+  } else if (p > 0) {
       A <- cpp_amprod_W_v(W, alpha)
       B <- cpp_amprod_W_v(W, beta)
 
@@ -330,11 +377,11 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
 
   # Log-Likelihood and Variance Estimation
   # mll_sir calculates NLL (assuming sigma=1 for normal).
-  NLL <- mll_sir(tab, Y, W, X, Z, family)
+  NLL <- mll_sir(tab, Y, W, X, Z, family, fix_receiver=fix_receiver)
   ll <- -NLL
 
   # Compute fitted values on response scale
-  eta <- eta_tab(tab, W, X, Z)
+  eta <- eta_tab(tab, W, X, Z, fix_receiver=fix_receiver)
   if (family == "poisson") {
       fitted_values <- exp(eta)
   } else if (family == "binomial") {
@@ -370,87 +417,136 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
   vcov_mat <- NULL
   vcov_robust <- NULL
   if(calcSE){
-    # Use the Rcpp backend for Hessian calculation (Hessian of NLL)
-    Z_list <- prepare_Z_list(Z)
-    gH <- cpp_mll_gH(tab, Y, W, X, Z_list, family)
 
-    H <- gH$hess
+    if (fix_receiver && p > 0 && !is.null(mod$glm_fit)) {
+      # fix_receiver: extract SEs from the GLM fit directly
+      # The model is a standard GLM, so vcov is well-conditioned
+      glm_fit <- mod$glm_fit
 
-    # Adjust Hessian/Score for Gaussian sigma^2
-    if (family == "normal") {
-        # H_true = H_cpp / sigma^2
-        H <- H / sigma2_est
-        # S_true = S_cpp / sigma^4 (if S_cpp calculated using (mu-y) residuals)
-        # Note: cpp_mll_gH calculates S using d(NLL)/d(param), which already includes the sigma scaling if NLL definition included it.
-        # However, the Cpp implementation assumes sigma=1. We adjust here.
-        S <- gH$shess / (sigma2_est^2)
-    } else {
-        S <- gH$shess
-    }
+      if (family == "normal") {
+        # vcov(lm) = sigma^2 * (X'X)^{-1}, using sigma^2 = RSS/df
+        vcov_mat <- tryCatch(vcov(glm_fit), error = function(e) NULL)
+      } else {
+        vcov_mat <- tryCatch(vcov(glm_fit), error = function(e) NULL)
+      }
 
+      if (!is.null(vcov_mat)) {
+        se <- sqrt(pmax(diag(vcov_mat), 0))
 
-    # Check if Hessian is invertible (should be positive definite for NLL minimum)
-    # Use eigendecomposition for diagnostics and potential regularization
-    H_eig <- eigen(H, symmetric = TRUE)
-    min_eig <- min(H_eig$values)
-    max_eig <- max(H_eig$values)
-    cond_num <- max_eig / max(max(min_eig, .Machine$double.eps), .Machine$double.eps)
-
-    if (min_eig <= 0 || cond_num > 1e10) {
-        warning(sprintf(
-            paste0("Hessian is ill-conditioned (min eigenvalue: %.2e, ",
-                   "condition number: %.2e). Applying ridge regularization. ",
-                   "Consider bootstrap SEs via boot_sir() for reliable inference."),
-            min_eig, cond_num))
-        # Ridge regularization: add lambda*I to ensure positive definiteness
-        lambda <- max_eig * 1e-6
-        H_reg <- H + lambda * diag(nrow(H))
-        H_inv <- tryCatch(solve(H_reg), error = function(e) {
-            warning("Regularized Hessian inversion failed. Using ginv.")
-            tryCatch(MASS::ginv(H), error = function(e2) {
-                warning("Generalized inverse also failed. Cannot compute standard errors.")
-                return(NULL)
-            })
-        })
-    } else {
-        H_inv <- tryCatch(solve(H), error = function(e) {
-            warning("Hessian inversion failed unexpectedly. Using ginv.")
-            tryCatch(MASS::ginv(H), error = function(e2) {
-                return(NULL)
-            })
-        })
-    }
-
-    if (!is.null(H_inv)) {
-        # Classical SE
-        se_diag <- diag(H_inv)
-        # Ensure non-negative variance estimates
-        se_diag[se_diag < 0] <- NA
-        se <- sqrt(se_diag)
-
-        # Robust (Sandwich) SE
-        # Sandwich = H_inv %*% S %*% H_inv
-        vcov_mat <- H_inv
-        vcov_robust <- tryCatch(H_inv %*% S %*% H_inv, error = function(e) NULL)
+        # Robust (sandwich) SE: H^{-1} S H^{-1}
+        # where S = X' diag(r^2) X (meat of sandwich)
+        vcov_robust <- tryCatch({
+          X_mat <- model.matrix(glm_fit)
+          resids <- residuals(glm_fit)
+          # Keep only complete cases
+          complete <- !is.na(resids)
+          X_c <- X_mat[complete, , drop = FALSE]
+          r_c <- resids[complete]
+          meat <- crossprod(X_c * r_c)
+          bread <- vcov_mat / ifelse(family == "normal", sigma2_est, 1)
+          bread %*% meat %*% bread
+        }, error = function(e) NULL)
 
         rse <- tryCatch({
-            rse_diag <- diag(vcov_robust)
-            rse_diag[rse_diag < 0] <- NA
-            sqrt(rse_diag)
-        }, error = function(e) {
-            warning("Sandwich estimator calculation failed.")
-            return(rep(NA, length(se)))
-        })
+          rse_diag <- diag(vcov_robust)
+          rse_diag[rse_diag < 0] <- NA
+          sqrt(rse_diag)
+        }, error = function(e) rep(NA, length(se)))
 
         summ$se <- se
         summ$rse <- rse
         summ$t_se <- summ$coef / summ$se
         summ$t_rse <- summ$coef / summ$rse
-    } else {
+      } else {
         summ$se <- NA
         summ$rse <- NA
         summ$t_se <- NA
         summ$t_rse <- NA
+      }
+
+    } else {
+      # Standard path: use Rcpp backend for Hessian calculation
+      Z_list <- prepare_Z_list(Z)
+      gH <- cpp_mll_gH(tab, Y, W, X, Z_list, family)
+
+      H <- gH$hess
+
+      # Adjust Hessian/Score for Gaussian sigma^2
+      if (family == "normal") {
+          # H_true = H_cpp / sigma^2
+          H <- H / sigma2_est
+          # S_true = S_cpp / sigma^4 (if S_cpp calculated using (mu-y) residuals)
+          # Note: cpp_mll_gH calculates S using d(NLL)/d(param), which already includes the sigma scaling if NLL definition included it.
+          # However, the Cpp implementation assumes sigma=1. We adjust here.
+          S <- gH$shess / (sigma2_est^2)
+      } else {
+          S <- gH$shess
+      }
+
+
+      # Check if Hessian is invertible (should be positive definite for NLL minimum)
+      # Use eigendecomposition for diagnostics and potential regularization
+      H_eig <- eigen(H, symmetric = TRUE)
+      min_eig <- min(H_eig$values)
+      max_eig <- max(H_eig$values)
+      cond_num <- max_eig / max(max(min_eig, .Machine$double.eps), .Machine$double.eps)
+
+      if (min_eig <= 0 || cond_num > 1e10) {
+          warning(sprintf(
+              paste0("Hessian is ill-conditioned (min eigenvalue: %.2e, ",
+                     "condition number: %.2e). Applying ridge regularization. ",
+                     "Consider bootstrap SEs via boot_sir() for reliable inference."),
+              min_eig, cond_num))
+          # Ridge regularization: add lambda*I to ensure positive definiteness
+          lambda <- max_eig * 1e-6
+          H_reg <- H + lambda * diag(nrow(H))
+          H_inv <- tryCatch(solve(H_reg), error = function(e) {
+              warning("Regularized Hessian inversion failed. Using ginv.")
+              tryCatch(MASS::ginv(H), error = function(e2) {
+                  warning("Generalized inverse also failed. Cannot compute standard errors.")
+                  return(NULL)
+              })
+          })
+      } else {
+          H_inv <- tryCatch(solve(H), error = function(e) {
+              warning("Hessian inversion failed unexpectedly. Using ginv.")
+              tryCatch(MASS::ginv(H), error = function(e2) {
+                  return(NULL)
+              })
+          })
+      }
+
+      if (!is.null(H_inv)) {
+          # Classical SE
+          se_diag <- diag(H_inv)
+          # Ensure non-negative variance estimates
+          se_diag[se_diag < 0] <- NA
+          se <- sqrt(se_diag)
+
+          # Robust (Sandwich) SE
+          # Sandwich = H_inv %*% S %*% H_inv
+          vcov_mat <- H_inv
+          vcov_robust <- tryCatch(H_inv %*% S %*% H_inv, error = function(e) NULL)
+
+          rse <- tryCatch({
+              rse_diag <- diag(vcov_robust)
+              rse_diag[rse_diag < 0] <- NA
+              sqrt(rse_diag)
+          }, error = function(e) {
+              warning("Sandwich estimator calculation failed.")
+              return(rep(NA, length(se)))
+          })
+
+          summ$se <- se
+          summ$rse <- rse
+          summ$t_se <- summ$coef / summ$se
+          summ$t_rse <- summ$coef / summ$rse
+      } else {
+          summ$se <- NA
+          summ$rse <- NA
+          summ$t_se <- NA
+          summ$t_rse <- NA
+      }
     }
   }
 
@@ -459,8 +555,14 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
   W_names <- if (p > 0 && !is.null(dimnames(W)[[3]])) dimnames(W)[[3]] else paste0("W", 1:p)
 
   theta_names <- if (q>0) paste0("(Z) ", Z_names) else NULL
-  alpha_names <- if (p>1) paste0("(alphaW) ", W_names[-1]) else NULL
-  beta_names  <- if (p>0) paste0("(betaW) ", W_names) else NULL
+
+  if (fix_receiver && p > 0) {
+    alpha_names <- paste0("(alphaW) ", W_names)
+    beta_names <- NULL
+  } else {
+    alpha_names <- if (p>1) paste0("(alphaW) ", W_names[-1]) else NULL
+    beta_names  <- if (p>0) paste0("(betaW) ", W_names) else NULL
+  }
 
   rownames(summ) <- c(theta_names, alpha_names, beta_names)
 
@@ -531,9 +633,11 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calcSE=TRUE, ..
     W = W,
     X = X,
     Z = Z,
+    fix_receiver = fix_receiver,
+    kron_mode = kron_mode,
     iterations = if (!is.null(mod$iterations)) mod$iterations else NA,
     history = list(ALPHA=mod$ALPHA, BETA=mod$BETA, THETA=mod$THETA, DEV=mod$DEV),
-    convergence = if (method=="optim") mod$convergence == 0 else (mod$iterations < 100),
+    convergence = if (fix_receiver) TRUE else if (method=="optim") mod$convergence == 0 else (mod$iterations < 100),
     call = match.call()
   )
 

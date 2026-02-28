@@ -4,12 +4,12 @@
 \alias{eta_tab}
 \title{Calculate Linear Predictor (eta) for SIR Model}
 \usage{
-eta_tab(tab, W, X, Z)
+eta_tab(tab, W, X, Z, fix_receiver = FALSE)
 }
 \arguments{
-\item{tab}{Numeric vector of parameters ordered as [theta, alpha_2:p, beta_1:p].
-Length must equal q + 2p - 1, where q is number of exogenous covariates
-and p is number of influence covariates.}
+\item{tab}{Numeric vector of parameters. For the standard model, ordered as
+[theta, alpha_2:p, beta_1:p] (length q + 2p - 1). For fix_receiver mode,
+ordered as [theta, alpha_1:p] (length q + p).}
 
 \item{W}{Three-dimensional array (m x m x p) of influence covariates.
 Each slice W[,,r] parameterizes the influence structure.
@@ -24,6 +24,9 @@ Typically lagged outcomes. Required even if W is NULL (can be zeros).}
   \item 3D array (m x m x T): Single covariate
   \item 4D array (m x m x q x T): Multiple covariates
 }}
+
+\item{fix_receiver}{Logical. If TRUE, B is fixed to the identity matrix and
+tab is parsed as [theta, alpha_1:p] with all alpha free. Default FALSE.}
 }
 \value{
 Three-dimensional array (m x m x T) of linear predictors.

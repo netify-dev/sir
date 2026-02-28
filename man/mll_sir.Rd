@@ -4,7 +4,7 @@
 \alias{mll_sir}
 \title{Calculate Negative Log-Likelihood for SIR Model}
 \usage{
-mll_sir(tab, Y, W, X, Z, family)
+mll_sir(tab, Y, W, X, Z, family, fix_receiver = FALSE)
 }
 \arguments{
 \item{tab}{Numeric vector of parameters [theta, alpha_2:p, beta_1:p].}
@@ -25,6 +25,9 @@ or NULL for no network influence.}
   \item "normal": Continuous data with identity link (assumes sigma=1)
   \item "binomial": Binary data with logit link
 }}
+
+\item{fix_receiver}{Logical. If TRUE, B is fixed to identity and tab is
+parsed as [theta, alpha_1:p]. Default FALSE.}
 }
 \value{
 Numeric scalar giving the negative log-likelihood.

@@ -275,6 +275,8 @@ predict.sir <- function(object, newdata = NULL,
                         type = c("link", "response"), ...) {
   type <- match.arg(type)
   
+  fr <- isTRUE(object$fix_receiver)
+
   if (!is.null(newdata)) {
     # Extract components from newdata
     Y_new <- newdata$Y
@@ -283,7 +285,7 @@ predict.sir <- function(object, newdata = NULL,
     Z_new <- newdata$Z
 
     # Calculate linear predictor
-    eta <- eta_tab(object$tab, W_new, X_new, Z_new)
+    eta <- eta_tab(object$tab, W_new, X_new, Z_new, fix_receiver=fr)
 
     if (type == "response") {
       if (object$family == "poisson") {
@@ -301,7 +303,7 @@ predict.sir <- function(object, newdata = NULL,
     if (type == "response") {
         return(object$fitted.values)
     } else {
-        return(eta_tab(object$tab, object$W, object$X, object$Z))
+        return(eta_tab(object$tab, object$W, object$X, object$Z, fix_receiver=fr))
     }
   }
 }

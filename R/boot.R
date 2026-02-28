@@ -13,13 +13,15 @@
 #'   "parametric" simulates new data from the fitted model.
 #' @param seed Optional integer random seed for reproducibility.
 #' @param trace Logical. Print progress every 10 replicates.
-#' @return A list with:
+#' @return A list containing:
+#' \describe{
 #'   \item{coefs}{R x n_params matrix of bootstrap coefficient estimates}
 #'   \item{se}{Bootstrap standard errors (column SDs)}
-#'   \item{ci_lo}{Lower 2.5% percentile confidence bounds}
-#'   \item{ci_hi}{Upper 97.5% percentile confidence bounds}
+#'   \item{ci_lo}{Lower 2.5\% percentile confidence bounds}
+#'   \item{ci_hi}{Upper 97.5\% percentile confidence bounds}
 #'   \item{n_valid}{Number of successful bootstrap replicates}
 #'   \item{n_total}{Total number attempted}
+#' }
 #' @export
 boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
                      seed = NULL, trace = FALSE) {
@@ -76,6 +78,8 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
         tryCatch({
             fit_b <- sir(Y_b, W, X_b, Z_b, family = family,
                          method = "ALS", calcSE = FALSE,
+                         fix_receiver = isTRUE(sir_fit$fix_receiver),
+                         kron_mode = isTRUE(sir_fit$kron_mode),
                          max_iter = 100, tol = 1e-6)
             boot_coefs[b, ] <- fit_b$tab
         }, error = function(e) {

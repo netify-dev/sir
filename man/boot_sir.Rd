@@ -25,7 +25,15 @@ boot_sir(
 \item{trace}{Logical. Print progress every 10 replicates.}
 }
 \value{
-
+A list containing:
+\describe{
+  \item{coefs}{R x n_params matrix of bootstrap coefficient estimates}
+  \item{se}{Bootstrap standard errors (column SDs)}
+  \item{ci_lo}{Lower 2.5\% percentile confidence bounds}
+  \item{ci_hi}{Upper 97.5\% percentile confidence bounds}
+  \item{n_valid}{Number of successful bootstrap replicates}
+  \item{n_total}{Total number attempted}
+}
 }
 \description{
 Computes bootstrap standard errors and confidence intervals for SIR model

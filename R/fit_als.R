@@ -88,7 +88,16 @@
 #' @param max_iter Integer maximum number of ALS iterations. Default is 100.
 #'   Each iteration consists of one A-step and one B-step. Increase for difficult
 #'   problems or when starting far from the optimum.
-#'   
+#'
+#' @param fix_receiver Logical. If TRUE, fixes B = I (identity matrix) and
+#'   estimates only (theta, alpha) via a single GLM step. This eliminates the
+#'   bilinear identification problem by removing the receiver influence channel.
+#'   The model reduces to a standard GLM with well-conditioned standard errors.
+#'   Default is FALSE.
+#'
+#' @param kron_mode Logical. If TRUE, replaces separate (alpha, beta) with a
+#'   single p x p coefficient matrix C. Not yet implemented. Default is FALSE.
+#'
 #' @return A list with class "sir_als_fit" containing:
 #'   \item{tab}{Vector of all parameters [θ, α, β] in order}
 #'   \item{A}{The m x m sender effects matrix}
@@ -134,7 +143,8 @@
 #' @importFrom cli cli_progress_bar cli_progress_update cli_progress_done cli_alert_info cli_alert_success
 #' @importFrom crayon yellow green
 #' @export
-sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100) {
+sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
+                       fix_receiver=FALSE, kron_mode=FALSE) {
   p <- if (is.null(W)) 0 else dim(W)[3]
   q <- if (is.null(Z)) 0 else dim(Z)[3]
   m <- dim(Y)[1]
@@ -215,12 +225,77 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100) 
   BETA  <- matrix(beta, nrow=1)
   DEV   <- matrix(c(dev_old, dev_new), nrow=1)
 
+  # ---- fix_receiver: single GLM with B = Identity ----
+  if (fix_receiver && p > 0) {
+    if (kron_mode) stop("Cannot use both fix_receiver and kron_mode.")
+
+    # Build design matrix: column k = vec(W_k %*% X_t) across all t
+    Wfix_flat <- matrix(0, m * m * T_len, p)
+    for (k in 1:p) {
+      WkX <- array(0, dim = c(m, m, T_len))
+      for (t in 1:T_len) {
+        WkX[,,t] <- W[,,k] %*% X[,,t]
+      }
+      Wfix_flat[, k] <- c(WkX)
+    }
+    colnames(Wfix_flat) <- paste0("WA", 1:p)
+
+    if (q > 0) {
+      X_design <- cbind(Z_flat, Wfix_flat)
+    } else {
+      X_design <- Wfix_flat
+    }
+
+    glmData <- data.frame(Y = Y_flat, X_design)
+    form <- formula(paste0("Y ~ -1 + ", paste(colnames(X_design), collapse = " + ")))
+
+    if (family == "normal") {
+      fit_fix <- glm_fun(form, data = glmData)
+    } else {
+      fit_fix <- glm_fun(form, data = glmData, family = family_obj)
+    }
+
+    co <- coef(fit_fix)
+    co[is.na(co)] <- 0
+
+    if (q > 0) {
+      theta <- co[1:q]
+      alpha <- co[-(1:q)]
+    } else {
+      theta <- numeric(0)
+      alpha <- co
+    }
+
+    dev_val <- if (family == "normal") sum(fit_fix$residuals^2) else deviance(fit_fix)
+
+    if (trace) {
+      cli::cli_alert_success("fix_receiver: single GLM converged (deviance = {.val {sprintf('%.4f', dev_val)}})")
+    }
+
+    return(list(
+      theta = theta,
+      a = alpha,
+      b = numeric(0),
+      tab = c(theta, alpha),
+      ALPHA = matrix(alpha, nrow = 1),
+      BETA = matrix(nrow = 0, ncol = 0),
+      THETA = matrix(theta, nrow = 1),
+      DEV = matrix(c(Inf, dev_val), nrow = 1),
+      iterations = 1,
+      fix_receiver = TRUE,
+      glm_fit = fit_fix
+    ))
+  }
+
+  # ---- kron_mode placeholder ----
+  if (kron_mode) stop("kron_mode not yet implemented.")
+
   # ---- Iterative Updates ----
   # Initialize progress bar if trace is enabled
   if (trace && p > 0) {
     cli::cli_progress_bar("Fitting SIR model via ALS", total = max_iter)
   }
-  
+
   for (iter in 1:max_iter) {
 
     if (p == 0) break; # Stop if no bilinear part

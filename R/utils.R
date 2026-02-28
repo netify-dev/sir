@@ -1,7 +1,7 @@
 
 #' @useDynLib sir, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
-#' @importFrom stats dpois dnorm dbinom qnorm rnorm rgamma
+#' @importFrom stats dpois dnorm dbinom qnorm rnorm rgamma rpois rbinom vcov model.matrix
 NULL
 
 # ---- Helper functions for data handling ----
@@ -202,24 +202,27 @@ flatten_Z <- function(Z) {
 #'   \item Minimizes memory allocation through in-place operations
 #' }
 #'
-#' @param tab Numeric vector of parameters ordered as [theta, alpha_2:p, beta_1:p].
-#'   Length must equal q + 2p - 1, where q is number of exogenous covariates
-#'   and p is number of influence covariates.
-#'   
+#' @param tab Numeric vector of parameters. For the standard model, ordered as
+#'   [theta, alpha_2:p, beta_1:p] (length q + 2p - 1). For fix_receiver mode,
+#'   ordered as [theta, alpha_1:p] (length q + p).
+#'
 #' @param W Three-dimensional array (m x m x p) of influence covariates.
 #'   Each slice W[,,r] parameterizes the influence structure.
 #'   If NULL or p=0, no network influence is included.
-#'   
+#'
 #' @param X Three-dimensional array (m x m x T) carrying network influence.
 #'   Typically lagged outcomes. Required even if W is NULL (can be zeros).
-#'   
+#'
 #' @param Z Array of exogenous covariates. Can be:
 #'   \itemize{
 #'     \item NULL or q=0: No exogenous effects
 #'     \item 3D array (m x m x T): Single covariate
 #'     \item 4D array (m x m x q x T): Multiple covariates
 #'   }
-#'   
+#'
+#' @param fix_receiver Logical. If TRUE, B is fixed to the identity matrix and
+#'   tab is parsed as [theta, alpha_1:p] with all alpha free. Default FALSE.
+#'
 #' @return Three-dimensional array (m x m x T) of linear predictors.
 #'   Each element eta[i,j,t] is the linear predictor for outcome Y[i,j,t]
 #'   before applying the link function.
@@ -242,7 +245,7 @@ flatten_Z <- function(Z) {
 #' dim(eta)  # Returns c(10, 10, 5)
 #' }
 #' @export
-eta_tab <- function(tab, W, X, Z) {
+eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
   p <- if (is.null(W)) 0 else dim(W)[3]
   q <- if (is.null(Z)) 0 else dim(Z)[3]
   m <- dim(X)[1]
@@ -255,7 +258,10 @@ eta_tab <- function(tab, W, X, Z) {
       theta <- numeric(0)
   }
 
-  if (p > 0) {
+  if (fix_receiver && p > 0) {
+      # fix_receiver: tab = [theta, alpha_1:p], B = I
+      alpha <- tab[(q+1):(q+p)]
+  } else if (p > 0) {
       if (p > 1) {
           alpha_start = q + 1
           alpha_end = q + p - 1
@@ -269,7 +275,11 @@ eta_tab <- function(tab, W, X, Z) {
 
 
   # Bilinear part: AXB
-  if (p > 0) {
+  if (fix_receiver && p > 0) {
+      A <- cpp_amprod_W_v(W, alpha)
+      B <- diag(m)
+      AXB <- cpp_tprod_A_X_Bt(X, A, B)
+  } else if (p > 0) {
       # Build A, B using optimized C++ amprod wrapper
       A <- cpp_amprod_W_v(W, alpha)
       B <- cpp_amprod_W_v(W, beta)
@@ -347,10 +357,13 @@ eta_tab <- function(tab, W, X, Z) {
 #'     \item "normal": Continuous data with identity link (assumes sigma=1)
 #'     \item "binomial": Binary data with logit link
 #'   }
-#'   
+#'
+#' @param fix_receiver Logical. If TRUE, B is fixed to identity and tab is
+#'   parsed as [theta, alpha_1:p]. Default FALSE.
+#'
 #' @return Numeric scalar giving the negative log-likelihood.
 #'   Lower values indicate better fit. Used for optimization.
-#'   
+#'
 #' @note The normal family assumes unit variance (sigma=1) for simplicity.
 #'   The actual variance is estimated separately if needed.
 #'   
@@ -366,8 +379,8 @@ eta_tab <- function(tab, W, X, Z) {
 #' nll <- mll_sir(tab, Y_binary, W, X, Z, "binomial")
 #' }
 #' @export
-mll_sir <- function(tab, Y, W, X, Z, family) {
-  ETA <- eta_tab(tab, W, X, Z)
+mll_sir <- function(tab, Y, W, X, Z, family, fix_receiver=FALSE) {
+  ETA <- eta_tab(tab, W, X, Z, fix_receiver=fix_receiver)
 
   if (family == "poisson") {
     # Use dpois for numerical stability

@@ -4,7 +4,18 @@
 \alias{sir_alsfit}
 \title{Fit SIR Model via Alternating Least Squares (ALS)}
 \usage{
-sir_alsfit(Y, W, X, Z, family, trace = FALSE, tol = 1e-08, max_iter = 100)
+sir_alsfit(
+  Y,
+  W,
+  X,
+  Z,
+  family,
+  trace = FALSE,
+  tol = 1e-08,
+  max_iter = 100,
+  fix_receiver = FALSE,
+  kron_mode = FALSE
+)
 }
 \arguments{
 \item{Y}{Three-dimensional array (m x m x T) of network outcomes.
@@ -40,6 +51,15 @@ accurate results but require more iterations.}
 \item{max_iter}{Integer maximum number of ALS iterations. Default is 100.
 Each iteration consists of one A-step and one B-step. Increase for difficult
 problems or when starting far from the optimum.}
+
+\item{fix_receiver}{Logical. If TRUE, fixes B = I (identity matrix) and
+estimates only (theta, alpha) via a single GLM step. This eliminates the
+bilinear identification problem by removing the receiver influence channel.
+The model reduces to a standard GLM with well-conditioned standard errors.
+Default is FALSE.}
+
+\item{kron_mode}{Logical. If TRUE, replaces separate (alpha, beta) with a
+single p x p coefficient matrix C. Not yet implemented. Default is FALSE.}
 }
 \value{
 A list with class "sir_als_fit" containing:
