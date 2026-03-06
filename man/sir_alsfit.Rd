@@ -14,7 +14,8 @@ sir_alsfit(
   tol = 1e-08,
   max_iter = 100,
   fix_receiver = FALSE,
-  kron_mode = FALSE
+  kron_mode = FALSE,
+  dynamic_W = FALSE
 )
 }
 \arguments{
@@ -60,75 +61,40 @@ Default is FALSE.}
 
 \item{kron_mode}{Logical. If TRUE, replaces separate (alpha, beta) with a
 single p x p coefficient matrix C. Not yet implemented. Default is FALSE.}
+
+\item{dynamic_W}{Logical. If TRUE, W is treated as a 4D array
+(m x m x p x T) with time-varying influence covariates. Design matrices
+are constructed in R rather than C++. Default is FALSE.}
 }
 \value{
 A list with class "sir_als_fit" containing:
-  \item{tab}{Vector of all parameters [θ, α, β] in order}
+  \item{tab}{Vector of all parameters [theta, alpha, beta] in order}
   \item{A}{The m x m sender effects matrix}
   \item{B}{The m x m receiver effects matrix}
-  \item{deviance}{Final deviance (−2 × log-likelihood + constant)}
+  \item{deviance}{Final deviance (-2 * log-likelihood + constant)}
   \item{iterations}{Number of iterations until convergence}
   \item{converged}{Logical indicating successful convergence}
-  \item{THETA}{Matrix tracking θ parameters across iterations (if trace > 0)}
-  \item{ALPHA}{Matrix tracking α parameters across iterations (if trace > 0)}
-  \item{BETA}{Matrix tracking β parameters across iterations (if trace > 0)}
-  \item{DEV}{Matrix tracking deviance across iterations (if trace > 0)}
+  \item{THETA}{Matrix tracking theta parameters across iterations}
+  \item{ALPHA}{Matrix tracking alpha parameters across iterations}
+  \item{BETA}{Matrix tracking beta parameters across iterations}
+  \item{DEV}{Matrix tracking deviance across iterations}
   \item{glm_alpha}{Final GLM object from the A-step}
   \item{glm_beta}{Final GLM object from the B-step}
 }
 \description{
-Implements the Alternating Least Squares algorithm (also known as Block Coordinate Descent) 
-for fitting Social Influence Regression models. This method alternates between optimizing 
-the sender effects (A matrix) and receiver effects (B matrix) while holding the other fixed,
-leveraging the bilinear structure of the model for computational efficiency.
+Fits the SIR model by alternating between optimizing sender effects (alpha)
+with receiver effects fixed, and vice versa. Each sub-step is a standard
+GLM, making this approach more stable than direct optimization for
+high-dimensional problems.
 }
 \details{
-The ALS algorithm exploits the fact that the SIR model is linear in A when B is fixed, 
-and linear in B when A is fixed. This allows us to use standard GLM solvers in each step.
+The algorithm exploits the bilinear structure: when B is fixed, the model
+is linear in alpha (and theta), and vice versa. Each iteration solves two
+GLMs using \code{speedglm} (if available) or \code{stats::glm}.
 
-\strong{Algorithm Overview:}
-\enumerate{
-  \item Initialize B matrix (typically as identity)
-  \item Repeat until convergence:
-    \enumerate{
-      \item \strong{A-step}: Fix B, optimize (θ, α) by solving:
-        \deqn{Y \sim GLM(θ^T Z + vec(XB^T)^T (I ⊗ W) α)}
-      \item \strong{B-step}: Fix A, optimize (θ, β) by solving:
-        \deqn{Y \sim GLM(θ^T Z + vec(A^T X)^T (W ⊗ I) β)}
-      \item Check convergence based on change in deviance
-    }
-}
-
-\strong{Computational Efficiency:}
-\itemize{
-  \item Uses optimized C++ routines for matrix operations via RcppArmadillo
-  \item Constructs sparse design matrices efficiently using Kronecker products
-  \item Optionally uses speedglm for faster GLM fitting on large datasets
-  \item Vectorized operations minimize memory allocations
-}
-
-\strong{Convergence Criteria:}
-The algorithm converges when one of the following is met:
-\itemize{
-  \item Relative change in deviance < tol: |D_new - D_old|/|D_old| < tol
-  \item Maximum iterations reached
-  \item Deviance increases (indicating numerical issues)
-}
-
-\strong{Advantages of ALS:}
-\itemize{
-  \item More stable than direct optimization for high-dimensional problems
-  \item Each sub-problem is convex (though overall problem is non-convex)
-  \item Natural handling of constraints (e.g., non-negativity)
-  \item Parallelizable sub-problems (future enhancement)
-}
-
-\strong{Limitations:}
-\itemize{
-  \item May converge to local optima (depends on initialization)
-  \item Convergence can be slow near the optimum
-  \item Requires good initialization for best results
-}
+Convergence is declared when the relative change in deviance falls below
+\code{tol}, or when \code{max_iter} is reached. Supports both static (3D)
+and dynamic (4D) W arrays.
 }
 \examples{
 \dontrun{

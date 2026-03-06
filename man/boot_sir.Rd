@@ -2,7 +2,7 @@
 % Please edit documentation in R/boot.R
 \name{boot_sir}
 \alias{boot_sir}
-\title{Bootstrap Standard Errors for SIR Model}
+\title{Bootstrap Inference for SIR Model Parameters}
 \usage{
 boot_sir(
   sir_fit,
@@ -13,31 +13,76 @@ boot_sir(
 )
 }
 \arguments{
-\item{sir_fit}{A fitted sir object from \code{\link{sir}}.}
+\item{sir_fit}{A fitted \code{sir} object from \code{\link{sir}}.}
 
-\item{R}{Integer. Number of bootstrap replicates (default 200).}
+\item{R}{Integer. Number of bootstrap replicates. Default is 200. Increase
+to 500-1000 for publication-quality intervals.}
 
-\item{type}{Character. Bootstrap type: "block" resamples time periods,
-"parametric" simulates new data from the fitted model.}
+\item{type}{Character. Bootstrap type: \code{"block"} (default) resamples
+time periods with replacement; \code{"parametric"} simulates new outcomes
+from the fitted model.}
 
-\item{seed}{Optional integer random seed for reproducibility.}
+\item{seed}{Optional integer for reproducibility. Sets the random seed
+before resampling.}
 
-\item{trace}{Logical. Print progress every 10 replicates.}
+\item{trace}{Logical. If TRUE, prints progress every 10 replicates.}
 }
 \value{
-A list containing:
+An object of class \code{"boot_sir"} with components:
 \describe{
-  \item{coefs}{R x n_params matrix of bootstrap coefficient estimates}
-  \item{se}{Bootstrap standard errors (column SDs)}
-  \item{ci_lo}{Lower 2.5\% percentile confidence bounds}
-  \item{ci_hi}{Upper 97.5\% percentile confidence bounds}
-  \item{n_valid}{Number of successful bootstrap replicates}
-  \item{n_total}{Total number attempted}
+  \item{coefs}{R x n_params matrix of bootstrap coefficient estimates.
+    Rows for failed replicates contain NA.}
+  \item{se}{Named numeric vector of bootstrap standard errors (one per
+    parameter).}
+  \item{ci_lo}{Lower 2.5\% percentile bounds.}
+  \item{ci_hi}{Upper 97.5\% percentile bounds.}
+  \item{point_est}{Point estimates from the original fit.}
+  \item{param_names}{Character vector of parameter names.}
+  \item{n_valid}{Number of successful bootstrap replicates.}
+  \item{n_total}{Total number of replicates attempted.}
+  \item{type}{The bootstrap type used.}
+  \item{family}{The distribution family.}
 }
 }
 \description{
 Computes bootstrap standard errors and confidence intervals for SIR model
-parameters. Uses block bootstrap (resampling time periods) or parametric
-bootstrap (simulating from the fitted model) to avoid reliance on the
-Hessian matrix, which can be singular or ill-conditioned.
+parameters. This is the recommended approach for inference when the Hessian
+is singular or ill-conditioned, which is common in models with bilinear
+influence terms (i.e., when \code{fix_receiver = FALSE}).
+}
+\details{
+Two bootstrap strategies are available:
+\describe{
+  \item{block}{Resamples time periods with replacement. Preserves the
+    within-period dependence structure. Best when T is moderately large
+    (T >= 10).}
+  \item{parametric}{Simulates new outcome arrays from the fitted model
+    using the estimated parameters and the specified family distribution.
+    Better when T is small but the model is well-specified.}
+}
+
+Each replicate refits the full SIR model. Replicates that fail to converge
+are dropped and reported. Standard errors are column standard deviations
+of the successful replicates. Confidence intervals use the percentile
+method.
+}
+\examples{
+\dontrun{
+model <- sir(Y, W, X, family = "poisson")
+
+# block bootstrap with 200 replicates
+boot_result <- boot_sir(model, R = 200, seed = 42)
+print(boot_result)
+
+# use bootstrap CIs with confint
+confint(model, boot = boot_result)
+
+# parametric bootstrap
+boot_par <- boot_sir(model, R = 200, type = "parametric")
+}
+
+}
+\seealso{
+\code{\link{confint.sir}} to use bootstrap intervals,
+  \code{\link{confint.boot_sir}} for direct interval extraction.
 }

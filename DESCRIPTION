@@ -13,26 +13,26 @@ Description: Implements Social Influence Regression (SIR) models for analyzing
     Normal, and Binomial outcome distributions.
 License: MIT + file LICENSE
 Encoding: UTF-8
-LazyData: true
-Depends: 
+Depends:
     R (>= 3.5.0)
-Imports: 
+Imports:
     Rcpp (>= 1.0.0),
     stats,
     MASS,
-    reshape2,
-    speedglm,
     cli,
-    crayon,
     ggplot2,
     patchwork,
-    tidyr,
-    viridis
+    tidyr
 Suggests:
     testthat (>= 3.0.0),
+    speedglm,
     igraph,
-    ggraph
-LinkingTo: 
+    ggraph,
+    numDeriv,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+LinkingTo:
     Rcpp,
     RcppArmadillo
 RoxygenNote: 7.3.3

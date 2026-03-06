@@ -34,32 +34,9 @@ Numeric scalar giving the negative log-likelihood.
   Lower values indicate better fit. Used for optimization.
 }
 \description{
-Computes the negative log-likelihood for the Social Influence Regression model
-under the specified distributional family. Used as the objective function
-for parameter estimation.
-}
-\details{
-The likelihood depends on the distributional family:
-
-\strong{Poisson:} For count outcomes
-\deqn{L = \prod_{i,j,t} \frac{e^{-\lambda_{ijt}} \lambda_{ijt}^{y_{ijt}}}{y_{ijt}!}}
-where \eqn{\lambda_{ijt} = \exp(\eta_{ijt})}
-
-\strong{Normal:} For continuous outcomes
-\deqn{L = \prod_{i,j,t} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(-\frac{(y_{ijt} - \mu_{ijt})^2}{2\sigma^2}\right)}
-where \eqn{\mu_{ijt} = \eta_{ijt}} (identity link)
-
-\strong{Binomial:} For binary outcomes
-\deqn{L = \prod_{i,j,t} p_{ijt}^{y_{ijt}} (1-p_{ijt})^{1-y_{ijt}}}
-where \eqn{p_{ijt} = \frac{1}{1 + \exp(-\eta_{ijt})}} (logit link)
-
-\strong{Numerical Stability:}
-\itemize{
-  \item Uses log-space computations to avoid underflow
-  \item Bounds probabilities away from 0 and 1 for binomial
-  \item Caps extreme values of lambda for Poisson
-  \item Handles NA values by exclusion from likelihood
-}
+Computes the negative log-likelihood for the SIR model under the specified
+distributional family. Diagonal entries (self-ties) and NA values are
+excluded. Used as the objective function for parameter estimation.
 }
 \note{
 The normal family assumes unit variance (sigma=1) for simplicity.

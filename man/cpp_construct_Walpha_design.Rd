@@ -28,7 +28,7 @@ linear in beta. This function constructs the required design matrix efficiently.
 For covariate k and observation (i,j,t), the design matrix element is:
 [A * X[,,t] * W[,,k]'][i,j]
 
-Where A = I + sum_l alpha[l] * W[,,l] is the current sender effects matrix
+Where A = sum_l alpha[l] * W[,,l] is the current sender effects matrix
 (with alpha[1] = 1 fixed for identifiability).
 
 The algorithm mirrors the alpha update but with roles reversed:

@@ -32,13 +32,13 @@ Determines the likelihood and link function used.}
   \item 3+: Detailed debugging information
 }}
 
-\item{start}{Optional numeric vector of starting values [θ, α, β].
+\item{start}{Optional numeric vector of starting values [theta, alpha, beta].
 Length must equal q + 2p. If NULL, uses smart initialization.
 Good starting values dramatically improve convergence.}
 }
 \value{
 A list with class "sir_optim_fit" containing:
-  \item{tab}{Vector of optimized parameters [θ, α, β]}
+  \item{tab}{Vector of optimized parameters [theta, alpha, beta]}
   \item{A}{The m x m sender effects matrix}
   \item{B}{The m x m receiver effects matrix}
   \item{convergence}{Convergence code from optim (0 = success)}
@@ -49,67 +49,22 @@ A list with class "sir_optim_fit" containing:
   \item{gradient}{Final gradient (should be near zero)}
 }
 \description{
-Implements direct optimization of the Social Influence Regression model using the 
-Broyden-Fletcher-Goldfarb-Shanno (BFGS) quasi-Newton method. This approach optimizes
-all parameters simultaneously, treating the full likelihood as a single objective function.
+Optimizes all SIR model parameters simultaneously using BFGS with
+analytical gradients computed via C++. An alternative to the ALS method
+that can be faster for small problems or when good starting values are
+available.
 }
 \details{
-Unlike the ALS method which alternates between parameter blocks, direct optimization
-treats the SIR model as a single non-linear optimization problem:
+This function treats the SIR negative log-likelihood as a single
+optimization problem over all parameters (theta, alpha, beta). It uses
+the BFGS quasi-Newton method with analytical gradients from the C++
+backend.
 
-\deqn{\min_{\theta, \alpha, \beta} -\ell(\theta, \alpha, \beta | Y, X, W, Z)}
+If no starting values are provided, theta is initialized by fitting a GLM
+ignoring network effects, and alpha/beta are set to small random values.
 
-where \eqn{\ell} is the log-likelihood function for the specified family.
-
-\strong{Optimization Strategy:}
-\itemize{
-  \item Uses BFGS algorithm with analytical gradients computed via C++
-  \item Gradients leverage the chain rule through the bilinear structure
-  \item Line search ensures sufficient decrease in objective
-  \item Hessian approximation updated using gradient information
-}
-
-\strong{Gradient Computation:}
-The gradient with respect to parameters is:
-\itemize{
-  \item \eqn{\nabla_\theta \ell}: Direct gradient for exogenous covariates
-  \item \eqn{\nabla_\alpha \ell}: Gradient flows through A = alpha_0 I + sum_r alpha_r W_r
-  \item \eqn{\nabla_\beta \ell}: Gradient flows through B = beta_0 I + sum_r beta_r W_r
-}
-
-\strong{Initialization:}
-If no starting values provided, uses smart initialization:
-\enumerate{
-  \item Fit GLM ignoring network effects to initialize theta
-  \item Set alpha and beta to small random values or zeros
-  \item Scale parameters based on outcome variance
-}
-
-\strong{Advantages over ALS:}
-\itemize{
-  \item Can find better global optima (not restricted to alternating updates)
-  \item Faster convergence when near optimum
-  \item Provides Hessian for standard error calculation
-  \item Single convergence criterion
-}
-
-\strong{Disadvantages:}
-\itemize{
-  \item Less stable for high-dimensional problems (p large)
-  \item Can fail with poor initialization
-  \item Memory intensive for large networks
-  \item Sensitive to scaling of covariates
-}
-
-\strong{Convergence Diagnostics:}
-The optimizer reports convergence codes:
-\itemize{
-  \item 0: Successful convergence
-  \item 1: Maximum iterations reached
-  \item 10: Degeneracy of Nelder-Mead simplex
-  \item 51: Warning from L-BFGS-B
-  \item 52: Error from L-BFGS-B
-}
+Convergence code 0 indicates success; code 1 means the maximum number of
+iterations was reached. Only supports static (3D) W.
 }
 \examples{
 \dontrun{

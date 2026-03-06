@@ -1,0 +1,102 @@
+url: https://netify-dev.github.io/sir/
+template:
+  bootstrap: 5
+
+navbar:
+  structure:
+    left:  [methodology, paper, articles, reference]
+    right: [search, github]
+  components:
+    methodology:
+      text: Methodology
+      href: articles/methodology.html
+    paper:
+      text: Paper
+      href: sir_manuscript.pdf
+
+articles:
+  - title: "Getting Started"
+    navbar: ~
+    contents:
+    - sir_overview
+    - sir_inference
+    - sir_extensions
+  - title: internal
+    contents:
+    - methodology
+
+reference:
+  - title: "Model Fitting"
+    desc: "Fit Social Influence Regression models to network data"
+    contents:
+    - sir
+    - sir_alsfit
+    - sir_optfit
+
+  - title: "S3 Methods"
+    desc: "Standard R methods for sir model objects"
+    contents:
+    - coef.sir
+    - vcov.sir
+    - confint.sir
+    - nobs.sir
+    - fitted.sir
+    - residuals.sir
+    - logLik.sir
+    - AIC.sir
+    - BIC.sir
+    - predict.sir
+    - summary.sir
+    - print.sir
+    - print.summary.sir
+    - plot.sir
+
+  - title: "Visualization"
+    desc: "Network visualization of influence matrices"
+    contents:
+    - plot_sir_network
+
+  - title: "Bootstrap & Inference"
+    desc: "Bootstrap standard errors and robust inference"
+    contents:
+    - boot_sir
+    - print.boot_sir
+    - summary.boot_sir
+    - confint.boot_sir
+
+  - title: "Counterfactual Scenarios"
+    desc: "Build counterfactual scenario arrays for prediction"
+    contents:
+    - get_scen_vals
+    - get_scen_array
+
+  - title: "Simulation & Data Preparation"
+    desc: "Simulate network data and prepare inputs for SIR models"
+    contents:
+    - sim_sir
+    - rel_covar
+    - cast_array
+    - eta_tab
+    - mll_sir
+
+  - title: "C++ Backend"
+    desc: "Optimized C++ routines for matrix operations"
+    contents:
+    - cpp_tprod_A_X_Bt
+    - cpp_amprod_W_v
+    - cpp_construct_Wbeta_design
+    - cpp_construct_Walpha_design
+    - cpp_construct_Wbeta_design_dyn
+    - cpp_construct_Walpha_design_dyn
+    - cpp_mll_gH
+    - cpp_mll_gH_dyn
+
+  - title: "Internal Helpers"
+    desc: "Internal utility functions (not exported)"
+    contents:
+    - flatten_Y
+    - flatten_Z
+    - prepare_Z_list
+    - amprod
+    - mat
+    - tprod

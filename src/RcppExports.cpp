@@ -62,6 +62,48 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_construct_Wbeta_design_dyn
+arma::mat cpp_construct_Wbeta_design_dyn(const Rcpp::List& W_field, const arma::cube& X, const arma::vec& beta);
+RcppExport SEXP _sir_cpp_construct_Wbeta_design_dyn(SEXP W_fieldSEXP, SEXP XSEXP, SEXP betaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type W_field(W_fieldSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type beta(betaSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_construct_Wbeta_design_dyn(W_field, X, beta));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_construct_Walpha_design_dyn
+arma::mat cpp_construct_Walpha_design_dyn(const Rcpp::List& W_field, const arma::cube& X, const arma::vec& alpha);
+RcppExport SEXP _sir_cpp_construct_Walpha_design_dyn(SEXP W_fieldSEXP, SEXP XSEXP, SEXP alphaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type W_field(W_fieldSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type alpha(alphaSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_construct_Walpha_design_dyn(W_field, X, alpha));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cpp_mll_gH_dyn
+Rcpp::List cpp_mll_gH_dyn(const arma::vec& tab, const arma::cube& Y, const Rcpp::List& W_field, const arma::cube& X, const Rcpp::List& Z_list, const std::string& family);
+RcppExport SEXP _sir_cpp_mll_gH_dyn(SEXP tabSEXP, SEXP YSEXP, SEXP W_fieldSEXP, SEXP XSEXP, SEXP Z_listSEXP, SEXP familySEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type tab(tabSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type W_field(W_fieldSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type Z_list(Z_listSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type family(familySEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_mll_gH_dyn(tab, Y, W_field, X, Z_list, family));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_mll_gH
 Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cube& W, const arma::cube& X, const Rcpp::List& Z_list, const std::string& family);
 RcppExport SEXP _sir_cpp_mll_gH(SEXP tabSEXP, SEXP YSEXP, SEXP WSEXP, SEXP XSEXP, SEXP Z_listSEXP, SEXP familySEXP) {
@@ -84,6 +126,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_sir_cpp_amprod_W_v", (DL_FUNC) &_sir_cpp_amprod_W_v, 2},
     {"_sir_cpp_construct_Wbeta_design", (DL_FUNC) &_sir_cpp_construct_Wbeta_design, 3},
     {"_sir_cpp_construct_Walpha_design", (DL_FUNC) &_sir_cpp_construct_Walpha_design, 3},
+    {"_sir_cpp_construct_Wbeta_design_dyn", (DL_FUNC) &_sir_cpp_construct_Wbeta_design_dyn, 3},
+    {"_sir_cpp_construct_Walpha_design_dyn", (DL_FUNC) &_sir_cpp_construct_Walpha_design_dyn, 3},
+    {"_sir_cpp_mll_gH_dyn", (DL_FUNC) &_sir_cpp_mll_gH_dyn, 6},
     {"_sir_cpp_mll_gH", (DL_FUNC) &_sir_cpp_mll_gH, 6},
     {NULL, NULL, 0}
 };

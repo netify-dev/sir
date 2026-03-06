@@ -5,7 +5,7 @@ using namespace Rcpp;
 using namespace arma;
 
 // ----------------------------------------------------------------------------
-// --- Tensor Utility Functions ---
+// --- tensor utility functions ---
 // ----------------------------------------------------------------------------
 
 //' Tensor Product for SIR Model (A * X * B')
@@ -65,13 +65,14 @@ using namespace arma;
 //'   
 // [[Rcpp::export]]
 arma::cube cpp_tprod_A_X_Bt(const arma::cube& X, const arma::mat& A, const arma::mat& B) {
-  int m = X.n_rows;
+  int n1 = A.n_rows;
+  int n2 = B.n_rows;
   int T = X.n_slices;
 
-  arma::cube AXB(m, m, T);
+  arma::cube AXB(n1, n2, T);
   arma::mat Bt = B.t();
 
-  // Loop over time T
+  // loop over time periods
   for(int t=0; t < T; ++t) {
     AXB.slice(t) = A * X.slice(t) * Bt;
   }
@@ -89,10 +90,10 @@ arma::cube cpp_tprod_A_X_Bt(const arma::cube& X, const arma::mat& A, const arma:
 //' Result = sum(k=1 to p) v[k] * W[,,k]
 //' 
 //' In the SIR model context:
-//' - A = alpha[1] * I + sum(k=2 to p) alpha[k] * W[,,k-1]
+//' - A = sum(k=1 to p) alpha[k] * W[,,k]  (alpha[1] = 1 fixed)
 //' - B = sum(k=1 to p) beta[k] * W[,,k]
 //' 
-//' The parameterization reduces the number of free parameters from O(m²) to O(p),
+//' The parameterization reduces the number of free parameters from O(m^2) to O(p),
 //' where typically p << m. This makes estimation feasible for larger networks.
 //' 
 //' Computational strategy:
@@ -133,11 +134,11 @@ arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
         stop("Dimension mismatch in cpp_amprod_W_v.");
     }
 
-    // This is equivalent to reshaping W to (m*m x p) and multiplying by v, then reshaping back.
+    // equivalent to reshaping W to (m*m x p) and multiplying by v, then reshaping back.
     // arma::mat result = arma::reshape(W, m*m, p) * v;
     // result.reshape(m, m);
 
-    // Loop implementation (often clearer and sometimes faster for small p)
+    // loop implementation (often clearer for small p)
     arma::mat result = arma::zeros<arma::mat>(m, m);
     for(int k=0; k < p; ++k) {
         if (v(k) != 0.0) {
@@ -148,10 +149,9 @@ arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
 }
 
 // ----------------------------------------------------------------------------
-// --- ALS Design Matrix Construction ---
+// --- als design matrix construction ---
 // ----------------------------------------------------------------------------
-// These functions optimize the main bottleneck in the ALS algorithm by constructing
-// the design matrices (Wbeta, Walpha) in C++ instead of slow R loops/apply calls.
+// construct als design matrices in c++ to avoid slow r loops
 
 //' Construct Design Matrix for Alpha Updates in ALS
 //' 
@@ -192,7 +192,7 @@ arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
 //'   Each column corresponds to one influence covariate, rows match vectorized Y.
 //'   
 //' @note This function is called once per ALS iteration. The resulting matrix can
-//'   be large (m²T x p), so memory usage should be considered for big networks.
+//'   be large (m^2 * T x p), so memory usage should be considered for big networks.
 //'   
 //' @examples
 //' \dontrun{
@@ -207,18 +207,18 @@ arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, c
     int p = W.n_slices;
     int T = X.n_slices;
 
-    // 1. Calculate WSbeta = W * beta (m x m matrix)
+    // 1. calculate wsbeta = w * beta (m x m matrix)
     arma::mat WSbeta = cpp_amprod_W_v(W, beta);
 
-    // 2. Calculate Wbeta design matrix ((m*m*T) x p)
+    // 2. calculate wbeta design matrix ((m*m*t) x p)
     arma::mat Wbeta_design(m*m*T, p);
 
-    // For each covariate k, calculate Wk %*% X %*% WSbeta^T and flatten
+    // for each covariate k, calculate wk * x * wsbeta^t and flatten
     for(int k=0; k < p; ++k) {
-        // This uses the optimized tprod implementation
+        // uses the optimized tprod implementation
         arma::cube Wk_X_WSbeta = cpp_tprod_A_X_Bt(X, W.slice(k), WSbeta);
-        // Flatten the resulting cube into a column vector (Column-major flattening)
-        // This ensures the flattening matches R's c(Y) order.
+        // flatten the resulting cube into a column vector (column-major)
+        // matches r's c(y) order
         Wbeta_design.col(k) = arma::vectorise(Wk_X_WSbeta);
     }
 
@@ -238,7 +238,7 @@ arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, c
 //' For covariate k and observation (i,j,t), the design matrix element is:
 //' [A * X[,,t] * W[,,k]'][i,j]
 //' 
-//' Where A = I + sum_l alpha[l] * W[,,l] is the current sender effects matrix
+//' Where A = sum_l alpha[l] * W[,,l] is the current sender effects matrix
 //' (with alpha[1] = 1 fixed for identifiability).
 //' 
 //' The algorithm mirrors the alpha update but with roles reversed:
@@ -271,16 +271,16 @@ arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, 
     int p = W.n_slices;
     int T = X.n_slices;
 
-    // 1. Calculate WSalpha = W * alpha (m x m matrix)
+    // 1. calculate wsalpha = w * alpha (m x m matrix)
     arma::mat WSalpha = cpp_amprod_W_v(W, alpha);
 
-    // 2. Calculate Walpha design matrix ((m*m*T) x p)
+    // 2. calculate walpha design matrix ((m*m*t) x p)
     arma::mat Walpha_design(m*m*T, p);
 
-    // For each covariate k, calculate WSalpha %*% X %*% Wk^T and flatten
+    // for each covariate k, calculate wsalpha * x * wk^t and flatten
     for(int k=0; k < p; ++k) {
         arma::cube WSalpha_X_Wk = cpp_tprod_A_X_Bt(X, WSalpha, W.slice(k));
-        // Flatten the resulting cube into a column vector
+        // flatten to column vector
         Walpha_design.col(k) = arma::vectorise(WSalpha_X_Wk);
     }
 
@@ -288,7 +288,267 @@ arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, 
 }
 
 // ----------------------------------------------------------------------------
-// --- Gradient and Hessian Calculation ---
+// --- dynamic W design matrix construction (4D W arrays) ---
+// ----------------------------------------------------------------------------
+
+//' Construct Design Matrix for Alpha Updates with Dynamic W
+//'
+//' @description
+//' Builds the design matrix for updating sender effects when influence
+//' covariates vary over time (4D W array: m x m x p x T).
+//'
+//' @param W_field List of T cubes, each m x m x p (one per time period).
+//' @param X Three-dimensional array (m x m x T) of network states.
+//' @param beta Vector (p x 1) of current receiver parameters.
+//'
+//' @return Matrix (m*m*T x p) design matrix for alpha GLM step.
+// [[Rcpp::export]]
+arma::mat cpp_construct_Wbeta_design_dyn(const Rcpp::List& W_field, const arma::cube& X, const arma::vec& beta) {
+    int T = X.n_slices;
+    arma::cube W0 = Rcpp::as<arma::cube>(W_field[0]);
+    int m = W0.n_rows;
+    int p = W0.n_slices;
+
+    arma::mat design(m * m * T, p, arma::fill::zeros);
+
+    for (int t = 0; t < T; ++t) {
+        arma::cube Wt = Rcpp::as<arma::cube>(W_field[t]);
+        arma::mat Bt = cpp_amprod_W_v(Wt, beta);
+        arma::mat Bt_trans = Bt.t();
+        int offset = t * m * m;
+
+        for (int k = 0; k < p; ++k) {
+            arma::mat val = Wt.slice(k) * X.slice(t) * Bt_trans;
+            design.col(k).subvec(offset, offset + m * m - 1) = arma::vectorise(val);
+        }
+    }
+    return design;
+}
+
+//' Construct Design Matrix for Beta Updates with Dynamic W
+//'
+//' @description
+//' Builds the design matrix for updating receiver effects when influence
+//' covariates vary over time (4D W array: m x m x p x T).
+//'
+//' @param W_field List of T cubes, each m x m x p (one per time period).
+//' @param X Three-dimensional array (m x m x T) of network states.
+//' @param alpha Vector (p x 1) of current sender parameters.
+//'
+//' @return Matrix (m*m*T x p) design matrix for beta GLM step.
+// [[Rcpp::export]]
+arma::mat cpp_construct_Walpha_design_dyn(const Rcpp::List& W_field, const arma::cube& X, const arma::vec& alpha) {
+    int T = X.n_slices;
+    arma::cube W0 = Rcpp::as<arma::cube>(W_field[0]);
+    int m = W0.n_rows;
+    int p = W0.n_slices;
+
+    arma::mat design(m * m * T, p, arma::fill::zeros);
+
+    for (int t = 0; t < T; ++t) {
+        arma::cube Wt = Rcpp::as<arma::cube>(W_field[t]);
+        arma::mat At = cpp_amprod_W_v(Wt, alpha);
+        int offset = t * m * m;
+
+        for (int k = 0; k < p; ++k) {
+            arma::mat val = At * X.slice(t) * Wt.slice(k).t();
+            design.col(k).subvec(offset, offset + m * m - 1) = arma::vectorise(val);
+        }
+    }
+    return design;
+}
+
+// ----------------------------------------------------------------------------
+// --- gradient and hessian for dynamic W ---
+// ----------------------------------------------------------------------------
+
+//' Calculate Gradient and Hessian with Dynamic W
+//'
+//' @description
+//' Computes gradient and Hessian of the negative log-likelihood when
+//' influence covariates W vary over time (4D: m x m x p x T). The W
+//' array is passed as a list of cubes to avoid Rcpp 4D array limitations.
+//'
+//' @param tab Parameter vector [theta, alpha_2:p, beta].
+//' @param Y Three-dimensional array (m x m x T) of outcomes.
+//' @param W_field List of T cubes, each m x m x p.
+//' @param X Three-dimensional array (m x m x T).
+//' @param Z_list List of q cubes (m x m x T), one per covariate.
+//' @param family Distribution family string.
+//'
+//' @return List with grad, hess, shess (after identifiability projection).
+// [[Rcpp::export]]
+Rcpp::List cpp_mll_gH_dyn(const arma::vec& tab, const arma::cube& Y,
+                           const Rcpp::List& W_field, const arma::cube& X,
+                           const Rcpp::List& Z_list, const std::string& family) {
+
+    int n1 = Y.n_rows;
+    int n2 = Y.n_cols;
+    int T = Y.n_slices;
+    arma::cube W0 = Rcpp::as<arma::cube>(W_field[0]);
+    int p = W0.n_slices;
+    int q = Z_list.size();
+    bool is_square = (n1 == n2);
+
+    // parse parameters
+    arma::vec theta(q);
+    if (q > 0) theta = tab.subvec(0, q - 1);
+
+    arma::vec alpha(p);
+    arma::vec beta(p);
+    if (p > 0) {
+        alpha(0) = 1.0;
+        if (p > 1) {
+            alpha.subvec(1, p - 1) = tab.subvec(q, q + p - 2);
+        }
+        beta = tab.subvec(q + p - 1, tab.n_elem - 1);
+    }
+
+    int dim_full = q + 2 * p;
+    arma::vec G(dim_full, arma::fill::zeros);
+    arma::mat H(dim_full, dim_full, arma::fill::zeros);
+    arma::mat S(dim_full, dim_full, arma::fill::zeros);
+
+    // pre-extract Z cubes
+    std::vector<arma::cube> Z_cubes(q);
+    for (int k = 0; k < q; ++k) {
+        Z_cubes[k] = Rcpp::as<arma::cube>(Z_list[k]);
+    }
+
+    arma::vec d_eta(dim_full);
+    arma::vec score_i(dim_full);
+
+    for (int t = 0; t < T; ++t) {
+        arma::cube Wt = Rcpp::as<arma::cube>(W_field[t]);
+        arma::mat Xt = X.slice(t);
+        arma::mat Yt = Y.slice(t);
+
+        // build A_t, B_t from time-specific W
+        arma::mat At = cpp_amprod_W_v(Wt, alpha);
+        arma::mat Bt = cpp_amprod_W_v(Wt, beta);
+
+        // linear predictor
+        arma::mat ZT(n1, n2, arma::fill::zeros);
+        if (q > 0) {
+            for (int k = 0; k < q; ++k) {
+                if ((int)Z_cubes[k].n_slices > t) {
+                    ZT += Z_cubes[k].slice(t) * theta(k);
+                }
+            }
+        }
+        arma::mat AXB(n1, n2, arma::fill::zeros);
+        if (p > 0) AXB = At * Xt * Bt.t();
+        arma::mat Eta = ZT + AXB;
+
+        // mu, residuals, weights
+        arma::mat Mu(n1, n2);
+        arma::mat Resid(n1, n2);
+        arma::mat Weights(n1, n2);
+
+        if (family == "poisson") {
+            arma::mat Eta_c = arma::clamp(Eta, -500.0, 500.0);
+            Mu = arma::exp(Eta_c);
+            Resid = Mu - Yt;
+            Weights = Mu;
+        } else if (family == "normal") {
+            Mu = Eta;
+            Resid = Mu - Yt;
+            Weights.fill(1.0);
+        } else if (family == "binomial") {
+            Mu = 1.0 / (1.0 + arma::exp(-Eta));
+            Resid = Mu - Yt;
+            Weights = Mu % (1.0 - Mu);
+            Weights += 1e-16;
+        } else {
+            stop("Unsupported family.");
+        }
+
+        // derivative matrices using time-specific W
+        std::vector<arma::mat> WkXBt(p);
+        std::vector<arma::mat> AXWkt(p);
+        if (p > 0) {
+            arma::mat Bt_trans = Bt.t();
+            for (int k = 0; k < p; ++k) {
+                WkXBt[k] = Wt.slice(k) * Xt * Bt_trans;
+                AXWkt[k] = At * Xt * Wt.slice(k).t();
+            }
+        }
+
+        // second derivatives
+        std::vector<arma::mat> WkXWlt(p * p);
+        if (p > 0) {
+            for (int k = 0; k < p; ++k) {
+                arma::mat WkXt = Wt.slice(k) * Xt;
+                for (int l = 0; l < p; ++l) {
+                    WkXWlt[k * p + l] = WkXt * Wt.slice(l).t();
+                }
+            }
+        }
+
+        // accumulate over dyads
+        for (int i = 0; i < n1; ++i) {
+            for (int j = 0; j < n2; ++j) {
+                if ((is_square && i == j) || std::isnan(Yt(i, j))) continue;
+                double resid_ij = Resid(i, j);
+                double weight_ij = Weights(i, j);
+
+                d_eta.zeros();
+                if (q > 0) {
+                    for (int k = 0; k < q; ++k) {
+                        d_eta(k) = Z_cubes[k](i, j, t);
+                    }
+                }
+                if (p > 0) {
+                    for (int k = 0; k < p; ++k) {
+                        d_eta(q + k) = WkXBt[k](i, j);
+                    }
+                    for (int k = 0; k < p; ++k) {
+                        d_eta(q + p + k) = AXWkt[k](i, j);
+                    }
+                }
+
+                score_i = resid_ij * d_eta;
+                G += score_i;
+                S += score_i * score_i.t();
+                H += weight_ij * (d_eta * d_eta.t());
+
+                if (p > 0) {
+                    for (int k = 0; k < p; ++k) {
+                        for (int l = 0; l < p; ++l) {
+                            double h_kl = resid_ij * WkXWlt[k * p + l](i, j);
+                            H(q + k, q + p + l) += h_kl;
+                            H(q + p + l, q + k) += h_kl;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // identifiability constraint: remove alpha_1 dimension
+    if (p == 0) {
+        return Rcpp::List::create(
+            Rcpp::Named("grad") = G,
+            Rcpp::Named("hess") = H,
+            Rcpp::Named("shess") = S
+        );
+    }
+
+    int dim_reduced = dim_full - 1;
+    arma::mat J(dim_reduced, dim_full, arma::fill::zeros);
+    if (q > 0) J.submat(0, 0, q - 1, q - 1) = arma::eye(q, q);
+    if (p > 1) J.submat(q, q + 1, q + p - 2, q + p - 1) = arma::eye(p - 1, p - 1);
+    if (p > 0) J.submat(q + p - 1, q + p, dim_reduced - 1, dim_full - 1) = arma::eye(p, p);
+
+    return Rcpp::List::create(
+        Rcpp::Named("grad") = J * G,
+        Rcpp::Named("hess") = J * H * J.t(),
+        Rcpp::Named("shess") = J * S * J.t()
+    );
+}
+
+// ----------------------------------------------------------------------------
+// --- gradient and hessian calculation ---
 // ----------------------------------------------------------------------------
 
 //' Calculate Gradient and Hessian for Direct Optimization
@@ -374,12 +634,14 @@ arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, 
 Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cube& W, const arma::cube& X,
                       const Rcpp::List& Z_list, const std::string& family) {
 
-    int m = Y.n_rows;
+    int n1 = Y.n_rows;
+    int n2 = Y.n_cols;
     int T = Y.n_slices;
     int p = W.n_slices;
     int q = Z_list.size();
+    bool is_square = (n1 == n2);
 
-    // --- 1. Parse Parameters and Setup ---
+    // --- 1. parse parameters and setup ---
     arma::vec theta(q);
     if (q > 0) {
         theta = tab.subvec(0, q-1);
@@ -401,166 +663,148 @@ Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cub
         beta = tab.subvec(start_idx_beta, tab.n_elem-1);
     }
 
-
-    // Initialize G, H, S (Full dimension q + 2p)
+    // full dimension: q (theta) + p (alpha) + p (beta)
     int dim_full = q + 2*p;
-    // Initialize gradient, Hessian, and score matrices
     arma::vec G(dim_full, fill::zeros);
     arma::mat H(dim_full, dim_full, fill::zeros);
     arma::mat S(dim_full, dim_full, fill::zeros);
 
-    // Calculate A and B matrices (m x m)
-    arma::mat A(m, m, fill::zeros);
-    arma::mat B(m, m, fill::zeros);
+    // construct A (n1 x n1) and B (n2 x n2)
+    arma::mat A(n1, n1, fill::zeros);
+    arma::mat B(n2, n2, fill::zeros);
     if (p > 0) {
         A = cpp_amprod_W_v(W, alpha);
         B = cpp_amprod_W_v(W, beta);
     }
 
-    // --- 2. Main Loop over T, i, j ---
-    // We iterate through the data to calculate G, H, S based on the NLL derivatives.
+    // pre-extract Z cubes
+    std::vector<arma::cube> Z_cubes(q);
+    for (int k = 0; k < q; ++k) {
+        Z_cubes[k] = as<arma::cube>(Z_list[k]);
+    }
+
+    // hoisted allocation for d_eta (reused each dyad)
+    arma::vec d_eta(dim_full);
+    arma::vec score_i(dim_full);
+
+    // --- 2. main loop over time ---
     for (int t = 0; t < T; ++t) {
         arma::mat Xt = X.slice(t);
         arma::mat Yt = Y.slice(t);
 
-        // Calculate linear predictor Eta_t (m x m)
-
-        // ZT part
-        arma::mat ZT(m, m, fill::zeros);
+        // linear predictor: Z*theta + A*X*B'
+        arma::mat ZT(n1, n2, fill::zeros);
         if (q > 0) {
-            for(int k=0; k<q; ++k) {
-                // Safely access the cube from the list
-                if (Z_list.size() > k) {
-                    arma::cube Zk = as<arma::cube>(Z_list[k]);
-                    if (Zk.n_slices > t) {
-                        // Extract slice t from the k-th covariate cube
-                        arma::mat Zkt = Zk.slice(t);
-                        ZT += Zkt * theta(k);
-                    }
+            for (int k = 0; k < q; ++k) {
+                if ((int)Z_cubes[k].n_slices > t) {
+                    ZT += Z_cubes[k].slice(t) * theta(k);
                 }
             }
         }
 
-
-        // Bilinear part AXB
-        arma::mat AXB(m, m, fill::zeros);
+        arma::mat AXB(n1, n2, fill::zeros);
         if (p > 0) {
             AXB = A * Xt * B.t();
         }
 
         arma::mat Eta = ZT + AXB;
 
-        // Calculate Mu (mean) and Residuals/Weights based on family
-        arma::mat Mu(m, m);
-        arma::mat Resid(m, m); // NLL residual: d(NLL)/d(eta)
-        arma::mat Weights(m, m); // Hessian weights: d^2(NLL)/d(eta)^2
+        // mu, residuals, weights by family
+        arma::mat Mu(n1, n2);
+        arma::mat Resid(n1, n2);
+        arma::mat Weights(n1, n2);
 
         if (family == "poisson") {
-            Mu = arma::exp(Eta);
+            arma::mat Eta_capped = arma::clamp(Eta, -500.0, 500.0);
+            Mu = arma::exp(Eta_capped);
             Resid = Mu - Yt;
             Weights = Mu;
         } else if (family == "normal") {
             Mu = Eta;
             Resid = Mu - Yt;
-            Weights.fill(1.0); // Assuming sigma^2=1
+            Weights.fill(1.0);
         } else if (family == "binomial") {
-            // Use arma::exp for element-wise exponentiation
-            Mu = 1.0 / (1.0 + arma::exp(-Eta)); // This is 'p'
+            Mu = 1.0 / (1.0 + arma::exp(-Eta));
             Resid = Mu - Yt;
-            Weights = Mu % (1.0 - Mu); // p*(1-p)
-            // Add small stabilization factor to weights to prevent exact zeros
+            Weights = Mu % (1.0 - Mu);
             Weights += 1e-16;
         } else {
             stop("Unsupported family.");
         }
 
-        // Loop over dyads (i, j)
-        for (int i = 0; i < m; ++i) {
-            for (int j = 0; j < m; ++j) {
-                if (i == j || std::isnan(Yt(i,j))) continue;
+        // derivative matrices: d(eta)/d(alpha_k) and d(eta)/d(beta_k)
+        std::vector<arma::mat> WkXBt(p);
+        std::vector<arma::mat> AXWkt(p);
+        if (p > 0) {
+            arma::mat Bt = B.t();
+            for (int k = 0; k < p; ++k) {
+                WkXBt[k] = W.slice(k) * Xt * Bt;
+                AXWkt[k] = A * Xt * W.slice(k).t();
+            }
+        }
+
+        // second derivatives: d^2(eta)/d(alpha_k)d(beta_l)
+        std::vector<arma::mat> WkXWlt(p * p);
+        if (p > 0) {
+            for (int k = 0; k < p; ++k) {
+                arma::mat WkXt = W.slice(k) * Xt;
+                for (int l = 0; l < p; ++l) {
+                    WkXWlt[k * p + l] = WkXt * W.slice(l).t();
+                }
+            }
+        }
+
+        // accumulate over dyads
+        for (int i = 0; i < n1; ++i) {
+            for (int j = 0; j < n2; ++j) {
+                // skip diagonal for square networks, skip NAs
+                if ((is_square && i == j) || std::isnan(Yt(i,j))) continue;
 
                 double resid_ij = Resid(i, j);
                 double weight_ij = Weights(i, j);
 
-                // --- Calculate derivatives of eta w.r.t parameters (d_eta) ---
-                // This forms the 'Xtab' vector for this observation (q + 2p vector)
+                d_eta.zeros();
 
-                arma::vec d_eta(dim_full, fill::zeros);
-
-                // 1. d_eta / d_theta (q vector)
                 if (q > 0) {
-                    for(int k=0; k<q; ++k) {
-                        arma::cube Zk = as<arma::cube>(Z_list[k]);
-                        d_eta(k) = Zk(i, j, t);
+                    for (int k = 0; k < q; ++k) {
+                        d_eta(k) = Z_cubes[k](i, j, t);
                     }
                 }
 
                 if (p > 0) {
-                    // 2. d_eta / d_alpha (p vector)
-                    // Derivative is (W_k X B^T)_{ij}
-                    for(int k=0; k<p; ++k) {
-                        // This calculation avoids explicit Xij construction
-                        arma::mat WkXB = W.slice(k) * Xt * B.t();
-                        d_eta(q + k) = WkXB(i, j);
+                    for (int k = 0; k < p; ++k) {
+                        d_eta(q + k) = WkXBt[k](i, j);
                     }
-
-                    // 3. d_eta / d_beta (p vector)
-                    // Derivative is (A X W_k^T)_{ij}
-                    for(int k=0; k<p; ++k) {
-                        arma::mat AXWk = A * Xt * W.slice(k).t();
-                        d_eta(q + p + k) = AXWk(i, j);
+                    for (int k = 0; k < p; ++k) {
+                        d_eta(q + p + k) = AXWkt[k](i, j);
                     }
                 }
 
-                // --- Update G, H, S ---
-
-                // Update Gradient (G += resid * d_eta)
-                arma::vec score_i = resid_ij * d_eta;
+                // gradient
+                score_i = resid_ij * d_eta;
                 G += score_i;
-
-                // Update Score outer product (S += score * score^T)
+                // score outer product (for sandwich SE)
                 S += score_i * score_i.t();
+                // fisher information part
+                H += weight_ij * (d_eta * d_eta.t());
 
-                // Update Hessian (H += weight * d_eta * d_eta^T + resid * d^2_eta)
-
-                // GLM part (Fisher Information approximation)
-                arma::mat H_glm = weight_ij * (d_eta * d_eta.t());
-
-                // Bilinear part (Observed Information adjustment for d^2_eta)
-                arma::mat H_adj(dim_full, dim_full, fill::zeros);
-
-                // The adjustment term is only strictly required for the Observed Information Hessian.
-                // It was included in the original R Poisson script but omitted for Normal/Binomial.
-                // We include it here for Poisson as in the original script.
+                // observed information: bilinear cross-derivatives
                 if (p > 0) {
-                    // d^2(eta)/d(alpha_k)d(beta_l) = (W_k X W_l^T)_{ij}
-
-                    // Calculate the p x p matrix of second derivatives H_ab
-                    arma::mat H_ab(p, p);
-                    for(int k=0; k<p; ++k) {
-                        for(int l=0; l<p; ++l) {
-                            arma::mat WkXWl = W.slice(k) * Xt * W.slice(l).t();
-                            H_ab(k, l) = WkXWl(i, j);
+                    for (int k = 0; k < p; ++k) {
+                        for (int l = 0; l < p; ++l) {
+                            double h_kl = resid_ij * WkXWlt[k * p + l](i, j);
+                            H(q + k, q + p + l) += h_kl;
+                            H(q + p + l, q + k) += h_kl;
                         }
                     }
-                    // Adjustment = resid * H_ab
-                    arma::mat rH_ab = resid_ij * H_ab;
-
-                    // Place into the Hessian adjustment matrix
-                    H_adj.submat(q, q + p, q + p - 1, dim_full - 1) = rH_ab;
-                    H_adj.submat(q + p, q, dim_full - 1, q + p - 1) = rH_ab.t();
                 }
-
-                H += H_glm + H_adj;
             }
         }
     }
 
-    // --- 3. Apply Identifiability Constraint (J matrix) ---
-    // J removes the dimension corresponding to alpha_1 (index q).
-
+    // --- 3. identifiability constraint ---
+    // remove alpha_1 dimension (index q in full param vector)
     if (p == 0) {
-        // No bilinear part, no J needed.
         return Rcpp::List::create(
             Rcpp::Named("grad") = G,
             Rcpp::Named("hess") = H,
@@ -571,22 +815,16 @@ Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cub
     int dim_reduced = dim_full - 1;
     arma::mat J(dim_reduced, dim_full, fill::zeros);
 
-    // Construct J matrix
-    // Identity for theta (0 to q-1)
     if (q > 0) {
         J.submat(0, 0, q - 1, q - 1) = arma::eye(q, q);
     }
-    // Identity for alpha[-1] (q to q+p-2) -> maps from (q+1 to q+p-1) in full
     if (p > 1) {
         J.submat(q, q + 1, q + p - 2, q + p - 1) = arma::eye(p - 1, p - 1);
     }
-    // Identity for beta (q+p-1 to end) -> maps from (q+p to end) in full
     if (p > 0) {
        J.submat(q + p - 1, q + p, dim_reduced - 1, dim_full - 1) = arma::eye(p, p);
     }
 
-
-    // Project G, H, S
     arma::vec grad_id = J * G;
     arma::mat hess_id = J * H * J.t();
     arma::mat shess_id = J * S * J.t();

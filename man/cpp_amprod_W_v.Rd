@@ -27,10 +27,10 @@ This function implements the parameterization:
 Result = sum(k=1 to p) v[k] * W[,,k]
 
 In the SIR model context:
-- A = alpha[1] * I + sum(k=2 to p) alpha[k] * W[,,k-1]
+- A = sum(k=1 to p) alpha[k] * W[,,k]  (alpha[1] = 1 fixed)
 - B = sum(k=1 to p) beta[k] * W[,,k]
 
-The parameterization reduces the number of free parameters from O(m²) to O(p),
+The parameterization reduces the number of free parameters from O(m^2) to O(p),
 where typically p << m. This makes estimation feasible for larger networks.
 
 Computational strategy:

@@ -34,34 +34,10 @@ Three-dimensional array (m x m x T) of linear predictors.
   before applying the link function.
 }
 \description{
-Computes the linear predictor for the Social Influence Regression model,
-combining exogenous effects and network influence through bilinear terms.
-}
-\details{
-The linear predictor has two components:
-
-\deqn{\eta_{i,j,t} = \theta^T z_{i,j,t} + \sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}}
-
-Where:
-\itemize{
-  \item First term: Linear effect of exogenous covariates
-  \item Second term: Bilinear network influence effect
-}
-
-The influence matrices are parameterized as:
-\itemize{
-  \item \eqn{A = I + \sum_{r=1}^{p-1} \alpha_r W_r} (sender effects)
-  \item \eqn{B = \beta_0 I + \sum_{r=1}^{p} \beta_r W_r} (receiver effects)
-}
-
-Note: The first alpha is fixed at 1 for identifiability.
-
-\strong{Computational Strategy:}
-\itemize{
-  \item Uses optimized C++ routines for matrix products
-  \item Exploits sparsity when present
-  \item Minimizes memory allocation through in-place operations
-}
+Computes the linear predictor \eqn{\eta_{i,j,t} = \theta^T z_{i,j,t} +
+\sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}}, combining exogenous covariate
+effects with the bilinear network influence term. Handles both static
+(3D) and dynamic (4D) W arrays.
 }
 \examples{
 \dontrun{

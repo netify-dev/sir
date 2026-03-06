@@ -11,8 +11,10 @@ sir(
   Z = NULL,
   family,
   method = "ALS",
-  calcSE = TRUE,
+  calc_se = TRUE,
   fix_receiver = FALSE,
+  symmetric = FALSE,
+  bipartite = NULL,
   kron_mode = FALSE,
   ...
 )
@@ -23,14 +25,19 @@ outcomes. Y[i,j,t] represents the directed outcome from node i to node j at time
 Can contain NA values for missing observations. The diagonal (self-loops) can be 
 included or excluded depending on the application.}
 
-\item{W}{Optional three-dimensional array of dimensions (m x m x p) containing 
-influence covariates used to parameterize the A and B matrices. W[i,j,r] represents
-the r-th influence covariate for the edge from i to j. Common choices include:
+\item{W}{Optional influence covariate array, either:
 \itemize{
-  \item Graph Laplacians or adjacency matrices from other networks
-  \item Geographic or social distance matrices
-  \item Node-level covariates expanded to edge-level
+  \item \strong{3D array} (m x m x p): Static influence covariates. W[i,j,r]
+    represents the r-th covariate for the edge from i to j. The same W is used
+    for all time periods.
+  \item \strong{4D array} (m x m x p x T): Dynamic (time-varying) influence
+    covariates. W[i,j,r,t] allows the influence structure to change over time.
+    Parameters (alpha, beta) are still estimated jointly across all periods,
+    but the influence matrices A_t and B_t vary with t. Only ALS method is
+    supported for 4D W.
 }
+Common choices include graph Laplacians, geographic distance matrices, or
+node-level covariates expanded to edge-level.
 If NULL or p=0, the model uses only identity matrices (no network influence structure).}
 
 \item{X}{Optional three-dimensional array of dimensions (m x m x T) representing the 
@@ -54,7 +61,7 @@ nature of your outcome variable.}
 (Alternating Least Squares) or "optim" (direct optimization via BFGS).
 Default is "ALS" which is generally more stable.}
 
-\item{calcSE}{Logical indicating whether to calculate standard errors for the
+\item{calc_se}{Logical indicating whether to calculate standard errors for the
 parameters. Standard errors are computed using the observed information matrix.
 Setting to FALSE speeds up computation when uncertainty quantification is not needed.}
 
@@ -65,6 +72,20 @@ influence channel. The model becomes a standard GLM, yielding proper
 standard errors. Appropriate when receiver effects are negligible.
 Default is FALSE.}
 
+\item{symmetric}{Logical. If TRUE, treats the network as undirected
+(symmetric). The function symmetrizes Y by averaging upper and lower
+triangles, uses only upper-triangle observations for fitting, and
+sets \code{fix_receiver = TRUE} (since sender/receiver distinction is
+meaningless for undirected networks). Default is FALSE.}
+
+\item{bipartite}{Logical or NULL. Indicates whether the network is
+bipartite (senders and receivers are distinct node sets). If NULL
+(the default), bipartite status is inferred from Y: non-square arrays
+(n1 != n2) are treated as bipartite. Set to TRUE explicitly for
+square arrays where senders and receivers are nonetheless distinct
+populations. Setting FALSE on a non-square Y raises an error.
+Bipartite networks require \code{fix_receiver = TRUE}.}
+
 \item{kron_mode}{Logical. If TRUE, replaces separate (alpha, beta) with a
 single p x p coefficient matrix C, where C[r,s] is the weight on
 W_r X W_s'. This is a general fix for the bilinear identification problem.
@@ -72,27 +93,72 @@ Not yet implemented. Default is FALSE.}
 
 \item{...}{Additional arguments passed to the fitting functions:
 \itemize{
-  \item \code{trace}: Logical or integer controlling output verbosity
-  \item \code{tol}: Convergence tolerance (default 1e-6)
-  \item \code{max_iter}: Maximum iterations (default 100 for ALS, 1000 for optim)
-  \item \code{init_method}: Initialization method ("smart" or "random")
+  \item \code{trace}: Logical or integer controlling output verbosity.
+  \item \code{tol}: Convergence tolerance for ALS (default 1e-8).
+  \item \code{max_iter}: Maximum ALS iterations (default 100).
 }}
 }
 \value{
-An object of class "sir" containing:
-  \item{A}{The m x m sender effects matrix}
-  \item{B}{The m x m receiver effects matrix}
-  \item{theta}{Coefficients for exogenous covariates Z}
-  \item{alpha}{Coefficients for sender influence covariates W}
-  \item{beta}{Coefficients for receiver influence covariates W}
-  \item{summ}{Summary table with coefficients and standard errors}
-  \item{ll}{Log-likelihood at convergence}
-  \item{AIC}{Akaike Information Criterion}
-  \item{BIC}{Bayesian Information Criterion}
-  \item{convergence}{Logical indicating successful convergence}
-  \item{iterations}{Number of iterations until convergence}
-  \item{history}{Iteration history of parameters and deviance (if trace=TRUE)}
-  \item{call}{The matched call}
+An object of class \code{"sir"} with the following components:
+  \describe{
+    \item{summ}{Data frame of parameter estimates with columns \code{coef},
+      \code{se} (classical SE), \code{rse} (robust/sandwich SE),
+      \code{t_se} (z-statistic using classical SE),
+      \code{t_rse} (z-statistic using robust SE). Row names identify each
+      parameter.}
+    \item{A}{Sender influence matrix. For static W: n1 x n1 matrix.
+      For dynamic (4D) W: n1 x n1 x T array. Off-diagonal entry A[i,k]
+      measures how much node k's behavior (via X) shapes node i's outgoing
+      ties. Diagonal is set to zero.}
+    \item{B}{Receiver influence matrix. Same dimensions as A.
+      Off-diagonal entry B[j,l] measures how node l's position shapes node
+      j's incoming ties. Identity when \code{fix_receiver = TRUE}.
+      Diagonal is zeroed.}
+    \item{tab}{Numeric vector of all estimated parameters in order:
+      [theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p].
+      When \code{fix_receiver = TRUE}: [theta_1, ..., theta_q, alpha_1, ..., alpha_p].}
+    \item{theta}{Coefficients for exogenous covariates Z (length q).}
+    \item{alpha}{Full alpha vector including the fixed alpha_1 = 1 (length p).
+      When \code{fix_receiver = TRUE}, all alpha are free.}
+    \item{beta}{Coefficients for receiver influence covariates (length p).
+      Empty when \code{fix_receiver = TRUE}.}
+    \item{ll}{Log-likelihood at convergence.}
+    \item{family}{The distribution family used (\code{"poisson"}, \code{"normal"},
+      or \code{"binomial"}).}
+    \item{method}{The estimation method used (\code{"ALS"} or \code{"optim"}).}
+    \item{p}{Number of influence covariates in W.}
+    \item{q}{Number of exogenous covariates in Z.}
+    \item{m}{Number of sender nodes (same as n1).}
+    \item{n1}{Number of sender (row) nodes.}
+    \item{n2}{Number of receiver (column) nodes.}
+    \item{bipartite}{Logical, TRUE if the network is bipartite (n1 != n2).}
+    \item{n_periods}{Number of time periods.}
+    \item{nobs}{Number of non-missing observations used in estimation.}
+    \item{fitted.values}{Array (n1 x n2 x T) of fitted values on the response
+      scale (counts for Poisson, probabilities for binomial, means for normal).}
+    \item{residuals}{List with three components: \code{response} (Y - fitted),
+      \code{pearson} (standardized by variance function), and
+      \code{deviance} (signed square root of deviance contributions).}
+    \item{vcov}{Variance-covariance matrix of parameters from the Hessian
+      (classical SEs). NULL if \code{calc_se = FALSE}.}
+    \item{vcov_robust}{Sandwich (robust) variance-covariance matrix.
+      NULL if \code{calc_se = FALSE} or computation failed.}
+    \item{Y}{The outcome array as used in fitting (with NAs from symmetric
+      masking or Z missingness applied).}
+    \item{W}{The influence covariate array.}
+    \item{X}{The network state array (NAs replaced with 0).}
+    \item{Z}{The exogenous covariate array (converted to 4D if 3D input).}
+    \item{fix_receiver}{Logical, whether receiver effects were fixed.}
+    \item{symmetric}{Logical, whether the network was treated as undirected.}
+    \item{kron_mode}{Logical, whether Kronecker mode was used.}
+    \item{iterations}{Number of iterations until convergence.}
+    \item{history}{List with matrices ALPHA, BETA, THETA, DEV tracking
+      parameter trajectories across iterations (useful for convergence
+      diagnostics).}
+    \item{convergence}{Logical, TRUE if the algorithm converged.}
+    \item{call}{The matched function call.}
+    \item{sigma2}{Estimated error variance (only for \code{family = "normal"}).}
+  }
 }
 \description{
 Fits a Social Influence Regression model for network data with social influence effects.
@@ -101,8 +167,10 @@ interaction terms, allowing for both sender and receiver effects in directed net
 
 The model decomposes network influence into two components:
 \itemize{
-  \item \strong{Sender effects (A matrix)}: How much influence node i exerts on others
-  \item \strong{Receiver effects (B matrix)}: How susceptible node j is to influence from others
+  \item \strong{Sender influence (A matrix)}: A[i,k] measures how much node k's
+    behavior (via X) shapes node i's outgoing ties.
+  \item \strong{Receiver influence (B matrix)}: B[j,l] measures how node l's
+    position shapes node j's incoming ties.
 }
 }
 \details{
@@ -124,11 +192,11 @@ Where:
 The bilinear term \eqn{\sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}} captures network influence
 and can be parameterized using influence covariates W through:
 \itemize{
-  \item \eqn{A = \alpha_0 I + \sum_{r=1}^{p} \alpha_r W_r} (sender effects)
-  \item \eqn{B = \beta_0 I + \sum_{r=1}^{p} \beta_r W_r} (receiver effects)
+  \item \eqn{A = \sum_{r=1}^{p} \alpha_r W_r} (sender effects, \eqn{\alpha_1 = 1} fixed)
+  \item \eqn{B = \sum_{r=1}^{p} \beta_r W_r} (receiver effects)
 }
 
-This parameterization reduces the number of parameters from O(m²) to O(p), where p << m.
+This parameterization reduces the number of parameters from \eqn{O(m^2)} to \eqn{O(p)}, where \eqn{p \ll m}.
 }
 \section{Estimation Methods}{
 
@@ -156,59 +224,41 @@ This parameterization reduces the number of parameters from O(m²) to O(p), wher
 \strong{Poisson:} For count data (e.g., number of interactions)
 \itemize{
   \item Link function: log
-  \item Variance function: V(μ) = μ
+  \item Variance function: \eqn{V(\mu) = \mu}
   \item Use when: Y_ijt represents counts
 }
 
 \strong{Normal:} For continuous data (e.g., trade volumes, distances)
 \itemize{
   \item Link function: identity
-  \item Variance function: V(μ) = σ²
+  \item Variance function: \eqn{V(\mu) = \sigma^2}
   \item Use when: Y_ijt is continuous and approximately normal
 }
 
 \strong{Binomial:} For binary data (e.g., presence/absence of ties)
 \itemize{
   \item Link function: logit
-  \item Variance function: V(μ) = μ(1-μ)
+  \item Variance function: \eqn{V(\mu) = \mu(1 - \mu)}
   \item Use when: Y_ijt is binary (0/1)
 }
 }
 
 \examples{
-\dontrun{
-# Generate example network data
+\donttest{
 set.seed(123)
-m <- 20  # number of nodes
-T <- 10  # number of time periods
-
-# Create synthetic network with influence
-Y <- array(rpois(m*m*T, lambda=2), dim=c(m,m,T))
-
-# Use lagged Y as influence carrier
-X <- array(0, dim=c(m,m,T))
-X[,,2:T] <- Y[,,1:(T-1)]
-
-# Create influence covariates (e.g., based on node attributes)
-W <- array(rnorm(m*m*2), dim=c(m,m,2))
-
-# Fit SIR model with Poisson family
-model <- sir(Y=Y, W=W, X=X, family="poisson", method="ALS")
-
-# View results
-summary(model)
-plot(model)
-
-# Extract influence matrices
-A_matrix <- model$A  # Sender effects
-B_matrix <- model$B  # Receiver effects
+m <- 8; T_len <- 5; p <- 2
+Y <- array(rpois(m * m * T_len, lambda = 2), dim = c(m, m, T_len))
+X <- array(0, dim = c(m, m, T_len))
+X[,,2:T_len] <- Y[,,1:(T_len - 1)]
+W <- array(rnorm(m * m * p), dim = c(m, m, p))
+model <- sir(Y = Y, W = W, X = X, family = "poisson",
+             method = "ALS", calc_se = FALSE, max_iter = 10)
+print(model)
+coef(model)
 }
 
 }
 \references{
-Minhas, S., Hoff, P. D., & Ward, M. D. (2019). Inferential approaches for 
-network analysis: AMEN for latent factor models. Political Analysis, 27(2), 208-222.
-
-Hoff, P. D. (2021). Additive and multiplicative effects network models. 
-Statistical Science, 36(1), 34-50.
+Minhas, S. & Hoff, P. D. (2025). Social Influence Regression.
+Political Analysis.
 }

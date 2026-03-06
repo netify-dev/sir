@@ -46,7 +46,7 @@ loops or apply functions, making ALS feasible for larger networks.
 }
 \note{
 This function is called once per ALS iteration. The resulting matrix can
-  be large (m²T x p), so memory usage should be considered for big networks.
+  be large (m^2 * T x p), so memory usage should be considered for big networks.
 }
 \examples{
 \dontrun{

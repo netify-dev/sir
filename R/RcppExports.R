@@ -71,10 +71,10 @@ cpp_tprod_A_X_Bt <- function(X, A, B) {
 #' Result = sum(k=1 to p) v[k] * W[,,k]
 #' 
 #' In the SIR model context:
-#' - A = alpha[1] * I + sum(k=2 to p) alpha[k] * W[,,k-1]
+#' - A = sum(k=1 to p) alpha[k] * W[,,k]  (alpha[1] = 1 fixed)
 #' - B = sum(k=1 to p) beta[k] * W[,,k]
 #' 
-#' The parameterization reduces the number of free parameters from O(m²) to O(p),
+#' The parameterization reduces the number of free parameters from O(m^2) to O(p),
 #' where typically p << m. This makes estimation feasible for larger networks.
 #' 
 #' Computational strategy:
@@ -149,7 +149,7 @@ cpp_amprod_W_v <- function(W, v) {
 #'   Each column corresponds to one influence covariate, rows match vectorized Y.
 #'   
 #' @note This function is called once per ALS iteration. The resulting matrix can
-#'   be large (m²T x p), so memory usage should be considered for big networks.
+#'   be large (m^2 * T x p), so memory usage should be considered for big networks.
 #'   
 #' @examples
 #' \dontrun{
@@ -175,7 +175,7 @@ cpp_construct_Wbeta_design <- function(W, X, beta) {
 #' For covariate k and observation (i,j,t), the design matrix element is:
 #' [A * X[,,t] * W[,,k]'][i,j]
 #' 
-#' Where A = I + sum_l alpha[l] * W[,,l] is the current sender effects matrix
+#' Where A = sum_l alpha[l] * W[,,l] is the current sender effects matrix
 #' (with alpha[1] = 1 fixed for identifiability).
 #' 
 #' The algorithm mirrors the alpha update but with roles reversed:
@@ -204,6 +204,55 @@ cpp_construct_Wbeta_design <- function(W, X, beta) {
 #' }
 cpp_construct_Walpha_design <- function(W, X, alpha) {
     .Call(`_sir_cpp_construct_Walpha_design`, W, X, alpha)
+}
+
+#' Construct Design Matrix for Alpha Updates with Dynamic W
+#'
+#' @description
+#' Builds the design matrix for updating sender effects when influence
+#' covariates vary over time (4D W array: m x m x p x T).
+#'
+#' @param W_field List of T cubes, each m x m x p (one per time period).
+#' @param X Three-dimensional array (m x m x T) of network states.
+#' @param beta Vector (p x 1) of current receiver parameters.
+#'
+#' @return Matrix (m*m*T x p) design matrix for alpha GLM step.
+cpp_construct_Wbeta_design_dyn <- function(W_field, X, beta) {
+    .Call(`_sir_cpp_construct_Wbeta_design_dyn`, W_field, X, beta)
+}
+
+#' Construct Design Matrix for Beta Updates with Dynamic W
+#'
+#' @description
+#' Builds the design matrix for updating receiver effects when influence
+#' covariates vary over time (4D W array: m x m x p x T).
+#'
+#' @param W_field List of T cubes, each m x m x p (one per time period).
+#' @param X Three-dimensional array (m x m x T) of network states.
+#' @param alpha Vector (p x 1) of current sender parameters.
+#'
+#' @return Matrix (m*m*T x p) design matrix for beta GLM step.
+cpp_construct_Walpha_design_dyn <- function(W_field, X, alpha) {
+    .Call(`_sir_cpp_construct_Walpha_design_dyn`, W_field, X, alpha)
+}
+
+#' Calculate Gradient and Hessian with Dynamic W
+#'
+#' @description
+#' Computes gradient and Hessian of the negative log-likelihood when
+#' influence covariates W vary over time (4D: m x m x p x T). The W
+#' array is passed as a list of cubes to avoid Rcpp 4D array limitations.
+#'
+#' @param tab Parameter vector [theta, alpha_2:p, beta].
+#' @param Y Three-dimensional array (m x m x T) of outcomes.
+#' @param W_field List of T cubes, each m x m x p.
+#' @param X Three-dimensional array (m x m x T).
+#' @param Z_list List of q cubes (m x m x T), one per covariate.
+#' @param family Distribution family string.
+#'
+#' @return List with grad, hess, shess (after identifiability projection).
+cpp_mll_gH_dyn <- function(tab, Y, W_field, X, Z_list, family) {
+    .Call(`_sir_cpp_mll_gH_dyn`, tab, Y, W_field, X, Z_list, family)
 }
 
 #' Calculate Gradient and Hessian for Direct Optimization

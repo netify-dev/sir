@@ -1,10 +1,10 @@
 
 #' @useDynLib sir, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
-#' @importFrom stats dpois dnorm dbinom qnorm rnorm rgamma rpois rbinom vcov model.matrix
+#' @importFrom stats dpois dnorm dbinom qnorm rnorm rgamma rpois rbinom runif vcov model.matrix
 NULL
 
-# ---- Helper functions for data handling ----
+# helper functions for data handling
 
 #' Prepare Z Array for C++ Consumption
 #'
@@ -53,7 +53,7 @@ NULL
 #' }
 prepare_Z_list <- function(Z) {
   if (is.null(Z) || length(dim(Z)) == 0) {
-    return(list())
+	return(list())
   }
 
   dims <- dim(Z)
@@ -61,17 +61,17 @@ prepare_Z_list <- function(Z) {
   m <- dims[1]
 
   if (ndims == 3) {
-    # Assume (m x m x T) and q=1
-    T_len <- dims[3]
-    # Ensure it remains 3D even if T=1 or m=1
-    if (is.null(dim(Z))) {
-        Z <- array(Z, dim=c(m, m, T_len))
-    }
-    return(list(Z))
+	# (m x m x T) with q=1
+	T_len <- dims[3]
+	# keep 3D even if T=1 or m=1
+	if (is.null(dim(Z))) {
+		Z <- array(Z, dim=c(m, m, T_len))
+	}
+	return(list(Z))
   }
 
   if (ndims != 4) {
-    stop("Z must be a 3D or 4D array.")
+	cli::cli_abort("Z must be a 3D or 4D array.")
   }
 
   # Z is (m x m x q x T)
@@ -79,16 +79,30 @@ prepare_Z_list <- function(Z) {
   T_len <- dims[4]
 
   Z_list <- lapply(1:q, function(k) {
-      # Extract the (m x m x T) cube for the k-th covariate
-      Zk <- Z[,,k,]
-      # Ensure it remains a 3D array even if T=1 or m=1
-      if (is.null(dim(Zk)) || length(dim(Zk)) < 3) {
-          Zk <- array(Zk, dim=c(m, m, T_len))
-      }
-      return(Zk)
+	  # extract (m x m x T) cube for covariate k
+	  Zk <- Z[,,k,]
+	  # keep 3D even if T=1 or m=1
+	  if (is.null(dim(Zk)) || length(dim(Zk)) < 3) {
+		  Zk <- array(Zk, dim=c(m, m, T_len))
+	  }
+	  return(Zk)
   })
 
   return(Z_list)
+}
+
+# convert 4D W array (m x m x p x T) to a list of T cubes for C++
+prepare_W_field <- function(W) {
+	T_len <- dim(W)[4]
+	m <- dim(W)[1]
+	p <- dim(W)[3]
+	lapply(seq_len(T_len), function(t) {
+		Wt <- W[,,,t]
+		if (is.null(dim(Wt)) || length(dim(Wt)) < 3) {
+			Wt <- array(Wt, dim = c(m, m, p))
+		}
+		Wt
+	})
 }
 
 #' Flatten Y Array for GLM Input
@@ -109,7 +123,7 @@ prepare_Z_list <- function(Z) {
 #'   
 #' @return Numeric vector of length m*m*T containing flattened outcomes.
 flatten_Y <- function(Y) {
-    return(c(Y))
+	return(c(Y))
 }
 
 #' Flatten Z Array for GLM Input
@@ -143,64 +157,40 @@ flatten_Y <- function(Y) {
 #' @return Design matrix with dimensions (m*m*T) x q, or NULL if Z is NULL.
 #'   Column names are preserved from dimension names or auto-generated.
 flatten_Z <- function(Z) {
-    if (is.null(Z)) return(NULL)
+	if (is.null(Z)) return(NULL)
 
-    dims <- dim(Z)
-    ndims <- length(dims)
+	dims <- dim(Z)
+	ndims <- length(dims)
 
-    if (ndims == 3) {
-        # (m x m x T), q=1
-        Z_flat <- matrix(c(Z), ncol=1)
-        cname <- if (!is.null(dimnames(Z)[[3]])) dimnames(Z)[[3]][1] else "Z1"
-        colnames(Z_flat) <- cname
-        return(Z_flat)
-    }
+	if (ndims == 3) {
+		# (m x m x T), q=1
+		Z_flat <- matrix(c(Z), ncol=1)
+		cname <- if (!is.null(dimnames(Z)[[3]])) dimnames(Z)[[3]][1] else "Z1"
+		colnames(Z_flat) <- cname
+		return(Z_flat)
+	}
 
-    # (m x m x q x T)
-    q <- dims[3]
-    # Permute Z to (m, m, T, q) for correct flattening order when using c() or matrix()
-    Z_perm <- aperm(Z, c(1, 2, 4, 3))
-    Z_flat <- matrix(Z_perm, ncol = q)
+	# (m x m x q x T)
+	q <- dims[3]
+	# permute to (m, m, T, q) for correct flattening order
+	Z_perm <- aperm(Z, c(1, 2, 4, 3))
+	Z_flat <- matrix(Z_perm, ncol = q)
 
-    cnames <- if (!is.null(dimnames(Z)[[3]])) dimnames(Z)[[3]] else paste0("Z", 1:q)
-    colnames(Z_flat) <- cnames
-    return(Z_flat)
+	cnames <- if (!is.null(dimnames(Z)[[3]])) dimnames(Z)[[3]] else paste0("Z", 1:q)
+	colnames(Z_flat) <- cnames
+	return(Z_flat)
 }
 
 
-# ---- Core Model Components (R wrappers using Cpp) ----
+# core model components (R wrappers around C++)
 
 #' Calculate Linear Predictor (eta) for SIR Model
 #'
 #' @description
-#' Computes the linear predictor for the Social Influence Regression model,
-#' combining exogenous effects and network influence through bilinear terms.
-#'
-#' @details
-#' The linear predictor has two components:
-#' 
-#' \deqn{\eta_{i,j,t} = \theta^T z_{i,j,t} + \sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}}
-#' 
-#' Where:
-#' \itemize{
-#'   \item First term: Linear effect of exogenous covariates
-#'   \item Second term: Bilinear network influence effect
-#' }
-#' 
-#' The influence matrices are parameterized as:
-#' \itemize{
-#'   \item \eqn{A = I + \sum_{r=1}^{p-1} \alpha_r W_r} (sender effects)
-#'   \item \eqn{B = \beta_0 I + \sum_{r=1}^{p} \beta_r W_r} (receiver effects)
-#' }
-#' 
-#' Note: The first alpha is fixed at 1 for identifiability.
-#' 
-#' \strong{Computational Strategy:}
-#' \itemize{
-#'   \item Uses optimized C++ routines for matrix products
-#'   \item Exploits sparsity when present
-#'   \item Minimizes memory allocation through in-place operations
-#' }
+#' Computes the linear predictor \eqn{\eta_{i,j,t} = \theta^T z_{i,j,t} +
+#' \sum_{k,l} X_{k,l,t} A_{i,k} B_{j,l}}, combining exogenous covariate
+#' effects with the bilinear network influence term. Handles both static
+#' (3D) and dynamic (4D) W arrays.
 #'
 #' @param tab Numeric vector of parameters. For the standard model, ordered as
 #'   [theta, alpha_2:p, beta_1:p] (length q + 2p - 1). For fix_receiver mode,
@@ -246,64 +236,71 @@ flatten_Z <- function(Z) {
 #' }
 #' @export
 eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
+  dynamic_W <- !is.null(W) && length(dim(W)) == 4
   p <- if (is.null(W)) 0 else dim(W)[3]
-  q <- if (is.null(Z)) 0 else dim(Z)[3]
-  m <- dim(X)[1]
+  q <- if (is.null(Z)) 0 else if (length(dim(Z)) == 3) 1 else dim(Z)[3]
+  n1 <- dim(X)[1]
+  n2 <- dim(X)[2]
+  m <- n1
   T_len <- dim(X)[3]
 
-  # Parse parameters
+  # parse parameters
   if (q > 0) {
-      theta <- tab[1:q]
+	  theta <- tab[1:q]
   } else {
-      theta <- numeric(0)
+	  theta <- numeric(0)
   }
 
   if (fix_receiver && p > 0) {
-      # fix_receiver: tab = [theta, alpha_1:p], B = I
-      alpha <- tab[(q+1):(q+p)]
+	  # fix_receiver: tab = [theta, alpha_1:p], B = I
+	  alpha <- tab[(q+1):(q+p)]
   } else if (p > 0) {
-      if (p > 1) {
-          alpha_start = q + 1
-          alpha_end = q + p - 1
-          alpha <- c(1, tab[alpha_start:alpha_end])
-      } else {
-          alpha <- c(1)
-      }
-      beta_start = q + p
-      beta <- tab[beta_start:length(tab)]
+	  if (p > 1) {
+		  alpha_start <- q + 1
+		  alpha_end <- q + p - 1
+		  alpha <- c(1, tab[alpha_start:alpha_end])
+	  } else {
+		  alpha <- c(1)
+	  }
+	  beta_start <- q + p
+	  beta <- tab[beta_start:length(tab)]
   }
 
-
-  # Bilinear part: AXB
-  if (fix_receiver && p > 0) {
-      A <- cpp_amprod_W_v(W, alpha)
-      B <- diag(m)
-      AXB <- cpp_tprod_A_X_Bt(X, A, B)
+  # bilinear part: AXB
+  if (dynamic_W && p > 0) {
+	  # dynamic W: compute A_t * X_t * B_t' per period
+	  AXB <- array(0, dim = c(n1, n2, T_len))
+	  for (t in seq_len(T_len)) {
+		  W_t <- W[,,,t]
+		  A_t <- cpp_amprod_W_v(W_t, alpha)
+		  if (fix_receiver) {
+			  AXB[,,t] <- A_t %*% X[,,t]
+		  } else {
+			  B_t <- cpp_amprod_W_v(W_t, beta)
+			  AXB[,,t] <- A_t %*% X[,,t] %*% t(B_t)
+		  }
+	  }
+  } else if (fix_receiver && p > 0) {
+	  A <- cpp_amprod_W_v(W, alpha)
+	  B <- diag(n2)
+	  AXB <- cpp_tprod_A_X_Bt(X, A, B)
   } else if (p > 0) {
-      # Build A, B using optimized C++ amprod wrapper
-      A <- cpp_amprod_W_v(W, alpha)
-      B <- cpp_amprod_W_v(W, beta)
-
-      # Calculate AXB using optimized C++ tprod wrapper
-      AXB <- cpp_tprod_A_X_Bt(X, A, B)
+	  A <- cpp_amprod_W_v(W, alpha)
+	  B <- cpp_amprod_W_v(W, beta)
+	  AXB <- cpp_tprod_A_X_Bt(X, A, B)
   } else {
-      AXB <- array(0, dim=c(m, m, T_len))
+	  AXB <- array(0, dim=c(n1, n2, T_len))
   }
 
-  # Exogenous part: ZT
+  # exogenous part: ZT
   if (q > 0) {
-    # We use the R implementation of amprod for the 4D Z contraction,
-    # as the C++ optimization focused on the 3D cases.
-    # Ensure Z is 4D before calling amprod on mode 3
-    if (length(dim(Z)) == 3) {
-        Z <- array(Z, dim=c(m, m, 1, T_len))
-    }
-    ZT  <- amprod(Z, matrix(theta, nrow=1), 3)
-    # Squeeze the result dimension (m x m x 1 x T) -> (m x m x T)
-    ZT <- array(ZT, dim=c(m, m, T_len))
-
+	if (length(dim(Z)) == 3) {
+		Z <- array(Z, dim=c(n1, n2, 1, T_len))
+	}
+	ZT  <- amprod(Z, matrix(theta, nrow=1), 3)
+	ZT <- array(ZT, dim=c(n1, n2, T_len))
   } else {
-    ZT <- array(0, dim=c(m, m, T_len))
+	ZT <- array(0, dim=c(n1, n2, T_len))
   }
 
   ZT + AXB
@@ -312,32 +309,9 @@ eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
 #' Calculate Negative Log-Likelihood for SIR Model
 #'
 #' @description
-#' Computes the negative log-likelihood for the Social Influence Regression model
-#' under the specified distributional family. Used as the objective function
-#' for parameter estimation.
-#'
-#' @details
-#' The likelihood depends on the distributional family:
-#' 
-#' \strong{Poisson:} For count outcomes
-#' \deqn{L = \prod_{i,j,t} \frac{e^{-\lambda_{ijt}} \lambda_{ijt}^{y_{ijt}}}{y_{ijt}!}}
-#' where \eqn{\lambda_{ijt} = \exp(\eta_{ijt})}
-#' 
-#' \strong{Normal:} For continuous outcomes
-#' \deqn{L = \prod_{i,j,t} \frac{1}{\sqrt{2\pi\sigma^2}} \exp\left(-\frac{(y_{ijt} - \mu_{ijt})^2}{2\sigma^2}\right)}
-#' where \eqn{\mu_{ijt} = \eta_{ijt}} (identity link)
-#' 
-#' \strong{Binomial:} For binary outcomes
-#' \deqn{L = \prod_{i,j,t} p_{ijt}^{y_{ijt}} (1-p_{ijt})^{1-y_{ijt}}}
-#' where \eqn{p_{ijt} = \frac{1}{1 + \exp(-\eta_{ijt})}} (logit link)
-#' 
-#' \strong{Numerical Stability:}
-#' \itemize{
-#'   \item Uses log-space computations to avoid underflow
-#'   \item Bounds probabilities away from 0 and 1 for binomial
-#'   \item Caps extreme values of lambda for Poisson
-#'   \item Handles NA values by exclusion from likelihood
-#' }
+#' Computes the negative log-likelihood for the SIR model under the specified
+#' distributional family. Diagonal entries (self-ties) and NA values are
+#' excluded. Used as the objective function for parameter estimation.
 #'
 #' @param tab Numeric vector of parameters [theta, alpha_2:p, beta_1:p].
 #'   
@@ -382,46 +356,52 @@ eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
 mll_sir <- function(tab, Y, W, X, Z, family, fix_receiver=FALSE) {
   ETA <- eta_tab(tab, W, X, Z, fix_receiver=fix_receiver)
 
+  # exclude diagonal (self-ties) to match C++ gradient/hessian which skips i == j
+  n1 <- dim(Y)[1]
+  n2 <- dim(Y)[2]
+  T_len <- dim(Y)[3]
+  if (n1 == n2) {
+	for (t in seq_len(T_len)) {
+	  diag(Y[,,t]) <- NA
+	  diag(ETA[,,t]) <- NA
+	}
+  }
+
   if (family == "poisson") {
-    # Use dpois for numerical stability
-    # Ensure lambda > 0
-    lambda <- exp(ETA)
-    # Stabilization for very large lambda
-    lambda[lambda > 1e300] <- 1e300
-    nll <- -sum(dpois(Y, lambda = lambda, log = TRUE), na.rm = TRUE)
+	lambda <- exp(ETA)
+	lambda[lambda > 1e300] <- 1e300
+	# guard against lambda underflowing to 0
+	lambda[lambda < 1e-300] <- 1e-300
+	nll <- -sum(dpois(Y, lambda = lambda, log = TRUE), na.rm = TRUE)
   } else if (family == "normal") {
-    # Use dnorm (assuming sd=1, as the fitting procedure estimates sigma^2 separately if needed)
-    nll <- -sum(dnorm(Y, mean = ETA, sd = 1, log = TRUE), na.rm = TRUE)
+	nll <- -sum(dnorm(Y, mean = ETA, sd = 1, log = TRUE), na.rm = TRUE)
   } else if (family == "binomial") {
-    # Use dbinom for stability
-    prob <- 1/(1+exp(-ETA))
-    # Stabilization for probabilities near 0 or 1
-    prob[prob < 1e-15] <- 1e-15
-    prob[prob > 1 - 1e-15] <- 1 - 1e-15
-    nll <- -sum(dbinom(Y, size = 1, prob = prob, log = TRUE), na.rm = TRUE)
+	prob <- 1 / (1 + exp(-ETA))
+	prob[prob < 1e-15] <- 1e-15
+	prob[prob > 1 - 1e-15] <- 1 - 1e-15
+	nll <- -sum(dbinom(Y, size = 1, prob = prob, log = TRUE), na.rm = TRUE)
   } else {
-    stop("Unsupported family in mll_sir.")
+	cli::cli_abort("Unsupported family in {.fn mll_sir}: {.val {family}}.")
   }
 
   return(nll)
 }
 
 
-# ---- Functions from tfunctions.r (R Fallbacks) ----
-# Including R implementations of tensor functions for use cases not covered by the optimized Cpp (e.g. 4D ZT calculation)
+# r fallback tensor functions (used for 4D Z calculations not covered by C++)
 
 #' Matricization (R implementation)
 #' @keywords internal
 mat<-function(A,k)
 {
-  # Handle vector case
+  # handle vector case
   if (is.null(dim(A))) {
-      if (k==1) return(matrix(A, ncol=1))
-      else stop("Invalid mode for vector.")
+	  if (k==1) return(matrix(A, ncol=1))
+	  else cli::cli_abort("Invalid mode for vector in {.fn mat}.")
   }
 
   Ak<-t(apply(A,k,"c"))
-  # Ensure Ak is a matrix and handle dimension issues during transposition
+  # ensure Ak is a matrix, handle dimension issues
   if(!is.matrix(Ak)) Ak <- matrix(Ak, nrow=dim(A)[k])
   if(is.matrix(Ak) && nrow(Ak)!=dim(A)[k])  { Ak<-t(Ak) }
   Ak
@@ -433,30 +413,29 @@ mat<-function(A,k)
 #' @keywords internal
 amprod<-function(A,M,k)
 {
-  if(is.vector(M)) { M<-matrix(M,nrow=1) } # Treat vectors as row matrices by default for this implementation
+  if(is.vector(M)) { M<-matrix(M,nrow=1) } # treat vectors as row matrices
 
   K<-length(dim(A))
-  if(is.null(K)) { # A is a vector
-      if (k!=1) stop("Invalid mode for vector.")
-      AM <- M %*% A
-      return(c(AM)) # Return vector
+  if(is.null(K)) { # a is a vector
+	  if (k!=1) cli::cli_abort("Invalid mode for vector in {.fn amprod}.")
+	  AM <- M %*% A
+	  return(c(AM)) # Return vector
   }
 
   A_mat <- mat(A,k)
 
   if (ncol(M) != nrow(A_mat)) {
-      # Handle potential transposition issues if dim(A)[k] is 1
-      if (ncol(M) == ncol(A_mat) && nrow(A_mat) == 1 && dim(A)[k] == 1) {
-           A_mat <- t(A_mat)
-      } else {
-        # Provide detailed dimension info for debugging
-        stop(paste("Dimension mismatch in R amprod. k=", k, "dim(M) =", paste(dim(M), collapse="x"), ", dim(A)[k] =", dim(A)[k], ", nrow(A_mat)=", nrow(A_mat)))
-      }
+	  # handle transposition issues if dim(A)[k] is 1
+	  if (ncol(M) == ncol(A_mat) && nrow(A_mat) == 1 && dim(A)[k] == 1) {
+		   A_mat <- t(A_mat)
+	  } else {
+		cli::cli_abort("Dimension mismatch in {.fn amprod}: k={.val {k}}, dim(M)={.val {paste(dim(M), collapse='x')}}, dim(A)[k]={.val {dim(A)[k]}}, nrow(A_mat)={.val {nrow(A_mat)}}.")
+	  }
   }
 
   AM<-M %*% A_mat
 
-  # Determine new dimensions
+  # determine new dimensions
   dims_A <- dim(A)
   new_dims <- c(dim(M)[1], dims_A[-k])
 
@@ -464,17 +443,17 @@ amprod<-function(A,M,k)
 
   AMA<-array(AM, dim=new_dims)
 
-  # Handle permutation
+  # handle permutation
   if (K > 1) {
-    # Calculate permutation vector
-    perm_order <- c(k, (1:K)[-k])
-    # We need the inverse permutation to restore the original order relative to the new dimensions
-    inv_perm <- match(1:K, perm_order)
+	# calculate permutation vector
+	perm_order <- c(k, (1:K)[-k])
+	# inverse permutation to restore original dimension order
+	inv_perm <- match(1:K, perm_order)
 
-    if (any(is.na(inv_perm))) {
-        return(AMA) # Should not happen
-    }
-    AMA <- aperm(AMA, inv_perm)
+	if (any(is.na(inv_perm))) {
+		return(AMA) # Should not happen
+	}
+	AMA <- aperm(AMA, inv_perm)
   }
   AMA
 }
@@ -485,14 +464,14 @@ tprod<-function(A,B,modes=1:length(B))
 {
   X<-A
   for(i in seq_along(modes)) {
-    k <- modes[i]
-    M <- B[[i]]
-    X<-amprod(X, M, k)
+	k <- modes[i]
+	M <- B[[i]]
+	X<-amprod(X, M, k)
   }
   X
 }
 
-# ---- Functions from mltrHelpers.R (Data Prep) ----
+# data prep helpers
 
 #' Cast Directed Dyadic Data into Array Format
 #' 
@@ -526,7 +505,7 @@ tprod<-function(A,B,modes=1:length(B))
 #' Missing edges in the input are filled with zeros in the output array.
 #' This assumes that absence of an edge means zero interaction.
 #' 
-#' @param dyadData Data frame in long format with columns i, j, t, and the
+#' @param dyad_data Data frame in long format with columns i, j, t, and the
 #'   value variable specified by var parameter.
 #'   
 #' @param var Character string naming the column containing the values to
@@ -557,7 +536,7 @@ tprod<-function(A,B,modes=1:length(B))
 #' )
 #' 
 #' # Convert to array
-#' trade_array <- castArray(dyad_data, "trade")
+#' trade_array <- cast_array(dyad_data, "trade")
 #' dim(trade_array)  # 3 x 3 x 1
 #' 
 #' # Monadic example (node GDP)
@@ -568,38 +547,45 @@ tprod<-function(A,B,modes=1:length(B))
 #'   gdp = rep(c(1000,2000,1500), each=3)
 #' )
 #' 
-#' gdp_array <- castArray(node_data, "gdp", monadic=TRUE, row=TRUE)
+#' gdp_array <- cast_array(node_data, "gdp", monadic=TRUE, row=TRUE)
 #' diag(gdp_array[,,1])  # Shows node GDPs on diagonal
 #' }
 #' 
-#' @importFrom reshape2 acast
 #' @export
-castArray = function(dyadData, var, monadic=FALSE, row=FALSE){
-	# Assumes dyadData has columns i, j, t, and the value.var
-	arr = reshape2::acast(dyadData, i ~ j ~ t, value.var=var)
-	arr[is.na(arr)] = 0
+cast_array <- function(dyad_data, var, monadic=FALSE, row=FALSE){
+	# reshape long-format dyadic data into 3D array
+	i_levels <- sort(unique(as.character(dyad_data$i)))
+	j_levels <- sort(unique(as.character(dyad_data$j)))
+	t_levels <- sort(unique(as.character(dyad_data$t)))
+	arr <- array(0, dim = c(length(i_levels), length(j_levels), length(t_levels)),
+				 dimnames = list(i_levels, j_levels, t_levels))
+	i_idx <- match(as.character(dyad_data$i), i_levels)
+	j_idx <- match(as.character(dyad_data$j), j_levels)
+	t_idx <- match(as.character(dyad_data$t), t_levels)
+	for (row_n in seq_len(nrow(dyad_data))) {
+		arr[i_idx[row_n], j_idx[row_n], t_idx[row_n]] <- dyad_data[[var]][row_n]
+	}
+	arr[is.na(arr)] <- 0
 	if(monadic){
-	    # Logic for handling monadic variables (placing them on the diagonal)
+		# place monadic variable on diagonal
 		if(row){
 			for(t in 1:dim(arr)[3]){
-			    # Handle case where setdiff might return empty vector
-				diag_vals = apply(arr[,,t], 1, function(x){
-				    val <- setdiff(unique(x),0)
-				    if (length(val) > 0) return(val[1]) else return(0)
+				diag_vals <- apply(arr[,,t], 1, function(x){
+					val <- setdiff(unique(x),0)
+					if (length(val) > 0) return(val[1]) else return(0)
 				})
-				diag(arr[,,t]) = diag_vals
+				diag(arr[,,t]) <- diag_vals
 			}
 		} else {
 			for(t in 1:dim(arr)[3]){
-				diag_vals = apply(arr[,,t], 2, function(x){
-				    val <- setdiff(unique(x),0)
-				    if (length(val) > 0) return(val[1]) else return(0)
+				diag_vals <- apply(arr[,,t], 2, function(x){
+					val <- setdiff(unique(x),0)
+					if (length(val) > 0) return(val[1]) else return(0)
 				})
-				diag(arr[,,t]) = diag_vals
+				diag(arr[,,t]) <- diag_vals
 			}
 		}
 	}
 	return(arr)
 }
 
-# (createRelCovar and prepMLTR can be added here from the original scripts if desired by the user)

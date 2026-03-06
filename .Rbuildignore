@@ -8,3 +8,6 @@
 ^.*\.so$
 ^.*\.dll$
 ^\.claude$
+^_pkgdown\.yml$
+^pkgdown$
+^docs$
