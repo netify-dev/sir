@@ -1,0 +1,347 @@
+# sir: Social Influence Regression Models
+
+## Motivation
+
+Relational outcomes in political and social systems are rarely
+independent. When country $i$ initiates conflict with country $k$ at
+time $t$, that action may reshape the likelihood that country $j$ does
+the same at time $t + 1$, particularly if $i$ and $j$ share an alliance,
+geographic proximity, or a common adversary. Standard regression
+approaches to network data treat each directed dyad as an independent
+observation, conditioning on covariates but discarding the higher-order
+dependencies that constitute network influence.
+
+The Social Influence Regression (SIR) model addresses this limitation
+directly. Rather than treating network influence as a nuisance or a
+latent quantity to be absorbed by random effects, the model estimates
+influence as a function of observable covariates. The framework operates
+on longitudinal network data (a time series of $n \times n$ relational
+matrices) and asks how past interactions across the network predict
+current outcomes, and what dyad-level or actor-level covariates account
+for those predictive patterns. The methodological framework is
+introduced in Minhas and Hoff (2025), “Decomposing Network Dynamics:
+Social Influence Regression,” *Political Analysis*.
+
+## Model specification
+
+The SIR model specifies the expected outcome for directed edge $(i,j)$
+at time $t$ as:
+
+$$\mu_{i,j,t} = \mathbf{z}_{i,j,t}^{T}{\mathbf{θ}} + \sum\limits_{k,\ell}x_{k,\ell,t}a_{i,k}b_{j,\ell}$$
+
+The first term is a standard regression of the outcome on exogenous
+covariates $\mathbf{z}_{i,j,t}$ with coefficients $\mathbf{θ}$. The
+second term captures network influence: $a_{i,k}$ measures how
+predictive node $k$’s past sending behavior is of node $i$’s current
+sending, $b_{j,\ell}$ captures an analogous relationship on the receiver
+side, and the network state $x_{k,\ell,t}$ (typically lagged outcomes)
+carries the influence signal through these matrices.
+
+The influence matrices $\mathbf{A}$ and $\mathbf{B}$ are parameterized
+through known influence covariates $\mathbf{W}_{r}$ (geographic
+distance, alliance ties, shared attributes):
+
+$$\mathbf{A} = \sum\limits_{r = 1}^{p}\alpha_{r}\mathbf{W}_{r},\quad\alpha_{1} = 1{\mspace{6mu}\text{(fixed for identifiability)}}$$$$\mathbf{B} = \sum\limits_{r = 1}^{p}\beta_{r}\mathbf{W}_{r}$$
+
+This parameterization reduces the parameter count from
+$O\left( n^{2} \right)$ to $O(p)$, where $p$ is the number of influence
+covariates. More importantly, it makes the estimated influence patterns
+directly interpretable: the $\alpha$ and $\beta$ coefficients identify
+which covariates matter for influence and by how much.
+
+## Installation
+
+### From GitHub releases
+
+Pre-built binaries are available from the [releases
+page](https://github.com/netify-dev/sir/releases):
+
+``` r
+# windows
+install.packages("sir_0.1.0_windows.zip", repos = NULL, type = "binary")
+
+# macOS (apple silicon)
+install.packages("sir_0.1.0_macos-arm64.tgz", repos = NULL, type = "binary")
+
+# macOS (intel)
+install.packages("sir_0.1.0_macos-intel.tgz", repos = NULL, type = "binary")
+
+# linux (source)
+install.packages("sir_0.1.0_linux.tar.gz", repos = NULL, type = "source")
+```
+
+### From GitHub (development version)
+
+``` r
+if (!requireNamespace("remotes", quietly = TRUE)) {
+    install.packages("remotes")
+}
+remotes::install_github("netify-dev/sir")
+```
+
+### From source
+
+``` r
+install.packages(".", repos = NULL, type = "source")
+# or
+devtools::install(".")
+```
+
+## Usage
+
+``` r
+library(sir)
+
+# data inputs:
+# Y: m x m x T array of network outcomes
+# W: m x m x p array of influence covariates
+# X: m x m x T array of lagged network state
+# Z: m x m x q x T array of exogenous covariates
+
+model = sir(
+    Y = Y, W = W, X = X, Z = Z,
+    family = "poisson",
+    method = "ALS",
+    trace = TRUE
+)
+
+summary(model)
+plot(model)
+
+# extract components
+coef(model)          # parameter estimates
+model$A              # sender influence matrix
+model$B              # receiver influence matrix
+confint(model)       # confidence intervals
+```
+
+## Estimation
+
+The package provides two estimation approaches. The default, Alternating
+Least Squares (ALS), exploits the bilinear structure of the model by
+iterating between GLM sub-problems for $({\mathbf{θ}},{\mathbf{α}})$ and
+$({\mathbf{θ}},{\mathbf{β}})$. Each sub-problem is a standard
+generalized linear model, so the full estimation reduces to a sequence
+of low-dimensional optimizations. This is generally more stable for
+high-dimensional problems and substantially faster than the Bayesian
+approach originally used for bilinear network autoregressions. A direct
+BFGS optimizer (`method = "optim"`) is also available and uses
+analytical gradients computed via C++; it can converge faster for small
+networks but tends to be less stable when the number of influence
+covariates is large.
+
+Standard errors are computed from the Hessian (classical) and the
+sandwich estimator (robust). When the Hessian is ill-conditioned, which
+is common in bilinear models,
+[`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
+provides bootstrap standard errors via block resampling of time periods
+or parametric simulation.
+
+## Distribution families
+
+The model supports Poisson (count outcomes with log link), Normal
+(continuous outcomes with identity link), and Binomial (binary outcomes
+with logit link) families.
+
+``` r
+model_poisson  = sir(Y, W, X, Z, family = "poisson")
+model_normal   = sir(Y, W, X, Z, family = "normal")
+model_binomial = sir(Y, W, X, Z, family = "binomial")
+```
+
+## S3 methods
+
+``` r
+summary(model)                  # coefficient table with standard errors
+coef(model)                     # parameter estimates
+fitted(model)                   # fitted values on response scale
+residuals(model, type = "deviance")  # deviance residuals
+logLik(model)                   # log-likelihood
+AIC(model); BIC(model)          # information criteria
+vcov(model, type = "robust")    # sandwich variance-covariance
+confint(model)                  # Wald confidence intervals
+predict(model, newdata, type = "response")
+plot(model, which = 1:6)        # diagnostic plots
+```
+
+## Additional features
+
+The package supports symmetric (undirected) networks via
+`symmetric = TRUE`, bipartite (rectangular) networks via
+`bipartite = TRUE` or automatic detection from non-square $\mathbf{Y}$,
+dynamic (time-varying) influence covariates via 4D `W` arrays,
+counterfactual scenario construction via
+[`get_scen_vals()`](https://netify-dev.github.io/sir/reference/get_scen_vals.md)
+and
+[`get_scen_array()`](https://netify-dev.github.io/sir/reference/get_scen_array.md),
+and the
+[`cast_array()`](https://netify-dev.github.io/sir/reference/cast_array.md)
+utility for converting edge-list data to the required array format.
+
+## Citation
+
+``` bibtex
+@article{minhas:hoff:2025,
+  title={Decomposing Network Dynamics: Social Influence Regression},
+  author={Minhas, Shahryar and Hoff, Peter},
+  journal={Political Analysis},
+  year={2025},
+}
+
+@Manual{sir-package,
+  title = {sir: Social Influence Regression Models},
+  author = {Shahryar Minhas and Peter Hoff},
+  year = {2025},
+  note = {R package version 0.1.0},
+  url = {https://github.com/netify-dev/sir}
+}
+```
+
+## Authors
+
+Shahryar Minhas (Michigan State University) and Peter Hoff (Duke
+University).
+
+## License
+
+MIT License. See [LICENSE](https://netify-dev.github.io/sir/LICENSE) for
+details.
+
+# Package index
+
+## Model Fitting
+
+Fit Social Influence Regression models to network data
+
+- [`sir()`](https://netify-dev.github.io/sir/reference/sir.md) : Social
+  Influence Regression (SIR) Model
+- [`sir_alsfit()`](https://netify-dev.github.io/sir/reference/sir_alsfit.md)
+  : Fit SIR Model via Alternating Least Squares (ALS)
+- [`sir_optfit()`](https://netify-dev.github.io/sir/reference/sir_optfit.md)
+  : Fit SIR Model via Direct Optimization
+
+## S3 Methods
+
+Standard R methods for sir model objects
+
+- [`coef(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/coef.sir.md)
+  : Extract Model Coefficients from a SIR Model
+- [`vcov(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/vcov.sir.md)
+  : Variance-Covariance Matrix for SIR Model Parameters
+- [`confint(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/confint.sir.md)
+  : Confidence Intervals for SIR Model Parameters
+- [`nobs(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/nobs.sir.md)
+  : Extract Number of Observations from a SIR Model
+- [`fitted(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/fitted.sir.md)
+  : Extract Fitted Values from a SIR Model
+- [`residuals(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/residuals.sir.md)
+  : Extract Residuals from a SIR Model
+- [`logLik(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/logLik.sir.md)
+  : Extract Log-Likelihood from a SIR Model
+- [`AIC(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/AIC.sir.md)
+  : Akaike Information Criterion for a SIR Model
+- [`BIC(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/BIC.sir.md)
+  : Bayesian Information Criterion for a SIR Model
+- [`predict(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/predict.sir.md)
+  : Predictions from a Fitted SIR Model
+- [`summary(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/summary.sir.md)
+  : Summary of a Fitted SIR Model
+- [`print(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/print.sir.md)
+  : Print a Fitted SIR Model
+- [`print(`*`<summary.sir>`*`)`](https://netify-dev.github.io/sir/reference/print.summary.sir.md)
+  : Print a SIR Model Summary
+- [`plot(`*`<sir>`*`)`](https://netify-dev.github.io/sir/reference/plot.sir.md)
+  : Diagnostic Plots for a Fitted SIR Model
+
+## Visualization
+
+Network visualization of influence matrices
+
+- [`plot_sir_network()`](https://netify-dev.github.io/sir/reference/plot_sir_network.md)
+  : Network Graph Visualization of Influence Matrices
+
+## Bootstrap & Inference
+
+Bootstrap standard errors and robust inference
+
+- [`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
+  : Bootstrap Inference for SIR Model Parameters
+- [`print(`*`<boot_sir>`*`)`](https://netify-dev.github.io/sir/reference/print.boot_sir.md)
+  : Print Bootstrap SIR Results
+- [`summary(`*`<boot_sir>`*`)`](https://netify-dev.github.io/sir/reference/summary.boot_sir.md)
+  : Summary of Bootstrap SIR Results
+- [`confint(`*`<boot_sir>`*`)`](https://netify-dev.github.io/sir/reference/confint.boot_sir.md)
+  : Confidence Intervals from Bootstrap SIR Results
+
+## Counterfactual Scenarios
+
+Build counterfactual scenario arrays for prediction
+
+- [`get_scen_vals()`](https://netify-dev.github.io/sir/reference/get_scen_vals.md)
+  : Compute Summary Statistics for Scenario Construction
+- [`get_scen_array()`](https://netify-dev.github.io/sir/reference/get_scen_array.md)
+  : Build Counterfactual Scenario Array
+
+## Simulation & Data Preparation
+
+Simulate network data and prepare inputs for SIR models
+
+- [`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md) :
+  Simulate Data from a Social Influence Regression Model
+- [`rel_covar()`](https://netify-dev.github.io/sir/reference/rel_covar.md)
+  : Construct Relational Covariates from a Network Array
+- [`cast_array()`](https://netify-dev.github.io/sir/reference/cast_array.md)
+  : Cast Directed Dyadic Data into Array Format
+- [`eta_tab()`](https://netify-dev.github.io/sir/reference/eta_tab.md) :
+  Calculate Linear Predictor (eta) for SIR Model
+- [`mll_sir()`](https://netify-dev.github.io/sir/reference/mll_sir.md) :
+  Calculate Negative Log-Likelihood for SIR Model
+
+## C++ Backend
+
+Optimized C++ routines for matrix operations
+
+- [`cpp_tprod_A_X_Bt()`](https://netify-dev.github.io/sir/reference/cpp_tprod_A_X_Bt.md)
+  : Tensor Product for SIR Model (A \* X \* B')
+- [`cpp_amprod_W_v()`](https://netify-dev.github.io/sir/reference/cpp_amprod_W_v.md)
+  : Array-Matrix Product for Influence Matrices
+- [`cpp_construct_Wbeta_design()`](https://netify-dev.github.io/sir/reference/cpp_construct_Wbeta_design.md)
+  : Construct Design Matrix for Alpha Updates in ALS
+- [`cpp_construct_Walpha_design()`](https://netify-dev.github.io/sir/reference/cpp_construct_Walpha_design.md)
+  : Construct Design Matrix for Beta Updates in ALS
+- [`cpp_construct_Wbeta_design_dyn()`](https://netify-dev.github.io/sir/reference/cpp_construct_Wbeta_design_dyn.md)
+  : Construct Design Matrix for Alpha Updates with Dynamic W
+- [`cpp_construct_Walpha_design_dyn()`](https://netify-dev.github.io/sir/reference/cpp_construct_Walpha_design_dyn.md)
+  : Construct Design Matrix for Beta Updates with Dynamic W
+- [`cpp_mll_gH()`](https://netify-dev.github.io/sir/reference/cpp_mll_gH.md)
+  : Calculate Gradient and Hessian for Direct Optimization
+- [`cpp_mll_gH_dyn()`](https://netify-dev.github.io/sir/reference/cpp_mll_gH_dyn.md)
+  : Calculate Gradient and Hessian with Dynamic W
+
+## Internal Helpers
+
+Internal utility functions (not exported)
+
+- [`flatten_Y()`](https://netify-dev.github.io/sir/reference/flatten_Y.md)
+  : Flatten Y Array for GLM Input
+- [`flatten_Z()`](https://netify-dev.github.io/sir/reference/flatten_Z.md)
+  : Flatten Z Array for GLM Input
+- [`prepare_Z_list()`](https://netify-dev.github.io/sir/reference/prepare_Z_list.md)
+  : Prepare Z Array for C++ Consumption
+- [`amprod()`](https://netify-dev.github.io/sir/reference/amprod.md) :
+  Array-matrix product (R implementation)
+- [`mat()`](https://netify-dev.github.io/sir/reference/mat.md) :
+  Matricization (R implementation)
+- [`tprod()`](https://netify-dev.github.io/sir/reference/tprod.md) :
+  Tucker product (R implementation)
+
+# Articles
+
+### Getting Started
+
+- [Getting started with
+  sir](https://netify-dev.github.io/sir/articles/sir_overview.md):
+- [Inference and model
+  comparison](https://netify-dev.github.io/sir/articles/sir_inference.md):
+- [Distribution families, network types, and data
+  preparation](https://netify-dev.github.io/sir/articles/sir_extensions.md):

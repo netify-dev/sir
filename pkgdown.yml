@@ -1,0 +1,12 @@
+pandoc: 3.1.11
+pkgdown: 2.2.0
+pkgdown_sha: ~
+articles:
+  methodology: methodology.html
+  sir_extensions: sir_extensions.html
+  sir_inference: sir_inference.html
+  sir_overview: sir_overview.html
+last_built: 2026-03-06T13:24Z
+urls:
+  reference: https://netify-dev.github.io/sir/reference
+  article: https://netify-dev.github.io/sir/articles
