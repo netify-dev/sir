@@ -83,6 +83,8 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 	boot_coefs <- matrix(NA, R, n_params)
 	colnames(boot_coefs) <- rownames(sir_fit$summ)
 
+	dynamic_W <- isTRUE(sir_fit$dynamic_W)
+
 	for (b in 1:R) {
 		if (trace && b %% 10 == 0) cli::cli_inform("Bootstrap {.val {b}}/{.val {R}}")
 
@@ -96,6 +98,8 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 			} else {
 				Z
 			}
+			# resample W's time dimension for dynamic (4D) W
+			W_b <- if (dynamic_W) W[,,, t_idx, drop = FALSE] else W
 		} else {
 			# parametric: simulate from fitted model
 			eta <- eta_tab(sir_fit$tab, W, X, Z)
@@ -117,10 +121,11 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 			for (tt in 1:T_len) diag(Y_b[,,tt]) <- NA
 			X_b <- X
 			Z_b <- Z
+			W_b <- W
 		}
 
 		tryCatch({
-			fit_b <- sir(Y_b, W, X_b, Z_b, family = family,
+			fit_b <- sir(Y_b, W_b, X_b, Z_b, family = family,
 						 method = "ALS", calc_se = FALSE,
 						 fix_receiver = isTRUE(sir_fit$fix_receiver),
 						 kron_mode = isTRUE(sir_fit$kron_mode),

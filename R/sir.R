@@ -878,8 +878,17 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 	  deviance = deviance_resid
   )
 
-  # count observations
-  N_obs <- sum(!is.na(Y))
+  # count observations (exclude diagonal for square networks, matching likelihood)
+  if (n1 == n2) {
+	  N_obs <- 0L
+	  for (t in seq_len(T_len)) {
+		  Yt <- Y[,,t]
+		  diag(Yt) <- NA
+		  N_obs <- N_obs + sum(!is.na(Yt))
+	  }
+  } else {
+	  N_obs <- sum(!is.na(Y))
+  }
   
   # symmetrize fitted values for symmetric networks
   if (symmetric) {

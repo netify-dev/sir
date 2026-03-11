@@ -53,7 +53,8 @@ A list with components:
   \describe{
     \item{Y}{3D array (m x m x T_len) of simulated outcomes.}
     \item{W}{3D array (m x m x p) of influence covariates.}
-    \item{X}{3D array (m x m x T_len) of lagged network state.}
+    \item{X}{3D array (m x m x T_len) of lagged network state.
+      For Poisson family, X is log(Y + 1) to prevent explosive dynamics.}
     \item{Z}{4D array (m x m x q x T_len) of exogenous covariates, or
       NULL if q = 0.}
     \item{alpha}{True alpha vector (length p, with alpha_1 = 1).}

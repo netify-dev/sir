@@ -251,7 +251,7 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 	  THETA = matrix(theta, nrow = 1),
 	  DEV = matrix(c(Inf, dev_val), nrow = 1),
 	  iterations = 1,
-	  fix_receiver = TRUE,
+	  converged = TRUE,
 	  glm_fit = fit_fix
 	))
   }

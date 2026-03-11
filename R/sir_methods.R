@@ -156,7 +156,7 @@ summary.sir <- function(object, ...) {
   ans$n1 <- if (!is.null(object$n1)) object$n1 else nrow(object$A)
   ans$n2 <- if (!is.null(object$n2)) object$n2 else ncol(object$B)
   ans$bipartite <- isTRUE(object$bipartite)
-  ans$T <- object$n_periods
+  ans$n_periods <- object$n_periods
   ans$p <- object$p
   ans$q <- object$q
   ans$nobs <- object$nobs

@@ -28,7 +28,8 @@
 #'   \describe{
 #'     \item{Y}{3D array (m x m x T_len) of simulated outcomes.}
 #'     \item{W}{3D array (m x m x p) of influence covariates.}
-#'     \item{X}{3D array (m x m x T_len) of lagged network state.}
+#'     \item{X}{3D array (m x m x T_len) of lagged network state.
+#'       For Poisson family, X is log(Y + 1) to prevent explosive dynamics.}
 #'     \item{Z}{4D array (m x m x q x T_len) of exogenous covariates, or
 #'       NULL if q = 0.}
 #'     \item{alpha}{True alpha vector (length p, with alpha_1 = 1).}
@@ -125,7 +126,14 @@ sim_sir <- function(m, T_len, p = 2, q = 1, family = "poisson",
 	diag(Y[,,1]) <- 0
 
 	for (t in 2:T_len) {
-		X[,,t] <- Y[,,t - 1]
+		# for poisson, X is log(Y+1) to prevent explosive dynamics
+		# (raw counts through exp() link grow without bound)
+		if (family == "poisson") {
+			X[,,t] <- log(Y[,,t - 1] + 1)
+		} else {
+			X[,,t] <- Y[,,t - 1]
+		}
+		X[,,t][is.na(X[,,t])] <- 0
 
 		# linear predictor: eta = theta'Z + A X B'
 		eta <- A %*% X[,,t] %*% t(B)
@@ -138,7 +146,7 @@ sim_sir <- function(m, T_len, p = 2, q = 1, family = "poisson",
 		# generate from family
 		if (family == "poisson") {
 			lambda <- exp(eta)
-			lambda[lambda > 1e6] <- 1e6
+			lambda[lambda > 100] <- 100
 			lambda[lambda < 1e-10] <- 1e-10
 			Y[,,t] <- matrix(rpois(m * m, lambda = c(lambda)), m, m)
 		} else if (family == "normal") {
