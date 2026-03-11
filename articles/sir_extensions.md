@@ -18,7 +18,7 @@ overview.
 
 ``` r
 set.seed(42)
-m = 15; T_len = 8; p = 2
+m = 15; T_len = 10; p = 2
 
 W = array(0, dim = c(m, m, p))
 geo = matrix(runif(m * m), m, m); geo = (geo + t(geo)) / 2; diag(geo) = 0
@@ -58,10 +58,10 @@ fit_norm = sir(
 )
 summary(fit_norm)
 #>                       Estimate Std. Error z value Pr(>|z|)    
-#> (Z) distance          0.004039   0.051394   0.079  0.93736    
-#> (alphaW) shared_group 0.448838   0.166970   2.688  0.00719 ** 
-#> (betaW) proximity     0.013092   0.001560   8.390  < 2e-16 ***
-#> (betaW) shared_group  0.005396   0.001871   2.885  0.00392 ** 
+#> (Z) distance          0.016757   0.043840   0.382  0.70228    
+#> (alphaW) shared_group 0.407559   0.138459   2.944  0.00324 ** 
+#> (betaW) proximity     0.013482   0.001354   9.957  < 2e-16 ***
+#> (betaW) shared_group  0.005168   0.001602   3.225  0.00126 ** 
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
@@ -87,11 +87,13 @@ fit_bin = sir(
     family = "binomial", method = "ALS", calc_se = TRUE
 )
 summary(fit_bin)
-#>                        Estimate Std. Error z value Pr(>|z|)
-#> (Z) distance          -0.034690   0.072848  -0.476    0.634
-#> (alphaW) shared_group  1.858627   2.335002   0.796    0.426
-#> (betaW) proximity     -0.021955   0.017888  -1.227    0.220
-#> (betaW) shared_group  -0.007505   0.011087  -0.677    0.498
+#>                        Estimate Std. Error z value Pr(>|z|)  
+#> (Z) distance           0.008763   0.066122   0.133    0.895  
+#> (alphaW) shared_group  1.769791   1.459395   1.213    0.225  
+#> (betaW) proximity     -0.034493   0.016270  -2.120    0.034 *
+#> (betaW) shared_group   0.006164   0.010838   0.569    0.570  
+#> ---
+#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 ## Symmetric (undirected) networks
@@ -123,9 +125,9 @@ fit_sym = sir(
 )
 fit_sym
 #>                       Estimate Std. Err
-#> (Z) distance            0.0001   0.0359
-#> (alphaW) proximity      0.0423   0.0066
-#> (alphaW) shared_group   0.0097   0.0119
+#> (Z) distance            0.0206   0.0315
+#> (alphaW) proximity      0.0388   0.0056
+#> (alphaW) shared_group   0.0186   0.0101
 ```
 
 ## Bipartite networks
@@ -153,9 +155,9 @@ fit_bp = sir(
 )
 fit_bp
 #>             Estimate Std. Err
-#> (Z) Z1        0.0004   0.0270
-#> (alphaW) W1   0.0405   0.0080
-#> (alphaW) W2  -0.0503   0.0091
+#> (Z) Z1        0.0256   0.0238
+#> (alphaW) W1  -0.0858   0.0065
+#> (alphaW) W2  -0.0004   0.0078
 ```
 
 ## Dynamic influence covariates
@@ -189,7 +191,7 @@ fit_dyn = sir(
 
 # A is now a 3D array (m x m x T)
 dim(fit_dyn$A)
-#> [1] 15 15  8
+#> [1] 15 15 10
 fit_dyn$dynamic_W
 #> [1] TRUE
 ```
@@ -240,7 +242,7 @@ trade = array(abs(rnorm(m * m * T_len)), dim = c(m, m, T_len))
 # create all three relational effects
 Z_trade = rel_covar(trade, "trade")
 dim(Z_trade)
-#> [1] 15 15  3  8
+#> [1] 15 15  3 10
 dimnames(Z_trade)[[3]]
 #> [1] "trade"       "trade_recip" "trade_trans"
 ```

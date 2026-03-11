@@ -87,7 +87,7 @@ required by <code><a href="../reference/sir.html">sir()</a></code>. For basic mo
 overview.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
-<span><span class="va">m</span> <span class="op">=</span> <span class="fl">15</span>; <span class="va">T_len</span> <span class="op">=</span> <span class="fl">8</span>; <span class="va">p</span> <span class="op">=</span> <span class="fl">2</span></span>
+<span><span class="va">m</span> <span class="op">=</span> <span class="fl">15</span>; <span class="va">T_len</span> <span class="op">=</span> <span class="fl">10</span>; <span class="va">p</span> <span class="op">=</span> <span class="fl">2</span></span>
 <span></span>
 <span><span class="va">W</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/array.html" class="external-link">array</a></span><span class="op">(</span><span class="fl">0</span>, dim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">m</span>, <span class="va">m</span>, <span class="va">p</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">geo</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">m</span> <span class="op">*</span> <span class="va">m</span><span class="op">)</span>, <span class="va">m</span>, <span class="va">m</span><span class="op">)</span>; <span class="va">geo</span> <span class="op">=</span> <span class="op">(</span><span class="va">geo</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">geo</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="fl">2</span>; <span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">geo</span><span class="op">)</span> <span class="op">=</span> <span class="fl">0</span></span>
@@ -130,10 +130,10 @@ influence patterns.</p>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_norm</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                       Estimate Std. Error z value Pr(&gt;|z|)    </span></span>
-<span><span class="co">#&gt; (Z) distance          0.004039   0.051394   0.079  0.93736    </span></span>
-<span><span class="co">#&gt; (alphaW) shared_group 0.448838   0.166970   2.688  0.00719 ** </span></span>
-<span><span class="co">#&gt; (betaW) proximity     0.013092   0.001560   8.390  &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; (betaW) shared_group  0.005396   0.001871   2.885  0.00392 ** </span></span>
+<span><span class="co">#&gt; (Z) distance          0.016757   0.043840   0.382  0.70228    </span></span>
+<span><span class="co">#&gt; (alphaW) shared_group 0.407559   0.138459   2.944  0.00324 ** </span></span>
+<span><span class="co">#&gt; (betaW) proximity     0.013482   0.001354   9.957  &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; (betaW) shared_group  0.005168   0.001602   3.225  0.00126 ** </span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span></code></pre></div>
 </div>
@@ -160,11 +160,13 @@ characteristic increases the log-odds of influence.</p>
 <span>    family <span class="op">=</span> <span class="st">"binomial"</span>, method <span class="op">=</span> <span class="st">"ALS"</span>, calc_se <span class="op">=</span> <span class="cn">TRUE</span></span>
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_bin</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                        Estimate Std. Error z value Pr(&gt;|z|)</span></span>
-<span><span class="co">#&gt; (Z) distance          -0.034690   0.072848  -0.476    0.634</span></span>
-<span><span class="co">#&gt; (alphaW) shared_group  1.858627   2.335002   0.796    0.426</span></span>
-<span><span class="co">#&gt; (betaW) proximity     -0.021955   0.017888  -1.227    0.220</span></span>
-<span><span class="co">#&gt; (betaW) shared_group  -0.007505   0.011087  -0.677    0.498</span></span></code></pre></div>
+<span><span class="co">#&gt;                        Estimate Std. Error z value Pr(&gt;|z|)  </span></span>
+<span><span class="co">#&gt; (Z) distance           0.008763   0.066122   0.133    0.895  </span></span>
+<span><span class="co">#&gt; (alphaW) shared_group  1.769791   1.459395   1.213    0.225  </span></span>
+<span><span class="co">#&gt; (betaW) proximity     -0.034493   0.016270  -2.120    0.034 *</span></span>
+<span><span class="co">#&gt; (betaW) shared_group   0.006164   0.010838   0.569    0.570  </span></span>
+<span><span class="co">#&gt; ---</span></span>
+<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -199,9 +201,9 @@ alliance formation.</p>
 <span><span class="op">)</span></span>
 <span><span class="va">fit_sym</span></span>
 <span><span class="co">#&gt;                       Estimate Std. Err</span></span>
-<span><span class="co">#&gt; (Z) distance            0.0001   0.0359</span></span>
-<span><span class="co">#&gt; (alphaW) proximity      0.0423   0.0066</span></span>
-<span><span class="co">#&gt; (alphaW) shared_group   0.0097   0.0119</span></span></code></pre></div>
+<span><span class="co">#&gt; (Z) distance            0.0206   0.0315</span></span>
+<span><span class="co">#&gt; (alphaW) proximity      0.0388   0.0056</span></span>
+<span><span class="co">#&gt; (alphaW) shared_group   0.0186   0.0101</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="bipartite-networks">Bipartite networks<a class="anchor" aria-label="anchor" href="#bipartite-networks"></a>
@@ -229,9 +231,9 @@ populations, set <code>bipartite = TRUE</code> explicitly.</p>
 <span><span class="op">)</span></span>
 <span><span class="va">fit_bp</span></span>
 <span><span class="co">#&gt;             Estimate Std. Err</span></span>
-<span><span class="co">#&gt; (Z) Z1        0.0004   0.0270</span></span>
-<span><span class="co">#&gt; (alphaW) W1   0.0405   0.0080</span></span>
-<span><span class="co">#&gt; (alphaW) W2  -0.0503   0.0091</span></span></code></pre></div>
+<span><span class="co">#&gt; (Z) Z1        0.0256   0.0238</span></span>
+<span><span class="co">#&gt; (alphaW) W1  -0.0858   0.0065</span></span>
+<span><span class="co">#&gt; (alphaW) W2  -0.0004   0.0078</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="dynamic-influence-covariates">Dynamic influence covariates<a class="anchor" aria-label="anchor" href="#dynamic-influence-covariates"></a>
@@ -273,7 +275,7 @@ because the underlying covariates do.</p>
 <span></span>
 <span><span class="co"># A is now a 3D array (m x m x T)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">fit_dyn</span><span class="op">$</span><span class="va">A</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 15 15  8</span></span>
+<span><span class="co">#&gt; [1] 15 15 10</span></span>
 <span><span class="va">fit_dyn</span><span class="op">$</span><span class="va">dynamic_W</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
@@ -327,7 +329,7 @@ included directly in the exogenous covariate array
 <span><span class="co"># create all three relational effects</span></span>
 <span><span class="va">Z_trade</span> <span class="op">=</span> <span class="fu"><a href="../reference/rel_covar.html">rel_covar</a></span><span class="op">(</span><span class="va">trade</span>, <span class="st">"trade"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">Z_trade</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 15 15  3  8</span></span>
+<span><span class="co">#&gt; [1] 15 15  3 10</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="va">Z_trade</span><span class="op">)</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "trade"       "trade_recip" "trade_trans"</span></span></code></pre></div>
 </div>

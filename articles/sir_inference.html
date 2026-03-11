@@ -86,7 +86,7 @@ fitting see <code><a href="../articles/sir_overview.html">vignette("sir_overview
 <p>We use the same simulated data as in the overview vignette.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
-<span><span class="va">m</span> <span class="op">=</span> <span class="fl">15</span>; <span class="va">T_len</span> <span class="op">=</span> <span class="fl">8</span>; <span class="va">p</span> <span class="op">=</span> <span class="fl">2</span></span>
+<span><span class="va">m</span> <span class="op">=</span> <span class="fl">15</span>; <span class="va">T_len</span> <span class="op">=</span> <span class="fl">10</span>; <span class="va">p</span> <span class="op">=</span> <span class="fl">2</span></span>
 <span></span>
 <span><span class="va">W</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/array.html" class="external-link">array</a></span><span class="op">(</span><span class="fl">0</span>, dim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">m</span>, <span class="va">m</span>, <span class="va">p</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">geo</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Uniform.html" class="external-link">runif</a></span><span class="op">(</span><span class="va">m</span> <span class="op">*</span> <span class="va">m</span><span class="op">)</span>, <span class="va">m</span>, <span class="va">m</span><span class="op">)</span>; <span class="va">geo</span> <span class="op">=</span> <span class="op">(</span><span class="va">geo</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/t.html" class="external-link">t</a></span><span class="op">(</span><span class="va">geo</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span> <span class="fl">2</span>; <span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">geo</span><span class="op">)</span> <span class="op">=</span> <span class="fl">0</span></span>
@@ -145,14 +145,14 @@ serve as a diagnostic for model adequacy.</p>
 <span><span class="co"># classical and robust standard errors</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">V_classical</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">V_classical</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;          (Z) distance (alphaW) shared_group     (betaW) proximity </span></span>
-<span><span class="co">#&gt;          4.377128e-03          1.047672e-02          7.904988e-05 </span></span>
+<span><span class="co">#&gt;          3.808729e-03          9.218215e-03          6.868159e-05 </span></span>
 <span><span class="co">#&gt;  (betaW) shared_group </span></span>
-<span><span class="co">#&gt;          8.572805e-05</span></span>
+<span><span class="co">#&gt;          7.401193e-05</span></span>
 <span><span class="kw">if</span> <span class="op">(</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NULL.html" class="external-link">is.null</a></span><span class="op">(</span><span class="va">V_robust</span><span class="op">)</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">V_robust</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt;          (Z) distance (alphaW) shared_group     (betaW) proximity </span></span>
-<span><span class="co">#&gt;          0.0335701063          0.0720616695          0.0005627451 </span></span>
+<span><span class="co">#&gt;          0.0280850001          0.0627795083          0.0004841839 </span></span>
 <span><span class="co">#&gt;  (betaW) shared_group </span></span>
-<span><span class="co">#&gt;          0.0005850623</span></span></code></pre></div>
+<span><span class="co">#&gt;          0.0005015658</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="fixed-receiver-model">Fixed-receiver model<a class="anchor" aria-label="anchor" href="#fixed-receiver-model"></a>
@@ -176,9 +176,9 @@ comparison with the full bilinear model.</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit_fix</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                        Estimate Std. Error z value Pr(&gt;|z|)    </span></span>
-<span><span class="co">#&gt; (Z) distance          0.0110580  0.0039860   2.774  0.00553 ** </span></span>
-<span><span class="co">#&gt; (alphaW) proximity    0.1165619  0.0004064 286.830  &lt; 2e-16 ***</span></span>
-<span><span class="co">#&gt; (alphaW) shared_group 0.0480990  0.0006993  68.784  &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; (Z) distance          0.0121115  0.0034711   3.489 0.000484 ***</span></span>
+<span><span class="co">#&gt; (alphaW) proximity    0.1159768  0.0003548 326.907  &lt; 2e-16 ***</span></span>
+<span><span class="co">#&gt; (alphaW) shared_group 0.0487102  0.0006104  79.795  &lt; 2e-16 ***</span></span>
 <span><span class="co">#&gt; ---</span></span>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span></code></pre></div>
 <div class="section level3">
@@ -190,13 +190,13 @@ receiver-side parameters; whether the improvement in fit justifies the
 added complexity is an empirical question.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">AIC</a></span><span class="op">(</span><span class="va">fit_als</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 179979.5</span></span>
+<span><span class="co">#&gt; [1] 201745.3</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">AIC</a></span><span class="op">(</span><span class="va">fit_fix</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 156625.5</span></span>
+<span><span class="co">#&gt; [1] 170859.2</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">BIC</a></span><span class="op">(</span><span class="va">fit_als</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 180001.2</span></span>
+<span><span class="co">#&gt; [1] 201767.9</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">BIC</a></span><span class="op">(</span><span class="va">fit_fix</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 156641.7</span></span></code></pre></div>
+<span><span class="co">#&gt; [1] 170876.1</span></span></code></pre></div>
 </div>
 </div>
 <div class="section level2">
@@ -220,10 +220,10 @@ also available.</p>
 <span></span>
 <span><span class="va">boot_results</span></span>
 <span><span class="co">#&gt;                       Estimate Boot SE  2.5 % 97.5 %</span></span>
-<span><span class="co">#&gt; (Z) distance            0.0459  0.0129 0.0112 0.0603</span></span>
-<span><span class="co">#&gt; (alphaW) shared_group   0.5667  0.0104 0.5484 0.5865</span></span>
-<span><span class="co">#&gt; (betaW) proximity       0.0110  0.0001 0.0108 0.0111</span></span>
-<span><span class="co">#&gt; (betaW) shared_group    0.0063  0.0001 0.0062 0.0066</span></span></code></pre></div>
+<span><span class="co">#&gt; (Z) distance            0.0465  0.0086 0.0270 0.0582</span></span>
+<span><span class="co">#&gt; (alphaW) shared_group   0.5757  0.0107 0.5593 0.5982</span></span>
+<span><span class="co">#&gt; (betaW) proximity       0.0109  0.0001 0.0109 0.0111</span></span>
+<span><span class="co">#&gt; (betaW) shared_group    0.0062  0.0001 0.0060 0.0064</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="confidence-intervals">Confidence intervals<a class="anchor" aria-label="anchor" href="#confidence-intervals"></a>
@@ -233,21 +233,21 @@ assume approximate normality of the sampling distribution.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit_als</span><span class="op">)</span></span>
 <span><span class="co">#&gt;            2.5 %      97.5 %</span></span>
-<span><span class="co">#&gt; [1,] 0.037333753 0.054491781</span></span>
-<span><span class="co">#&gt; [2,] 0.546151791 0.587219794</span></span>
-<span><span class="co">#&gt; [3,] 0.010799755 0.011109625</span></span>
-<span><span class="co">#&gt; [4,] 0.006170181 0.006506229</span></span></code></pre></div>
+<span><span class="co">#&gt; [1,] 0.039065782 0.053995725</span></span>
+<span><span class="co">#&gt; [2,] 0.557612194 0.593746934</span></span>
+<span><span class="co">#&gt; [3,] 0.010814720 0.011083946</span></span>
+<span><span class="co">#&gt; [4,] 0.006058405 0.006348527</span></span></code></pre></div>
 <p>When bootstrap results are available, percentile intervals
 constructed from the empirical distribution of bootstrap replicates can
 be used instead. These are generally more reliable for bilinear
 parameters, particularly when the Hessian is ill-conditioned.</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit_als</span>, boot <span class="op">=</span> <span class="va">boot_results</span><span class="op">)</span></span>
-<span><span class="co">#&gt;            2.5 %      97.5 %</span></span>
-<span><span class="co">#&gt; [1,] 0.011194305 0.060265825</span></span>
-<span><span class="co">#&gt; [2,] 0.548383240 0.586535385</span></span>
-<span><span class="co">#&gt; [3,] 0.010845578 0.011070724</span></span>
-<span><span class="co">#&gt; [4,] 0.006180016 0.006615729</span></span></code></pre></div>
+<span><span class="co">#&gt;           2.5 %      97.5 %</span></span>
+<span><span class="co">#&gt; [1,] 0.02699795 0.058233021</span></span>
+<span><span class="co">#&gt; [2,] 0.55934364 0.598212656</span></span>
+<span><span class="co">#&gt; [3,] 0.01085486 0.011055276</span></span>
+<span><span class="co">#&gt; [4,] 0.00600889 0.006419507</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

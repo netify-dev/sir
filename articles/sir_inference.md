@@ -15,7 +15,7 @@ We use the same simulated data as in the overview vignette.
 
 ``` r
 set.seed(42)
-m = 15; T_len = 8; p = 2
+m = 15; T_len = 10; p = 2
 
 W = array(0, dim = c(m, m, p))
 geo = matrix(runif(m * m), m, m); geo = (geo + t(geo)) / 2; diag(geo) = 0
@@ -73,14 +73,14 @@ V_robust = vcov(fit_als, type = "robust")
 # classical and robust standard errors
 if (!is.null(V_classical)) sqrt(diag(V_classical))
 #>          (Z) distance (alphaW) shared_group     (betaW) proximity 
-#>          4.377128e-03          1.047672e-02          7.904988e-05 
+#>          3.808729e-03          9.218215e-03          6.868159e-05 
 #>  (betaW) shared_group 
-#>          8.572805e-05
+#>          7.401193e-05
 if (!is.null(V_robust)) sqrt(diag(V_robust))
 #>          (Z) distance (alphaW) shared_group     (betaW) proximity 
-#>          0.0335701063          0.0720616695          0.0005627451 
+#>          0.0280850001          0.0627795083          0.0004841839 
 #>  (betaW) shared_group 
-#>          0.0005850623
+#>          0.0005015658
 ```
 
 ## Fixed-receiver model
@@ -104,9 +104,9 @@ fit_fix = sir(
 
 summary(fit_fix)
 #>                        Estimate Std. Error z value Pr(>|z|)    
-#> (Z) distance          0.0110580  0.0039860   2.774  0.00553 ** 
-#> (alphaW) proximity    0.1165619  0.0004064 286.830  < 2e-16 ***
-#> (alphaW) shared_group 0.0480990  0.0006993  68.784  < 2e-16 ***
+#> (Z) distance          0.0121115  0.0034711   3.489 0.000484 ***
+#> (alphaW) proximity    0.1159768  0.0003548 326.907  < 2e-16 ***
+#> (alphaW) shared_group 0.0487102  0.0006104  79.795  < 2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
@@ -120,13 +120,13 @@ added complexity is an empirical question.
 
 ``` r
 AIC(fit_als)
-#> [1] 179979.5
+#> [1] 201745.3
 AIC(fit_fix)
-#> [1] 156625.5
+#> [1] 170859.2
 BIC(fit_als)
-#> [1] 180001.2
+#> [1] 201767.9
 BIC(fit_fix)
-#> [1] 156641.7
+#> [1] 170876.1
 ```
 
 ## Bootstrap inference
@@ -149,10 +149,10 @@ boot_results = boot_sir(
 
 boot_results
 #>                       Estimate Boot SE  2.5 % 97.5 %
-#> (Z) distance            0.0459  0.0129 0.0112 0.0603
-#> (alphaW) shared_group   0.5667  0.0104 0.5484 0.5865
-#> (betaW) proximity       0.0110  0.0001 0.0108 0.0111
-#> (betaW) shared_group    0.0063  0.0001 0.0062 0.0066
+#> (Z) distance            0.0465  0.0086 0.0270 0.0582
+#> (alphaW) shared_group   0.5757  0.0107 0.5593 0.5982
+#> (betaW) proximity       0.0109  0.0001 0.0109 0.0111
+#> (betaW) shared_group    0.0062  0.0001 0.0060 0.0064
 ```
 
 ## Confidence intervals
@@ -163,10 +163,10 @@ assume approximate normality of the sampling distribution.
 ``` r
 confint(fit_als)
 #>            2.5 %      97.5 %
-#> [1,] 0.037333753 0.054491781
-#> [2,] 0.546151791 0.587219794
-#> [3,] 0.010799755 0.011109625
-#> [4,] 0.006170181 0.006506229
+#> [1,] 0.039065782 0.053995725
+#> [2,] 0.557612194 0.593746934
+#> [3,] 0.010814720 0.011083946
+#> [4,] 0.006058405 0.006348527
 ```
 
 When bootstrap results are available, percentile intervals constructed
@@ -176,9 +176,9 @@ particularly when the Hessian is ill-conditioned.
 
 ``` r
 confint(fit_als, boot = boot_results)
-#>            2.5 %      97.5 %
-#> [1,] 0.011194305 0.060265825
-#> [2,] 0.548383240 0.586535385
-#> [3,] 0.010845578 0.011070724
-#> [4,] 0.006180016 0.006615729
+#>           2.5 %      97.5 %
+#> [1,] 0.02699795 0.058233021
+#> [2,] 0.55934364 0.598212656
+#> [3,] 0.01085486 0.011055276
+#> [4,] 0.00600889 0.006419507
 ```
