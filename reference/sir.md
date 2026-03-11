@@ -412,7 +412,7 @@ print(model)
 #> Social Influence Regression Model
 #> 8 nodes, 5 time periods (directed)
 #> Config: poisson | ALS
-#> Status: converged | N = 320 | Log-Lik: -576.96 | AIC: 1159.9
+#> Status: converged | N = 280 | Log-Lik: -576.96 | AIC: 1159.9
 #> Coefficients:
 #>             Estimate
 #> (alphaW) W2   3.9283

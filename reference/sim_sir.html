@@ -135,7 +135,8 @@ If NULL (default), drawn from U(-0.5, 0.5).</p></dd>
 <dd><p>3D array (m x m x p) of influence covariates.</p></dd>
 
     <dt>X</dt>
-<dd><p>3D array (m x m x T_len) of lagged network state.</p></dd>
+<dd><p>3D array (m x m x T_len) of lagged network state.
+      For Poisson family, X is log(Y + 1) to prevent explosive dynamics.</p></dd>
 
     <dt>Z</dt>
 <dd><p>4D array (m x m x q x T_len) of exogenous covariates, or

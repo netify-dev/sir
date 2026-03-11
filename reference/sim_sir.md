@@ -90,7 +90,8 @@ A list with components:
 
 - X:
 
-  3D array (m x m x T_len) of lagged network state.
+  3D array (m x m x T_len) of lagged network state. For Poisson family,
+  X is log(Y + 1) to prevent explosive dynamics.
 
 - Z:
 
