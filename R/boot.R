@@ -102,7 +102,8 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 			W_b <- if (dynamic_W) W[,,, t_idx, drop = FALSE] else W
 		} else {
 			# parametric: simulate from fitted model
-			eta <- eta_tab(sir_fit$tab, W, X, Z)
+			eta <- eta_tab(sir_fit$tab, W, X, Z,
+						   fix_receiver = isTRUE(sir_fit$fix_receiver))
 			if (family == "normal") {
 				sigma <- sqrt(sir_fit$sigma2)
 				Y_b <- array(rnorm(length(eta), mean = eta, sd = sigma),

@@ -653,12 +653,7 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 	  # fix_receiver: SEs from the GLM fit directly
 	  glm_fit <- mod$glm_fit
 
-	  if (family == "normal") {
-		# vcov(lm) = sigma^2 * (X'X)^{-1}
-		vcov_mat <- tryCatch(vcov(glm_fit), error = function(e) NULL)
-	  } else {
-		vcov_mat <- tryCatch(vcov(glm_fit), error = function(e) NULL)
-	  }
+	  vcov_mat <- tryCatch(vcov(glm_fit), error = function(e) NULL)
 
 	  if (!is.null(vcov_mat)) {
 		se <- sqrt(pmax(diag(vcov_mat), 0))

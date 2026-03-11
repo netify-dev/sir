@@ -30,7 +30,7 @@ We use the same simulated data as in the overview vignette.
 
 ```{r data}
 set.seed(42)
-m = 15; T_len = 8; p = 2
+m = 15; T_len = 10; p = 2
 
 W = array(0, dim = c(m, m, p))
 geo = matrix(runif(m * m), m, m); geo = (geo + t(geo)) / 2; diag(geo) = 0
