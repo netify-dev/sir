@@ -1,4 +1,91 @@
 
+# delete-one-actor jackknife covariance for the influence parameters. deleting
+# (rather than resampling-with-replacement) avoids duplicating actors into the
+# bilinear A X B' sums, which would attenuate the influence coefficients. for a
+# square directed network the same actor is dropped from both axes together; for
+# a bipartite network senders and receivers are dropped separately and the two
+# one-way jackknife covariances are summed as a delete-one-margin sensitivity
+# check.
+.sir_dyad_jackknife <- function(sir_fit, trace = FALSE) {
+	Y <- sir_fit$Y; W <- sir_fit$W; X <- sir_fit$X; Z <- sir_fit$Z
+	W_recv <- sir_fit$W_recv
+	family <- sir_fit$family
+	n1 <- dim(Y)[1]; n2 <- dim(Y)[2]
+	P <- length(sir_fit$tab)
+	bipartite <- isTRUE(sir_fit$bipartite)
+	fr <- isTRUE(sir_fit$fix_receiver)
+	dynamic_W <- isTRUE(sir_fit$dynamic_W)
+
+	z_sub <- function(i1, i2) {
+		if (is.null(Z)) return(NULL)
+		if (length(dim(Z)) == 4) Z[i1, i2, , , drop = FALSE] else Z[i1, i2, , drop = FALSE]
+	}
+	# refit on the sub-network induced by keeping sender set i1, receiver set i2
+	refit <- function(i1, i2) {
+		Y_s <- Y[i1, i2, , drop = FALSE]
+		if (!bipartite && length(i1) == length(i2) && all(i1 == i2)) {
+			for (tt in seq_len(dim(Y_s)[3])) diag(Y_s[, , tt]) <- NA
+		}
+		args <- list(Y_s,
+					 W = if (dynamic_W) W[i1, i1, , , drop = FALSE] else W[i1, i1, , drop = FALSE],
+					 X = X[i1, i2, , drop = FALSE], Z = z_sub(i1, i2),
+					 family = family, method = "ALS", calc_se = FALSE,
+					 bipartite = bipartite,
+					 fix_receiver = fr, max_iter = 100, tol = 1e-6)
+		if (!is.null(W_recv)) args$W_recv <- W_recv[i2, i2, , drop = FALSE]
+		tab <- tryCatch({
+			fit <- do.call(sir, args)
+			if (!isTRUE(fit$convergence)) return(NULL)
+			fit$tab
+		}, error = function(e) NULL)
+		if (is.null(tab) || length(tab) != P) NULL else tab
+	}
+	# jackknife covariance from the delete-one estimates of one margin
+	jk_cov <- function(mat) {
+		g <- nrow(mat)
+		if (is.null(g) || g < 2) return(matrix(0, P, P))
+		mbar <- colMeans(mat)
+		(g - 1) / g * Reduce(`+`, lapply(seq_len(g), function(k) {
+			d <- mat[k, ] - mbar; outer(d, d)
+		}))
+	}
+
+		if (bipartite || n1 != n2) {
+			# bipartite: drop senders and receivers separately, sum the covariances
+			Ms <- do.call(rbind, Filter(Negate(is.null),
+				lapply(seq_len(n1), function(a) refit(setdiff(seq_len(n1), a), seq_len(n2)))))
+			Mr <- do.call(rbind, Filter(Negate(is.null),
+				lapply(seq_len(n2), function(a) refit(seq_len(n1), setdiff(seq_len(n2), a)))))
+			gs <- if (is.null(Ms)) 0L else nrow(Ms)
+			gr <- if (is.null(Mr)) 0L else nrow(Mr)
+			n_valid <- gs + gr
+			n_total <- n1 + n2
+			V <- jk_cov(Ms) + jk_cov(Mr)
+			jack_est <- rbind(Ms, Mr)
+			if (gs < 2L || gr < 2L) {
+				cli::cli_warn("Dyad jackknife has fewer than two valid refits in at least one bipartite margin; intervals are a weak sensitivity check.")
+			}
+		} else {
+			# square directed: drop the same actor from both axes together
+			M <- do.call(rbind, Filter(Negate(is.null),
+				lapply(seq_len(n1), function(a) { k <- setdiff(seq_len(n1), a); refit(k, k) })))
+			n_valid <- if (is.null(M)) 0L else nrow(M)
+			n_total <- n1
+			V <- jk_cov(M)
+			jack_est <- M
+		}
+		if (n_valid < 2) cli::cli_abort("Dyad jackknife produced too few valid refits.")
+		if (n_valid < n_total) {
+			cli::cli_warn("{n_total - n_valid} of {n_total} dyad jackknife refit{?s} failed or did not converge and {?was/were} dropped.")
+		}
+
+		se <- sqrt(pmax(diag(V), 0))
+		point <- sir_fit$tab
+		z <- stats::qnorm(0.975)
+		list(se = se, ci_lo = point - z * se, ci_hi = point + z * se,
+			 jack_est = jack_est, n_valid = n_valid, n_total = n_total)
+}
+
 #' Bootstrap Inference for SIR Model Parameters
 #'
 #' Computes bootstrap standard errors and confidence intervals for SIR model
@@ -6,30 +93,57 @@
 #' is singular or ill-conditioned, which is common in models with bilinear
 #' influence terms (i.e., when \code{fix_receiver = FALSE}).
 #'
-#' Two bootstrap strategies are available:
+#' Three bootstrap strategies are available:
 #' \describe{
-#'   \item{block}{Resamples time periods with replacement. Preserves the
-#'     within-period dependence structure. Best when T is moderately large
-#'     (T >= 10).}
+#'   \item{block}{Resamples whole time periods with replacement as independent
+#'     period blocks. This preserves the within-period network dependence
+#'     structure but not serial dependence across adjacent periods. Best when T
+#'     is moderately large (T >= 10).}
+#'   \item{dyad}{A delete-one-actor jackknife: each actor is dropped in turn and
+#'     the model is refit on the induced sub-network, capturing the
+#'     cross-sectional dyadic dependence (shared-sender / shared-receiver
+#'     correlation) the block bootstrap ignores. Deletion (rather than
+#'     resampling with replacement) avoids duplicating actors into the bilinear
+#'     \eqn{A X B'} sums, which would attenuate the influence coefficients toward
+#'     zero. For a square directed network the same actor is dropped from both
+#'     axes together; for a bipartite network senders and receivers are dropped
+#'     separately and the two one-way jackknife covariances are summed. Standard
+#'     errors come from the jackknife covariance and intervals are normal
+#'     (\code{estimate +/- z * se}).}
 #'   \item{parametric}{Simulates new outcome arrays from the fitted model
 #'     using the estimated parameters and the specified family distribution.
 #'     Better when T is small but the model is well-specified.}
 #' }
 #'
-#' Each replicate refits the full SIR model. Replicates that fail to converge
-#' are dropped and reported. Standard errors are column standard deviations
-#' of the successful replicates. Confidence intervals use the percentile
-#' method.
+#' For \code{block} and \code{parametric}, each replicate refits the full SIR
+#' model; replicates that fail to converge are dropped and reported, standard
+#' errors are the column standard deviations of the successful replicates, and
+#' confidence intervals use the percentile method. The \code{dyad} jackknife
+#' instead enumerates all delete-one-actor refits and reports the jackknife
+#' standard error and a normal interval.
 #'
 #' @param sir_fit A fitted \code{sir} object from \code{\link{sir}}.
 #' @param R Integer. Number of bootstrap replicates. Default is 200. Increase
 #'   to 500-1000 for publication-quality intervals.
-#' @param type Character. Bootstrap type: \code{"block"} (default) resamples
-#'   time periods with replacement; \code{"parametric"} simulates new outcomes
-#'   from the fitted model.
+#' @param type Character. Inference type: \code{"block"} (default) resamples
+#'   whole time periods as independent blocks, preserving within-period network
+#'   dependence but not serial dependence; \code{"dyad"} is a delete-one-actor
+#'   jackknife on the induced sub-network (captures dyadic dependence, and the
+#'   only inference path for full-bilinear bipartite fits); \code{"parametric"}
+#'   simulates new outcomes from the fitted model. \code{R} is ignored for
+#'   \code{"dyad"} (it enumerates all actor deletions).
 #' @param seed Optional integer for reproducibility. Sets the random seed
-#'   before resampling.
-#' @param trace Logical. If TRUE, prints progress every 10 replicates.
+#'   before resampling. For exact reproducibility when \code{cores > 1}, the
+#'   "L'Ecuyer-CMRG" RNG is used so parallel workers draw independent streams;
+#'   results are then reproducible given the same \code{seed} and \code{cores}.
+#'   Serial runs (\code{cores = 1}) with the same \code{seed} are always
+#'   reproducible.
+#' @param trace Logical. If TRUE, shows progress and prints a verbose message
+#'   every 10 serial replicates. Ignored when \code{cores > 1}.
+#' @param cores Integer. Number of CPU cores to use. Default is 1 (serial). When
+#'   greater than 1, replicates are run in parallel with
+#'   \code{parallel::mclapply} (forking). Forking is unavailable on Windows, so
+#'   there \code{cores > 1} falls back to serial with a one-time warning.
 #'
 #' @return An object of class \code{"boot_sir"} with components:
 #' \describe{
@@ -48,46 +162,113 @@
 #' }
 #'
 #' @examples
-#' \dontrun{
-#' model <- sir(Y, W, X, family = "poisson")
+#' \donttest{
+#' dat <- sim_sir(m = 8, T_len = 12, p = 2, q = 1, family = "poisson", seed = 1)
+#' model <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z,
+#'              family = "poisson", seed = 1)
 #'
-#' # block bootstrap with 200 replicates
-#' boot_result <- boot_sir(model, R = 200, seed = 42)
+#' # use a larger R (for example 500+) for publication-quality intervals
+#' boot_result <- boot_sir(model, R = 10, seed = 42)
 #' print(boot_result)
 #'
 #' # use bootstrap CIs with confint
 #' confint(model, boot = boot_result)
-#'
-#' # parametric bootstrap
-#' boot_par <- boot_sir(model, R = 200, type = "parametric")
 #' }
 #'
 #' @seealso \code{\link{confint.sir}} to use bootstrap intervals,
 #'   \code{\link{confint.boot_sir}} for direct interval extraction.
 #' @export
-boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
-					 seed = NULL, trace = FALSE) {
+boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric", "dyad"),
+					 seed = NULL, trace = FALSE, cores = 1L) {
 	type <- match.arg(type)
-	if (!is.null(seed)) set.seed(seed)
+	if (!is.numeric(R) || length(R) != 1L || !is.finite(R) || R < 2 || R != round(R)) {
+		cli::cli_abort("{.arg R} must be a single integer >= 2.")
+	}
+	R <- as.integer(R)
+	if (!is.numeric(cores) || length(cores) != 1L || !is.finite(cores) ||
+		cores < 1 || cores != round(cores)) {
+		cli::cli_abort("{.arg cores} must be a positive integer.")
+	}
+	cores <- as.integer(cores)
+
+	# inference on a fit that itself did not converge is unreliable; surface it.
+	if (!is.null(sir_fit$convergence) && !isTRUE(sir_fit$convergence)) {
+		cli::cli_warn(c(
+			"The fitted model did not converge; bootstrap/jackknife inference on it may be unreliable.",
+			"i" = "Refit until convergence (e.g. raise {.arg max_iter} or {.arg n_restarts}) before trusting these intervals."
+		))
+	}
+
+	# parallel forking is unavailable on windows; fall back to serial
+	if (cores > 1 && .Platform$OS.type == "windows") {
+		cli::cli_warn(c(
+			"Parallel bootstrap is unavailable on Windows (no forking).",
+			"i" = "Falling back to serial ({.code cores = 1})."
+		))
+		cores <- 1L
+	}
+
+	# for reproducible parallel streams, switch to L'Ecuyer-CMRG before seeding.
+	# restore the user's RNGkind and global RNG stream on exit so a seeded run
+	# leaves no side effect (mirrors sir()/sim_sir()).
+	if (!is.null(seed)) {
+		if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+			old_seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+			on.exit(assign(".Random.seed", old_seed, envir = globalenv()), add = TRUE)
+		} else {
+			on.exit(if (exists(".Random.seed", envir = globalenv(), inherits = FALSE))
+				rm(".Random.seed", envir = globalenv()), add = TRUE)
+		}
+		if (cores > 1) {
+			old_kind <- RNGkind("L'Ecuyer-CMRG")
+			on.exit(RNGkind(old_kind[1]), add = TRUE)
+		}
+		set.seed(seed)
+	}
 
 	Y <- sir_fit$Y
 	W <- sir_fit$W
 	X <- sir_fit$X
 	Z <- sir_fit$Z
+	W_recv <- sir_fit$W_recv   # non-NULL only for full-bilinear bipartite fits
 	family <- sir_fit$family
 	T_len <- dim(Y)[3]
+	n1 <- dim(Y)[1]
+	n2 <- dim(Y)[2]
 	n_params <- length(sir_fit$tab)
 	p <- if (is.null(W)) 0L else dim(W)[3]
 	q <- if (is.null(Z)) 0L else dim(Z)[3]
 
-	boot_coefs <- matrix(NA, R, n_params)
-	colnames(boot_coefs) <- rownames(sir_fit$summ)
-
 	dynamic_W <- isTRUE(sir_fit$dynamic_W)
 
-	for (b in 1:R) {
-		if (trace && b %% 10 == 0) cli::cli_inform("Bootstrap {.val {b}}/{.val {R}}")
+	pnames <- rownames(sir_fit$summ)
+	point_est <- sir_fit$tab
+	names(point_est) <- pnames   # keep point_est names consistent with se / ci
 
+	# dyad inference uses a delete-one-actor jackknife, not a with-replacement
+	# resample: duplicating an actor inserts spurious zero self-pairs into the
+	# bilinear A X B' sums and attenuates the influence coefficients toward zero.
+	if (type == "dyad") {
+		jk <- .sir_dyad_jackknife(sir_fit, trace = trace)
+		coefs <- jk$jack_est
+		colnames(coefs) <- pnames
+		se <- jk$se; names(se) <- pnames
+		ci_lo <- jk$ci_lo; ci_hi <- jk$ci_hi
+		names(ci_lo) <- names(ci_hi) <- pnames
+			result <- list(
+				coefs = coefs, se = se, ci_lo = ci_lo, ci_hi = ci_hi,
+				point_est = point_est, param_names = pnames,
+				n_valid = jk$n_valid, n_total = jk$n_total,
+				type = "dyad", family = family, interval = "normal-jackknife"
+			)
+		class(result) <- "boot_sir"
+		return(result)
+	}
+
+	# one bootstrap replicate: resample/simulate and refit.
+	# returns the public normalized coefficient vector, or NA on failure.
+	run_rep <- function(b) {
+		W_recv_b <- W_recv
 		if (type == "block") {
 			# resample time periods with replacement
 			t_idx <- sample(1:T_len, T_len, replace = TRUE)
@@ -101,9 +282,15 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 			# resample W's time dimension for dynamic (4D) W
 			W_b <- if (dynamic_W) W[,,, t_idx, drop = FALSE] else W
 		} else {
-			# parametric: simulate from fitted model
-			eta <- eta_tab(sir_fit$tab, W, X, Z,
-						   fix_receiver = isTRUE(sir_fit$fix_receiver))
+			# parametric: simulate from fitted model. full-bilinear bipartite fits
+			# need the two-sided linear predictor (B is not the identity).
+			eta <- if (!is.null(W_recv)) {
+				eta_tab_bipartite(sir_fit$tab, W, W_recv, X, Z,
+								  sir_fit$p, sir_fit$p2, sir_fit$q)
+			} else {
+				eta_tab(sir_fit$tab, W, X, Z,
+						fix_receiver = isTRUE(sir_fit$fix_receiver))
+			}
 			if (family == "normal") {
 				sigma <- sqrt(sir_fit$sigma2)
 				Y_b <- array(rnorm(length(eta), mean = eta, sd = sigma),
@@ -118,35 +305,57 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 				Y_b <- array(rbinom(length(eta), 1, prob),
 							 dim = dim(Y))
 			}
-			# preserve diagonal NA structure
-			for (tt in 1:T_len) diag(Y_b[,,tt]) <- NA
+			# Preserve the exact estimation mask. This keeps off-diagonal missingness
+			# missing and avoids dropping diagonal cells in square bipartite fits.
+			Y_b[is.na(sir_fit$Y)] <- NA
 			X_b <- X
 			Z_b <- Z
 			W_b <- W
 		}
 
-		tryCatch({
-			fit_b <- sir(Y_b, W_b, X_b, Z_b, family = family,
-						 method = "ALS", calc_se = FALSE,
-						 fix_receiver = isTRUE(sir_fit$fix_receiver),
-						 kron_mode = isTRUE(sir_fit$kron_mode),
-						 max_iter = 100, tol = 1e-6)
-			tab_b <- fit_b$tab
-
-			# sign alignment for bilinear models: bootstrap replicates
-			# can converge to the reflected solution (-alpha, -beta).
-			# flip influence params if they point away from the original.
-			if (!isTRUE(sir_fit$fix_receiver) && p > 1 && length(tab_b) > q) {
-				infl_idx <- (q + 1):length(tab_b)
-				if (sum(sir_fit$tab[infl_idx] * tab_b[infl_idx]) < 0) {
-					tab_b[infl_idx] <- -tab_b[infl_idx]
-				}
-			}
-
-			boot_coefs[b, ] <- tab_b
-		}, error = function(e) {
-			# leave as NA for failed replicates
+			tryCatch({
+				refit_args <- list(Y_b, W_b, X_b, Z_b, family = family,
+								   method = "ALS", calc_se = FALSE,
+								   fix_receiver = isTRUE(sir_fit$fix_receiver),
+								   bipartite = isTRUE(sir_fit$bipartite),
+								   kron_mode = isTRUE(sir_fit$kron_mode),
+								   max_iter = 100, tol = 1e-6)
+			# route to the full-bilinear estimator when the original fit used it
+			if (!is.null(W_recv)) refit_args$W_recv <- W_recv_b
+			fit_b <- do.call(sir, refit_args)
+			if (!isTRUE(fit_b$convergence)) return(rep(NA_real_, n_params))
+					fit_b$tab
+			}, error = function(e) {
+			# failed replicate
+			rep(NA_real_, n_params)
 		})
+	}
+
+		if (cores > 1) {
+			# parallel path: mc.set.seed=TRUE makes each fork advance the
+			# L'Ecuyer-CMRG stream, so streams are independent and reproducible.
+			if (trace) cli::cli_inform("Bootstrapping {.val {R}} replicates on {.val {cores}} cores ...")
+			rep_list <- parallel::mclapply(seq_len(R), run_rep,
+										   mc.cores = cores, mc.set.seed = TRUE)
+		} else {
+			# serial path: trace controls both the progress bar and periodic messages
+			rep_list <- vector("list", R)
+			if (trace) cli::cli_progress_bar("Bootstrapping", total = R, clear = FALSE)
+			for (b in seq_len(R)) {
+				if (trace && b %% 10 == 0) cli::cli_inform("Bootstrap {.val {b}}/{.val {R}}")
+				rep_list[[b]] <- run_rep(b)
+				if (trace) cli::cli_progress_update()
+			}
+			if (trace) cli::cli_progress_done()
+		}
+
+	# assemble replicate coefficients into the R x n_params matrix.
+	# guard against worker errors that yield non-conformable results.
+	boot_coefs <- matrix(NA, R, n_params)
+	colnames(boot_coefs) <- rownames(sir_fit$summ)
+	for (b in seq_len(R)) {
+		v <- rep_list[[b]]
+		if (is.numeric(v) && length(v) == n_params) boot_coefs[b, ] <- v
 	}
 
 	# compute statistics from successful replicates
@@ -155,6 +364,9 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 
 	if (n_valid < 10) {
 		cli::cli_warn("Only {.val {n_valid}} valid bootstrap replicates (of {.val {R}}). Results unreliable.")
+	}
+	if (n_valid < 2) {
+		cli::cli_abort("Bootstrap produced fewer than 2 valid replicates; intervals and SEs are undefined.")
 	}
 
 	boot_se <- apply(boot_coefs[valid, , drop = FALSE], 2, sd)
@@ -166,12 +378,13 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric"),
 		se = boot_se,
 		ci_lo = boot_ci[1, ],
 		ci_hi = boot_ci[2, ],
-		point_est = sir_fit$tab,
-		param_names = rownames(sir_fit$summ),
+		point_est = point_est,
+		param_names = pnames,
 		n_valid = n_valid,
 		n_total = R,
 		type = type,
-		family = sir_fit$family
+		family = sir_fit$family,
+		interval = "percentile"
 	)
 	class(result) <- "boot_sir"
 	result
@@ -194,12 +407,14 @@ print.boot_sir <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 	cli::cli_text("Type: {.field {x$type}} | Replicates: {.val {x$n_valid}}/{.val {x$n_total}} valid")
 
 	# build results table
+	se_label <- if (identical(x$type, "dyad")) "Jackknife SE" else "Boot SE"
 	tab <- cbind(
 		Estimate = x$point_est,
-		`Boot SE` = x$se,
+		SE = x$se,
 		`2.5 %` = x$ci_lo,
 		`97.5 %` = x$ci_hi
 	)
+	colnames(tab)[2] <- se_label
 	rownames(tab) <- x$param_names
 
 	cli::cli_text("")
@@ -228,26 +443,33 @@ summary.boot_sir <- function(object, ...) {
 
 	tab <- cbind(
 		Estimate = object$point_est,
-		`Boot SE` = object$se,
+		SE = object$se,
 		`2.5 %` = object$ci_lo,
 		`97.5 %` = object$ci_hi
 	)
+	colnames(tab)[2] <- if (identical(object$type, "dyad")) "Jackknife SE" else "Boot SE"
 	rownames(tab) <- object$param_names
 
 	# flag parameters where CI includes zero
 	covers_zero <- object$ci_lo <= 0 & object$ci_hi >= 0
 	sig <- ifelse(covers_zero, " ", "*")
-	tab_print <- cbind(tab, ` ` = sig)
+	tab_print <- cbind(format(round(tab, 4), width = 10), ` ` = sig)
 
-	print(noquote(format(round(tab, 4), width = 10)))
+	print(noquote(tab_print))
 	cli::cli_text("{.emph * = 95% CI excludes zero}")
 
-	# bootstrap distribution summary
+	# distribution summary. for block/parametric this is the replicate
+	# distribution; the dyad jackknife yields delete-one estimates, not a
+	# sampling distribution, so its se comes from the jackknife covariance.
 	valid <- apply(object$coefs, 1, function(r) !any(is.na(r)))
 	boot_valid <- object$coefs[valid, , drop = FALSE]
 
 	cli::cli_rule()
-	cli::cli_h2("Bootstrap Distribution")
+	if (identical(object$type, "dyad")) {
+		cli::cli_h2("Delete-one-actor jackknife estimates")
+	} else {
+		cli::cli_h2("Bootstrap Distribution")
+	}
 	dist_tab <- data.frame(
 		mean = colMeans(boot_valid),
 		sd = apply(boot_valid, 2, sd),
@@ -261,8 +483,12 @@ summary.boot_sir <- function(object, ...) {
 
 #' Confidence Intervals from Bootstrap SIR Results
 #'
-#' Computes percentile confidence intervals at the specified level from the
-#' bootstrap coefficient distribution.
+#' Computes confidence intervals from a \code{boot_sir} object. For \code{block}
+#' and \code{parametric} bootstraps these are percentile intervals from the
+#' replicate distribution. For the \code{dyad} jackknife they are normal
+#' (\code{estimate +/- z * se}) intervals from the jackknife standard error;
+#' the jackknife produces a covariance, not a replicate distribution, so
+#' percentiles do not apply.
 #'
 #' @param object A \code{boot_sir} object from \code{\link{boot_sir}}.
 #' @param parm Character vector of parameter names or integer indices. If
@@ -273,12 +499,29 @@ summary.boot_sir <- function(object, ...) {
 #'   and upper bounds, labeled by percentage.
 #' @export
 confint.boot_sir <- function(object, parm = NULL, level = 0.95, ...) {
+	if (!inherits(object, "boot_sir")) {
+		cli::cli_abort("{.arg object} must be a {.cls boot_sir} object.")
+	}
+	if (!is.numeric(level) || length(level) != 1L || !is.finite(level) ||
+		level <= 0 || level >= 1) {
+		cli::cli_abort("{.arg level} must be a single number between 0 and 1.")
+	}
 	a <- (1 - level) / 2
 	pct <- paste0(format(100 * c(a, 1 - a), trim = TRUE, digits = 3), " %")
 
-	valid <- apply(object$coefs, 1, function(r) !any(is.na(r)))
-	boot_valid <- object$coefs[valid, , drop = FALSE]
-	ci <- t(apply(boot_valid, 2, quantile, probs = c(a, 1 - a)))
+	if (identical(object$type, "dyad")) {
+		# jackknife: normal interval from the jackknife se (no replicate dist)
+		z <- stats::qnorm(1 - a)
+		ci <- cbind(object$point_est - z * object$se,
+					object$point_est + z * object$se)
+	} else {
+		valid <- apply(object$coefs, 1, function(r) !any(is.na(r)))
+		boot_valid <- object$coefs[valid, , drop = FALSE]
+		if (nrow(boot_valid) < 2L) {
+			cli::cli_abort("Bootstrap intervals require at least 2 valid replicates.")
+		}
+		ci <- t(apply(boot_valid, 2, quantile, probs = c(a, 1 - a)))
+	}
 	rownames(ci) <- object$param_names
 	colnames(ci) <- pct
 

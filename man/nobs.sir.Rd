@@ -16,6 +16,7 @@ Integer count of observations.
 }
 \description{
 Returns the number of non-missing dyad-time observations used in fitting.
-For square networks, diagonal entries (self-loops) are excluded from this
-count.
+For one-mode square networks, diagonal entries (self-loops) are excluded from
+this count. Square bipartite fits keep diagonal cells because rows and columns
+are distinct actor sets.
 }

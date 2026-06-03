@@ -12,7 +12,12 @@
 \item{...}{Additional arguments (unused).}
 }
 \value{
-Named numeric vector of estimated coefficients.
+Named numeric vector of estimated coefficients. Names use the
+  \code{(Z)} / \code{(alphaW)} / \code{(betaW)} tagging from
+  \code{summary()}: \code{(Z)} = exogenous direct effects (theta);
+  \code{(alphaW)} = sender-influence weights (alpha_2..alpha_p, since
+  alpha_1 = 1 is fixed for identifiability); \code{(betaW)} = receiver-
+  influence weights (beta).
 }
 \description{
 Returns the estimated parameter values from a fitted SIR model. These

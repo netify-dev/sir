@@ -21,7 +21,7 @@ articles:
     - sir_overview
     - sir_inference
     - sir_extensions
-  - title: internal
+  - title: "Methods Reference"
     contents:
     - methodology
 
@@ -30,8 +30,6 @@ reference:
     desc: "Fit Social Influence Regression models to network data"
     contents:
     - sir
-    - sir_alsfit
-    - sir_optfit
 
   - title: "S3 Methods"
     desc: "Standard R methods for sir model objects"
@@ -49,7 +47,10 @@ reference:
     - summary.sir
     - print.sir
     - print.summary.sir
-    - plot.sir
+    - plot.sir_fit
+    - tidy.sir
+    - glance.sir
+    - augment.sir
 
   - title: "Visualization"
     desc: "Network visualization of influence matrices"
@@ -64,8 +65,16 @@ reference:
     - summary.boot_sir
     - confint.boot_sir
 
-  - title: "Counterfactual Scenarios"
-    desc: "Build counterfactual scenario arrays for prediction"
+  - title: "Forecasting & Scoring"
+    desc: "Forecast held-out networks and score predictions"
+    contents:
+    - forecast.sir_fit
+    - cv_sir
+    - print.sir_cv
+    - score_sir
+
+  - title: "Model-Implied Scenarios"
+    desc: "Build scenario arrays for prediction"
     contents:
     - get_scen_vals
     - get_scen_array
@@ -74,29 +83,6 @@ reference:
     desc: "Simulate network data and prepare inputs for SIR models"
     contents:
     - sim_sir
+    - icews
     - rel_covar
     - cast_array
-    - eta_tab
-    - mll_sir
-
-  - title: "C++ Backend"
-    desc: "Optimized C++ routines for matrix operations"
-    contents:
-    - cpp_tprod_A_X_Bt
-    - cpp_amprod_W_v
-    - cpp_construct_Wbeta_design
-    - cpp_construct_Walpha_design
-    - cpp_construct_Wbeta_design_dyn
-    - cpp_construct_Walpha_design_dyn
-    - cpp_mll_gH
-    - cpp_mll_gH_dyn
-
-  - title: "Internal Helpers"
-    desc: "Internal utility functions (not exported)"
-    contents:
-    - flatten_Y
-    - flatten_Z
-    - prepare_Z_list
-    - amprod
-    - mat
-    - tprod

@@ -5,8 +5,8 @@
 #' 
 #' @description
 #' Performs the bilinear transformation central to the Social Influence Regression model.
-#' Computes A * X_t * B' for each time slice t, where this product represents how
-#' network influence flows through the sender effects (A) and receiver effects (B).
+#' Computes A * X_t * B' for each time slice t, where this product is the
+#' bilinear contribution to the linear predictor for each directed edge.
 #' 
 #' @details
 #' This operation is the computational bottleneck of the SIR model, appearing in both
@@ -20,9 +20,9 @@
 #' - X typically contains lagged network outcomes that carry influence forward
 #' 
 #' Mathematical interpretation:
-#' - Element (i,j) of the result represents the total influence flowing from i to j
-#' - This influence is mediated by the entire network structure at time t
-#' - The bilinear form allows for complex, indirect influence pathways
+#' - Element (i,j) is the contribution to the linear predictor for edge i -> j
+#' - It aggregates lagged source dyads k -> l through A[i,k] and B[j,l]
+#' - The bilinear form allows indirect, network-mediated predictive channels
 #' 
 #' Computational optimizations:
 #' - Pre-computes B' once rather than for each time slice
@@ -39,12 +39,12 @@
 #' @param B Matrix (m x m) of receiver effects. Element B[j,l] represents how node j's
 #'   reception is modified by node l's receiving patterns.
 #'   
-#' @return Three-dimensional array (m x m x T) where element [i,j,t] represents the
-#'   total bilinear influence from node i to node j at time t.
+#' @return Three-dimensional array (m x m x T) where element [i,j,t] is the
+#'   bilinear contribution to the linear predictor for Y[i,j,t].
 #'   
 #' @examples
 #' \dontrun{
-#' // In R:
+#' # In R:
 #' m <- 10; T <- 5
 #' X <- array(rnorm(m*m*T), dim=c(m,m,T))
 #' A <- matrix(rnorm(m*m), m, m)
@@ -56,6 +56,7 @@
 #'   The implementation avoids unnecessary memory allocations and leverages BLAS Level 3
 #'   operations for optimal performance.
 #'   
+#' @noRd
 cpp_tprod_A_X_Bt <- function(X, A, B) {
     .Call(`_sir_cpp_tprod_A_X_Bt`, X, A, B)
 }
@@ -94,18 +95,19 @@ cpp_tprod_A_X_Bt <- function(X, A, B) {
 #'   
 #' @examples
 #' \dontrun{
-#' // In R:
+#' # In R:
 #' m <- 10; p <- 3
 #' W <- array(rnorm(m*m*p), dim=c(m,m,p))
-#' v <- c(1, 0.5, -0.3)  // Coefficients
+#' v <- c(1, 0.5, -0.3)  # Coefficients
 #' A <- cpp_amprod_W_v(W, v)
-#' // A is now the parameterized influence matrix
+#' # A is now the parameterized influence matrix
 #' }
 #' 
 #' @note The function checks for dimension compatibility and will throw an
 #'   error if v has incorrect length. Zero coefficients are detected and
 #'   skipped to improve performance when the model is sparse.
-#'   
+#' 
+#' @noRd
 cpp_amprod_W_v <- function(W, v) {
     .Call(`_sir_cpp_amprod_W_v`, W, v)
 }
@@ -114,7 +116,7 @@ cpp_amprod_W_v <- function(W, v) {
 #' 
 #' @description
 #' Builds the design matrix for updating sender effects (alpha parameters) in the
-#' Alternating Least Squares algorithm, holding receiver effects (beta) fixed.
+#' alternating GLM/IRLS algorithm, holding receiver effects (beta) fixed.
 #' 
 #' @details
 #' In the ALS algorithm, when updating alpha with beta fixed, the model becomes
@@ -153,11 +155,12 @@ cpp_amprod_W_v <- function(W, v) {
 #'   
 #' @examples
 #' \dontrun{
-#' // Called internally by sir_alsfit during the alpha update step
-#' // After computing this design matrix, the update is:
-#' // glm(Y ~ -1 + cbind(Z_design, Wbeta_design), family=...)
+#' # Called internally by sir_alsfit during the alpha update step
+#' # After computing this design matrix, the update is:
+#' # glm(Y ~ -1 + cbind(Z_design, Wbeta_design), family=...)
 #' }
 #' 
+#' @noRd
 cpp_construct_Wbeta_design <- function(W, X, beta) {
     .Call(`_sir_cpp_construct_Wbeta_design`, W, X, beta)
 }
@@ -166,7 +169,7 @@ cpp_construct_Wbeta_design <- function(W, X, beta) {
 #' 
 #' @description
 #' Builds the design matrix for updating receiver effects (beta parameters) in the
-#' Alternating Least Squares algorithm, holding sender effects (alpha) fixed.
+#' alternating GLM/IRLS algorithm, holding sender effects (alpha) fixed.
 #' 
 #' @details
 #' In the ALS algorithm, when updating beta with alpha fixed, the model becomes
@@ -198,10 +201,11 @@ cpp_construct_Wbeta_design <- function(W, X, beta) {
 #'   
 #' @examples
 #' \dontrun{
-#' // Called internally by sir_alsfit during the beta update step
-#' // The GLM call becomes:
-#' // glm(Y ~ -1 + cbind(Z_design, Walpha_design), family=...)
+#' # Called internally by sir_alsfit during the beta update step
+#' # The GLM call becomes:
+#' # glm(Y ~ -1 + cbind(Z_design, Walpha_design), family=...)
 #' }
+#' @noRd
 cpp_construct_Walpha_design <- function(W, X, alpha) {
     .Call(`_sir_cpp_construct_Walpha_design`, W, X, alpha)
 }
@@ -217,6 +221,7 @@ cpp_construct_Walpha_design <- function(W, X, alpha) {
 #' @param beta Vector (p x 1) of current receiver parameters.
 #'
 #' @return Matrix (m*m*T x p) design matrix for alpha GLM step.
+#' @noRd
 cpp_construct_Wbeta_design_dyn <- function(W_field, X, beta) {
     .Call(`_sir_cpp_construct_Wbeta_design_dyn`, W_field, X, beta)
 }
@@ -232,6 +237,7 @@ cpp_construct_Wbeta_design_dyn <- function(W_field, X, beta) {
 #' @param alpha Vector (p x 1) of current sender parameters.
 #'
 #' @return Matrix (m*m*T x p) design matrix for beta GLM step.
+#' @noRd
 cpp_construct_Walpha_design_dyn <- function(W_field, X, alpha) {
     .Call(`_sir_cpp_construct_Walpha_design_dyn`, W_field, X, alpha)
 }
@@ -251,6 +257,7 @@ cpp_construct_Walpha_design_dyn <- function(W_field, X, alpha) {
 #' @param family Distribution family string.
 #'
 #' @return List with grad, hess, shess (after identifiability projection).
+#' @noRd
 cpp_mll_gH_dyn <- function(tab, Y, W_field, X, Z_list, family) {
     .Call(`_sir_cpp_mll_gH_dyn`, tab, Y, W_field, X, Z_list, family)
 }
@@ -329,11 +336,12 @@ cpp_mll_gH_dyn <- function(tab, Y, W_field, X, Z_list, family) {
 #'   
 #' @examples
 #' \dontrun{
-#' // Called internally by optim() during optimization:
+#' # Called internally by optim() during optimization:
 #' result <- cpp_mll_gH(current_params, Y, W, X, Z_list, "poisson")
-#' // Use gradient for search direction
-#' // Use Hessian for step size (quasi-Newton methods)
+#' # Use gradient for search direction
+#' # Use Hessian for step size (quasi-Newton methods)
 #' }
+#' @noRd
 cpp_mll_gH <- function(tab, Y, W, X, Z_list, family) {
     .Call(`_sir_cpp_mll_gH`, tab, Y, W, X, Z_list, family)
 }

@@ -15,7 +15,8 @@ sim_sir(
   theta = NULL,
   W = NULL,
   sigma = 1,
-  seed = NULL
+  seed = NULL,
+  ...
 )
 }
 \arguments{
@@ -33,7 +34,8 @@ or \code{"binomial"}.}
 
 \item{alpha}{Numeric vector of length p for sender influence weights.
 The first element (alpha_1) is fixed at 1 for identifiability; only
-alpha_2:p are free. If NULL (default), drawn from N(0, 0.3).}
+alpha_2:p are free. If NULL (default), drawn from N(0, 0.3).
+Use \code{seed} for reproducibility.}
 
 \item{beta}{Numeric vector of length p for receiver influence weights.
 If NULL (default), drawn from N(0, 0.3).}
@@ -42,19 +44,26 @@ If NULL (default), drawn from N(0, 0.3).}
 If NULL (default), drawn from U(-0.5, 0.5).}
 
 \item{W}{Optional 3D array (m x m x p) of influence covariates. If NULL
-(default), generated with standard normal entries.}
+(default), generated with standard normal entries (a dense, well-conditioned
+influence design). The diagonal is set to zero because self-ties are not
+part of the one-mode SIR likelihood.}
 
 \item{sigma}{Numeric. Standard deviation for the normal family. Default 1.}
 
-\item{seed}{Optional integer for reproducibility.}
+\item{seed}{Optional integer for reproducibility. When supplied, the seed is
+set locally and the caller's global RNG state is restored on exit, so a
+subsequent draw (e.g. \code{runif}) in the caller is left unperturbed.}
+
+\item{...}{Unused; catches mistyped arguments and reports a clear error.}
 }
 \value{
 A list with components:
   \describe{
     \item{Y}{3D array (m x m x T_len) of simulated outcomes.}
     \item{W}{3D array (m x m x p) of influence covariates.}
-    \item{X}{3D array (m x m x T_len) of lagged network state.
-      For Poisson family, X is log(Y + 1) to prevent explosive dynamics.}
+    \item{X}{3D array (m x m x T_len) of the (scaled) lagged network state
+      used in the bilinear mean: \code{X[,,t]} is \code{log(Y[,,t-1] + 1)}
+      (Poisson) or \code{Y[,,t-1]} (otherwise), divided by \code{(m - 1)}.}
     \item{Z}{4D array (m x m x q x T_len) of exogenous covariates, or
       NULL if q = 0.}
     \item{alpha}{True alpha vector (length p, with alpha_1 = 1).}
@@ -71,12 +80,20 @@ Useful for testing, benchmarking, and pedagogical demonstrations. The
 function simulates Y[i,j,t] from the specified family using influence
 covariates W, lagged network state X, and optional exogenous covariates Z.
 }
+\details{
+The influence-carrying state \code{X} is scaled by \code{1 / (m - 1)} before
+it enters the bilinear mean. The bilinear term \eqn{A X_t B^\top} sums over all
+\eqn{(m-1)} off-diagonal partners on each side, so without this scaling the
+linear predictor would grow with network size and (for the Poisson/log link)
+the conditional mean would saturate, making the influence parameters
+unrecoverable. The returned \code{X} already includes this scaling, so a plain
+\code{\link{sir}} fit on \code{(Y, W, X, Z)} recovers the same \code{A}, \code{B}
+used to generate the data.
+}
 \examples{
 \dontrun{
-# Simulate Poisson network
-dat <- sim_sir(m = 15, T_len = 10, p = 2, q = 1, family = "poisson", seed = 42)
-
-# Fit model to recover parameters
+# Simulate Poisson network and recover the parameters
+dat <- sim_sir(m = 15, T_len = 30, p = 2, q = 1, family = "poisson", seed = 42)
 fit <- sir(dat$Y, dat$W, dat$X, dat$Z, family = "poisson")
 cbind(true = c(dat$theta, dat$alpha[-1], dat$beta), estimated = coef(fit))
 }

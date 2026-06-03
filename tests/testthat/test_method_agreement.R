@@ -19,9 +19,11 @@ test_that("ALS and optim produce similar estimates (fix_receiver)", {
 	fit_als = sir(Y = Y, W = W, X = X, Z = Z, family = "poisson",
 				method = "ALS", fix_receiver = TRUE,
 				calc_se = FALSE, trace = FALSE, max_iter = 100)
-	fit_opt = sir(Y = Y, W = W, X = X, Z = Z, family = "poisson",
-				method = "optim", fix_receiver = TRUE,
-				calc_se = FALSE, trace = 0)
+	expect_warning({
+		fit_opt = sir(Y = Y, W = W, X = X, Z = Z, family = "poisson",
+					method = "optim", fix_receiver = TRUE,
+					calc_se = FALSE, trace = 0)
+	}, "`fix_receiver` = TRUE forces ALS method")
 
 	# both should produce finite estimates
 	expect_true(all(is.finite(fit_als$tab)))
@@ -62,7 +64,7 @@ test_that("sign of influence parameters is consistent across seeds", {
 		X[,,t] = Y[,,t-1]
 		X[is.na(X[,,t])] = 0
 		}
-		ETA_t = eta_tab(true_alpha, W, X[,,t, drop=FALSE], Z = NULL, fix_receiver = TRUE)
+		ETA_t = sir:::eta_tab(true_alpha, W, X[,,t, drop=FALSE], Z = NULL, fix_receiver = TRUE)
 		lambda_t = exp(ETA_t[,,1])
 		diag(lambda_t) = 0
 		lambda_t = pmin(pmax(lambda_t, 0.01), 50)

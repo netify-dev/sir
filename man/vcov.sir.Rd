@@ -4,13 +4,26 @@
 \alias{vcov.sir}
 \title{Variance-Covariance Matrix for SIR Model Parameters}
 \usage{
-\method{vcov}{sir}(object, type = c("classical", "robust"), ...)
+\method{vcov}{sir}(object, type = c("cluster", "classical", "robust", "twoway", "dyad"), ...)
 }
 \arguments{
 \item{object}{A fitted \code{sir} object from \code{\link{sir}}.}
 
-\item{type}{Character string: \code{"classical"} (default) for
-Hessian-based vcov, or \code{"robust"} for the sandwich estimator.}
+\item{type}{Character string:
+\itemize{
+  \item \code{"cluster"} (default) --- multiway cluster-robust covariance
+    on sender, receiver, and time margins for directed-network data when
+    the Hessian bread is stable.
+  \item \code{"classical"} --- inverse-Hessian covariance.
+  \item \code{"robust"} --- HC0 sandwich; corrects heteroskedasticity /
+    overdispersion only, \emph{not} dyadic dependence.
+  \item \code{"twoway"} --- alias for \code{"cluster"}.
+  \item \code{"dyad"} --- clusters the directed dyad across time.
+}
+The cluster types require the classical covariance as their bread
+(\code{calc_se = TRUE}, the default) and are unavailable for dynamic (4D)
+\code{W} and for full-bilinear bipartite fits (use
+\code{boot_sir(type = "dyad")} there).}
 
 \item{...}{Additional arguments (unused).}
 }
@@ -19,11 +32,12 @@ A square matrix with rows and columns named by parameter.
   Returns NULL if standard errors were not computed (\code{calc_se = FALSE}).
 }
 \description{
-Returns the variance-covariance matrix of the estimated parameters. Two
-types are available: classical (inverse Hessian) and robust (sandwich
-estimator). The robust version is more reliable when the model is
-misspecified or when observations are not independent.
+Returns the variance-covariance matrix of the estimated parameters. Several
+types are available; for relational (dyadic) data the cluster-robust types are
+usually more cautious because the classical and HC0-robust covariances assume
+independent dyad-periods and often undercover.
 }
 \seealso{
-\code{\link{confint.sir}} for confidence intervals.
+\code{\link{confint.sir}} for confidence intervals,
+  \code{\link{boot_sir}} for resampling-based inference.
 }

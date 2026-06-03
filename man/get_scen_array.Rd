@@ -2,40 +2,55 @@
 % Please edit documentation in R/scenario.R
 \name{get_scen_array}
 \alias{get_scen_array}
-\title{Build Counterfactual Scenario Array}
+\title{Build Scenario Array for Prediction}
 \usage{
-get_scen_array(var_to_vary, scen_vals, node_names, var_names)
+get_scen_array(
+  var_to_vary,
+  scen_vals,
+  node_names,
+  var_names,
+  n_time = NULL,
+  value = NULL,
+  zero_diag = TRUE
+)
 }
 \arguments{
-\item{var_to_vary}{Character string naming the variable to vary.}
+\item{var_to_vary}{Character name of the variable to vary.}
 
-\item{scen_vals}{Named list produced by \code{\link{get_scen_vals}}.}
+\item{scen_vals}{Named list of scenario values (from \code{\link{get_scen_vals}}).}
 
-\item{node_names}{Character vector of node names (used for the
-first two array dimensions).}
+\item{node_names}{Character vector of node names.}
 
-\item{var_names}{Character vector of all variable names (third
-dimension of the output).}
+\item{var_names}{Character vector of all variable names in the array.}
+
+\item{n_time}{Optional integer number of time periods. If NULL (default),
+returns a static 3D \code{n x n x p} array. Set this to return a 4D
+time-varying \code{n x n x p x n_time} array.}
+
+\item{value}{Numeric scenario value for \code{var_to_vary}. If NULL, uses the
+mean of that variable's scenario values.}
+
+\item{zero_diag}{Logical. If TRUE (default), set square-array diagonals to
+zero. Use FALSE for square bipartite sender-side arrays whose diagonal cells
+are real observations.}
 }
 \value{
-A four-dimensional array of dimension
-  \code{m x m x p x S}, where \code{S} is the number of
-  unique quantile values for the varying variable.  Each slice
-  along the fourth dimension holds one scenario.  Off-diagonal
-  entries for the varying variable take its quantile value, while
-  all other variables are set to their mean.  Diagonals are zero.
+A static 3D scenario array by default, or a 4D array when
+  \code{n_time} is supplied.
 }
 \description{
-Constructs a 4D array of covariate values for counterfactual
-prediction, varying one variable across its empirical range while
-holding others at their mean.
+Constructs an artificial influence covariate grid for model-implied scenario prediction,
+where one variable is set to a scenario value while the others are held at the
+mean of their supplied scenario values. The resulting array can be passed to
+\code{\link{predict.sir}} via \code{newdata}. The diagonal is set to zero by
+default for one-mode scenario arrays so self-influence channels are not
+reintroduced. For empirical counterfactuals, prefer copying the observed
+\code{W} array and modifying a theoretically defined subset of cells.
 }
 \examples{
-\dontrun{
-vals <- get_scen_vals(W)
-scen <- get_scen_array("proximity", vals,
-                       node_names = rownames(W),
-                       var_names  = dimnames(W)[[3]])
-}
-
+dat <- sim_sir(m = 8, T_len = 10, p = 2, q = 1, family = "poisson", seed = 1)
+sv <- get_scen_vals(dat$W)
+arr <- get_scen_array(names(sv)[1], scen_vals = sv,
+                      node_names = paste0("n", 1:8), var_names = names(sv))
+dim(arr)
 }

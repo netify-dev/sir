@@ -6,6 +6,35 @@ NULL
 
 # helper functions for data handling
 
+set_square_diagonal <- function(arr, value) {
+	d <- dim(arr)
+	if (is.null(d) || length(d) < 2 || d[1] != d[2]) {
+		return(arr)
+	}
+
+	if (length(d) == 2) {
+		diag(arr) <- value
+		return(arr)
+	}
+
+	if (length(d) == 3) {
+		for (t in seq_len(d[3])) {
+			diag(arr[, , t]) <- value
+		}
+		return(arr)
+	}
+
+	if (length(d) == 4) {
+		for (k in seq_len(d[3])) {
+			for (t in seq_len(d[4])) {
+				diag(arr[, , k, t]) <- value
+			}
+		}
+	}
+
+	arr
+}
+
 #' Prepare Z Array for C++ Consumption
 #'
 #' @description
@@ -51,44 +80,46 @@ NULL
 #' Z_list <- prepare_Z_list(Z_multi)
 #' length(Z_list)  # Returns 3
 #' }
+#' @noRd
 prepare_Z_list <- function(Z) {
-  if (is.null(Z) || length(dim(Z)) == 0) {
+	if (is.null(Z) || length(dim(Z)) == 0) {
 	return(list())
-  }
+	}
 
-  dims <- dim(Z)
-  ndims <- length(dims)
-  m <- dims[1]
+	dims <- dim(Z)
+	ndims <- length(dims)
+	n1 <- dims[1]
+	n2 <- dims[2]
 
-  if (ndims == 3) {
-	# (m x m x T) with q=1
+	if (ndims == 3) {
+	# (n1 x n2 x T) with q=1
 	T_len <- dims[3]
 	# keep 3D even if T=1 or m=1
 	if (is.null(dim(Z))) {
-		Z <- array(Z, dim=c(m, m, T_len))
+		Z <- array(Z, dim=c(n1, n2, T_len))
 	}
 	return(list(Z))
-  }
+	}
 
-  if (ndims != 4) {
+	if (ndims != 4) {
 	cli::cli_abort("Z must be a 3D or 4D array.")
-  }
+	}
 
-  # Z is (m x m x q x T)
-  q <- dims[3]
-  T_len <- dims[4]
+	# Z is (n1 x n2 x q x T)
+	q <- dims[3]
+	T_len <- dims[4]
 
-  Z_list <- lapply(1:q, function(k) {
-	  # extract (m x m x T) cube for covariate k
+	Z_list <- lapply(1:q, function(k) {
+	  # extract (n1 x n2 x T) cube for covariate k
 	  Zk <- Z[,,k,]
 	  # keep 3D even if T=1 or m=1
 	  if (is.null(dim(Zk)) || length(dim(Zk)) < 3) {
-		  Zk <- array(Zk, dim=c(m, m, T_len))
+		  Zk <- array(Zk, dim=c(n1, n2, T_len))
 	  }
 	  return(Zk)
-  })
+	})
 
-  return(Z_list)
+	return(Z_list)
 }
 
 # convert 4D W array (m x m x p x T) to a list of T cubes for C++
@@ -122,6 +153,7 @@ prepare_W_field <- function(W) {
 #' @param Y Three-dimensional array (m x m x T) of network outcomes.
 #'   
 #' @return Numeric vector of length m*m*T containing flattened outcomes.
+#' @noRd
 flatten_Y <- function(Y) {
 	return(c(Y))
 }
@@ -156,6 +188,7 @@ flatten_Y <- function(Y) {
 #'   
 #' @return Design matrix with dimensions (m*m*T) x q, or NULL if Z is NULL.
 #'   Column names are preserved from dimension names or auto-generated.
+#' @noRd
 flatten_Z <- function(Z) {
 	if (is.null(Z)) return(NULL)
 
@@ -234,27 +267,28 @@ flatten_Z <- function(Z) {
 #' eta <- eta_tab(tab, W, X, Z)
 #' dim(eta)  # Returns c(10, 10, 5)
 #' }
-#' @export
+#' @keywords internal
+#' @noRd
 eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
-  dynamic_W <- !is.null(W) && length(dim(W)) == 4
-  p <- if (is.null(W)) 0 else dim(W)[3]
-  q <- if (is.null(Z)) 0 else if (length(dim(Z)) == 3) 1 else dim(Z)[3]
-  n1 <- dim(X)[1]
-  n2 <- dim(X)[2]
-  m <- n1
-  T_len <- dim(X)[3]
+	dynamic_W <- !is.null(W) && length(dim(W)) == 4
+	p <- if (is.null(W)) 0 else dim(W)[3]
+	q <- if (is.null(Z)) 0 else if (length(dim(Z)) == 3) 1 else dim(Z)[3]
+	n1 <- dim(X)[1]
+	n2 <- dim(X)[2]
+	m <- n1
+	T_len <- dim(X)[3]
 
-  # parse parameters
-  if (q > 0) {
+	# parse parameters
+	if (q > 0) {
 	  theta <- tab[1:q]
-  } else {
+	} else {
 	  theta <- numeric(0)
-  }
+	}
 
-  if (fix_receiver && p > 0) {
+	if (fix_receiver && p > 0) {
 	  # fix_receiver: tab = [theta, alpha_1:p], B = I
 	  alpha <- tab[(q+1):(q+p)]
-  } else if (p > 0) {
+	} else if (p > 0) {
 	  if (p > 1) {
 		  alpha_start <- q + 1
 		  alpha_end <- q + p - 1
@@ -264,10 +298,10 @@ eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
 	  }
 	  beta_start <- q + p
 	  beta <- tab[beta_start:length(tab)]
-  }
+	}
 
-  # bilinear part: AXB
-  if (dynamic_W && p > 0) {
+	# bilinear part: AXB
+	if (dynamic_W && p > 0) {
 	  # dynamic W: compute A_t * X_t * B_t' per period
 	  AXB <- array(0, dim = c(n1, n2, T_len))
 	  for (t in seq_len(T_len)) {
@@ -280,30 +314,30 @@ eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
 			  AXB[,,t] <- A_t %*% X[,,t] %*% t(B_t)
 		  }
 	  }
-  } else if (fix_receiver && p > 0) {
+	} else if (fix_receiver && p > 0) {
 	  A <- cpp_amprod_W_v(W, alpha)
 	  B <- diag(n2)
 	  AXB <- cpp_tprod_A_X_Bt(X, A, B)
-  } else if (p > 0) {
+	} else if (p > 0) {
 	  A <- cpp_amprod_W_v(W, alpha)
 	  B <- cpp_amprod_W_v(W, beta)
 	  AXB <- cpp_tprod_A_X_Bt(X, A, B)
-  } else {
+	} else {
 	  AXB <- array(0, dim=c(n1, n2, T_len))
-  }
+	}
 
-  # exogenous part: ZT
-  if (q > 0) {
+	# exogenous part: ZT
+	if (q > 0) {
 	if (length(dim(Z)) == 3) {
 		Z <- array(Z, dim=c(n1, n2, 1, T_len))
 	}
 	ZT  <- amprod(Z, matrix(theta, nrow=1), 3)
 	ZT <- array(ZT, dim=c(n1, n2, T_len))
-  } else {
+	} else {
 	ZT <- array(0, dim=c(n1, n2, T_len))
-  }
+	}
 
-  ZT + AXB
+	ZT + AXB
 }
 
 #' Calculate Negative Log-Likelihood for SIR Model
@@ -352,39 +386,41 @@ eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
 #' Y_binary[1,1,1] <- NA  # Missing value
 #' nll <- mll_sir(tab, Y_binary, W, X, Z, "binomial")
 #' }
-#' @export
-mll_sir <- function(tab, Y, W, X, Z, family, fix_receiver=FALSE) {
-  ETA <- eta_tab(tab, W, X, Z, fix_receiver=fix_receiver)
+#' @keywords internal
+#' @noRd
+mll_sir <- function(tab, Y, W, X, Z, family, fix_receiver = FALSE, bipartite = FALSE) {
+	ETA <- eta_tab(tab, W, X, Z, fix_receiver=fix_receiver)
 
-  # exclude diagonal (self-ties) to match C++ gradient/hessian which skips i == j
-  n1 <- dim(Y)[1]
-  n2 <- dim(Y)[2]
-  T_len <- dim(Y)[3]
-  if (n1 == n2) {
+	# exclude self-ties only for one-mode square networks; square bipartite arrays
+	# can have real sender-receiver cells on the diagonal.
+	n1 <- dim(Y)[1]
+	n2 <- dim(Y)[2]
+	T_len <- dim(Y)[3]
+	if (n1 == n2 && !isTRUE(bipartite)) {
 	for (t in seq_len(T_len)) {
 	  diag(Y[,,t]) <- NA
 	  diag(ETA[,,t]) <- NA
 	}
-  }
+	}
 
-  if (family == "poisson") {
+	if (family == "poisson") {
 	lambda <- exp(ETA)
 	lambda[lambda > 1e300] <- 1e300
 	# guard against lambda underflowing to 0
 	lambda[lambda < 1e-300] <- 1e-300
 	nll <- -sum(dpois(Y, lambda = lambda, log = TRUE), na.rm = TRUE)
-  } else if (family == "normal") {
+	} else if (family == "normal") {
 	nll <- -sum(dnorm(Y, mean = ETA, sd = 1, log = TRUE), na.rm = TRUE)
-  } else if (family == "binomial") {
+	} else if (family == "binomial") {
 	prob <- 1 / (1 + exp(-ETA))
 	prob[prob < 1e-15] <- 1e-15
 	prob[prob > 1 - 1e-15] <- 1 - 1e-15
 	nll <- -sum(dbinom(Y, size = 1, prob = prob, log = TRUE), na.rm = TRUE)
-  } else {
+	} else {
 	cli::cli_abort("Unsupported family in {.fn mll_sir}: {.val {family}}.")
-  }
+	}
 
-  return(nll)
+	return(nll)
 }
 
 
@@ -392,59 +428,61 @@ mll_sir <- function(tab, Y, W, X, Z, family, fix_receiver=FALSE) {
 
 #' Matricization (R implementation)
 #' @keywords internal
+#' @noRd
 mat<-function(A,k)
 {
-  # handle vector case
-  if (is.null(dim(A))) {
+	# handle vector case
+	if (is.null(dim(A))) {
 	  if (k==1) return(matrix(A, ncol=1))
 	  else cli::cli_abort("Invalid mode for vector in {.fn mat}.")
-  }
+	}
 
-  Ak<-t(apply(A,k,"c"))
-  # ensure Ak is a matrix, handle dimension issues
-  if(!is.matrix(Ak)) Ak <- matrix(Ak, nrow=dim(A)[k])
-  if(is.matrix(Ak) && nrow(Ak)!=dim(A)[k])  { Ak<-t(Ak) }
-  Ak
+	Ak<-t(apply(A,k,"c"))
+	# ensure Ak is a matrix, handle dimension issues
+	if(!is.matrix(Ak)) Ak <- matrix(Ak, nrow=dim(A)[k])
+	if(is.matrix(Ak) && nrow(Ak)!=dim(A)[k])  { Ak<-t(Ak) }
+	Ak
 }
 
 #' Array-matrix product (R implementation)
 #'
 #' This R implementation is used for operations not covered by the specialized Cpp optimizations (like 4D Z).
 #' @keywords internal
+#' @noRd
 amprod<-function(A,M,k)
 {
-  if(is.vector(M)) { M<-matrix(M,nrow=1) } # treat vectors as row matrices
+	if(is.vector(M)) { M<-matrix(M,nrow=1) } # treat vectors as row matrices
 
-  K<-length(dim(A))
-  if(is.null(K)) { # a is a vector
+	K<-length(dim(A))
+	if(is.null(K)) { # a is a vector
 	  if (k!=1) cli::cli_abort("Invalid mode for vector in {.fn amprod}.")
 	  AM <- M %*% A
 	  return(c(AM)) # Return vector
-  }
+	}
 
-  A_mat <- mat(A,k)
+	A_mat <- mat(A,k)
 
-  if (ncol(M) != nrow(A_mat)) {
+	if (ncol(M) != nrow(A_mat)) {
 	  # handle transposition issues if dim(A)[k] is 1
 	  if (ncol(M) == ncol(A_mat) && nrow(A_mat) == 1 && dim(A)[k] == 1) {
 		   A_mat <- t(A_mat)
 	  } else {
 		cli::cli_abort("Dimension mismatch in {.fn amprod}: k={.val {k}}, dim(M)={.val {paste(dim(M), collapse='x')}}, dim(A)[k]={.val {dim(A)[k]}}, nrow(A_mat)={.val {nrow(A_mat)}}.")
 	  }
-  }
+	}
 
-  AM<-M %*% A_mat
+	AM<-M %*% A_mat
 
-  # determine new dimensions
-  dims_A <- dim(A)
-  new_dims <- c(dim(M)[1], dims_A[-k])
+	# determine new dimensions
+	dims_A <- dim(A)
+	new_dims <- c(dim(M)[1], dims_A[-k])
 
-  if (length(new_dims) <= 1) return(c(AM)) # Return vector if result is 1D or scalar
+	if (length(new_dims) <= 1) return(c(AM)) # Return vector if result is 1D or scalar
 
-  AMA<-array(AM, dim=new_dims)
+	AMA<-array(AM, dim=new_dims)
 
-  # handle permutation
-  if (K > 1) {
+	# handle permutation
+	if (K > 1) {
 	# calculate permutation vector
 	perm_order <- c(k, (1:K)[-k])
 	# inverse permutation to restore original dimension order
@@ -454,21 +492,22 @@ amprod<-function(A,M,k)
 		return(AMA) # Should not happen
 	}
 	AMA <- aperm(AMA, inv_perm)
-  }
-  AMA
+	}
+	AMA
 }
 
 #' Tucker product (R implementation)
 #' @keywords internal
+#' @noRd
 tprod<-function(A,B,modes=1:length(B))
 {
-  X<-A
-  for(i in seq_along(modes)) {
+	X<-A
+	for(i in seq_along(modes)) {
 	k <- modes[i]
 	M <- B[[i]]
 	X<-amprod(X, M, k)
-  }
-  X
+	}
+	X
 }
 
 # data prep helpers
@@ -588,4 +627,3 @@ cast_array <- function(dyad_data, var, monadic=FALSE, row=FALSE){
 	}
 	return(arr)
 }
-

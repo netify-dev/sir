@@ -42,15 +42,12 @@ in SIR models capturing higher-order network dependencies.
 }
 }
 \examples{
-\dontrun{
-# Build relational covariates from trade data
-Z_trade <- rel_covar(trade_array, "trade")
-dim(Z_trade)  # m x m x 3 x T
+dat <- sim_sir(m = 8, T_len = 10, p = 2, q = 1, family = "poisson", seed = 1)
+# relational covariates from the (lagged) network: main, reciprocal, transitive
+Zrel <- rel_covar(dat$X, "conflict")
+dim(Zrel)  # m x m x 3 x T
 
-# Use only main and reciprocal effects
-Z_simple <- rel_covar(trade_array, "trade", effects = c("main", "reciprocal"))
-
-# Pass to sir() as exogenous covariates
-fit <- sir(Y, W, X, Z = Z_trade, family = "poisson")
-}
+# only main and reciprocal effects
+Zsimple <- rel_covar(dat$X, "conflict", effects = c("main", "reciprocal"))
+dim(Zsimple)
 }

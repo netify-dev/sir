@@ -1,5 +1,4 @@
-# test that sir() can recover known parameters from simulated data.
-# uses the model's own eta_tab to generate data, then fits and checks recovery.
+# check recovery on simulated data
 
 test_that("sir recovers Poisson parameters from simulated data", {
 	set.seed(123)
@@ -8,20 +7,23 @@ test_that("sir recovers Poisson parameters from simulated data", {
 	p = 2
 	q = 1
 
-	# true parameters: [theta_1, alpha_2, beta_1, beta_2]
 	true_theta = 0.2
-	true_alpha = c(1, 0.3)   # alpha_1=1 fixed
+	true_alpha = c(1, 0.3)
 	true_beta  = c(0.4, -0.2)
 	true_tab   = c(true_theta, true_alpha[2], true_beta)
 
-	# generate covariates (small sd to keep eta moderate)
 	W = array(rnorm(m * m * p, sd = 0.15), dim = c(m, m, p))
+	for (k in seq_len(p)) {
+		diag(W[, , k]) = 0
+	}
+	for (k in seq_len(p)) {
+		diag(W[, , k]) = 0
+	}
 	Z = array(rnorm(m * m * q * T_len, sd = 0.3), dim = c(m, m, q, T_len))
 
 	X = array(0, dim = c(m, m, T_len))
 	Y = array(0, dim = c(m, m, T_len))
 
-	# simulate forward
 	for (t in 1:T_len) {
 	if (t == 1) {
 		X[,,t] = matrix(rpois(m * m, 2), m, m)
@@ -30,7 +32,7 @@ test_that("sir recovers Poisson parameters from simulated data", {
 		X[,,t] = Y[,,t-1]
 		X[is.na(X[,,t])] = 0
 	}
-	ETA_t = sir::eta_tab(true_tab, W, X[,,t, drop=FALSE], Z[,,,t, drop=FALSE])
+	ETA_t = sir:::eta_tab(true_tab, W, X[,,t, drop=FALSE], Z[,,,t, drop=FALSE])
 	lambda_t = exp(ETA_t[,,1])
 	diag(lambda_t) = 0
 	lambda_t = pmin(lambda_t, 50)
@@ -40,7 +42,6 @@ test_that("sir recovers Poisson parameters from simulated data", {
 	Y[,,t] = Y_t
 	}
 
-	# fit using lagged Y as X
 	X_fit = array(0, dim = c(m, m, T_len))
 	for (t in 2:T_len) {
 	X_fit[,,t] = Y[,,t-1]
@@ -53,8 +54,6 @@ test_that("sir recovers Poisson parameters from simulated data", {
 
 	est = unname(model$tab)
 
-	# with T=30, estimates should be close to true values
-	# tab = [theta_1, alpha_2, beta_1, beta_2]
 	expect_equal(est[1], true_theta, tolerance = 0.25,
 				 label = "theta recovery")
 	expect_equal(est[2], true_alpha[2], tolerance = 0.25,
@@ -90,7 +89,7 @@ test_that("sir recovers Normal parameters from simulated data", {
 		X[,,t] = Y[,,t-1]
 		X[is.na(X[,,t])] = 0
 	}
-	ETA_t = sir::eta_tab(true_tab, W, X[,,t, drop=FALSE], Z[,,,t, drop=FALSE])
+	ETA_t = sir:::eta_tab(true_tab, W, X[,,t, drop=FALSE], Z[,,,t, drop=FALSE])
 	Y_t = ETA_t[,,1] + rnorm(m * m, sd = 1)
 	diag(Y_t) = NA
 	Y[,,t] = Y_t
@@ -129,6 +128,9 @@ test_that("sir recovers fix_receiver parameters", {
 	true_tab   = c(true_theta, true_alpha)
 
 	W = array(rnorm(m * m * p, sd = 0.3), dim = c(m, m, p))
+	for (k in seq_len(p)) {
+		diag(W[, , k]) = 0
+	}
 	Z = array(rnorm(m * m * q * T_len, sd = 0.3), dim = c(m, m, q, T_len))
 	X = array(0, dim = c(m, m, T_len))
 	Y = array(0, dim = c(m, m, T_len))
@@ -141,7 +143,7 @@ test_that("sir recovers fix_receiver parameters", {
 		X[,,t] = Y[,,t-1]
 		X[is.na(X[,,t])] = 0
 	}
-	ETA_t = sir::eta_tab(true_tab, W, X[,,t, drop=FALSE], Z[,,,t, drop=FALSE],
+	ETA_t = sir:::eta_tab(true_tab, W, X[,,t, drop=FALSE], Z[,,,t, drop=FALSE],
 							fix_receiver = TRUE)
 	lambda_t = exp(ETA_t[,,1])
 	diag(lambda_t) = 0

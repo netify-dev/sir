@@ -12,8 +12,8 @@ using namespace arma;
 //' 
 //' @description
 //' Performs the bilinear transformation central to the Social Influence Regression model.
-//' Computes A * X_t * B' for each time slice t, where this product represents how
-//' network influence flows through the sender effects (A) and receiver effects (B).
+//' Computes A * X_t * B' for each time slice t, where this product is the
+//' bilinear contribution to the linear predictor for each directed edge.
 //' 
 //' @details
 //' This operation is the computational bottleneck of the SIR model, appearing in both
@@ -27,9 +27,9 @@ using namespace arma;
 //' - X typically contains lagged network outcomes that carry influence forward
 //' 
 //' Mathematical interpretation:
-//' - Element (i,j) of the result represents the total influence flowing from i to j
-//' - This influence is mediated by the entire network structure at time t
-//' - The bilinear form allows for complex, indirect influence pathways
+//' - Element (i,j) is the contribution to the linear predictor for edge i -> j
+//' - It aggregates lagged source dyads k -> l through A[i,k] and B[j,l]
+//' - The bilinear form allows indirect, network-mediated predictive channels
 //' 
 //' Computational optimizations:
 //' - Pre-computes B' once rather than for each time slice
@@ -46,12 +46,12 @@ using namespace arma;
 //' @param B Matrix (m x m) of receiver effects. Element B[j,l] represents how node j's
 //'   reception is modified by node l's receiving patterns.
 //'   
-//' @return Three-dimensional array (m x m x T) where element [i,j,t] represents the
-//'   total bilinear influence from node i to node j at time t.
+//' @return Three-dimensional array (m x m x T) where element [i,j,t] is the
+//'   bilinear contribution to the linear predictor for Y[i,j,t].
 //'   
 //' @examples
 //' \dontrun{
-//' // In R:
+//' # In R:
 //' m <- 10; T <- 5
 //' X <- array(rnorm(m*m*T), dim=c(m,m,T))
 //' A <- matrix(rnorm(m*m), m, m)
@@ -63,6 +63,7 @@ using namespace arma;
 //'   The implementation avoids unnecessary memory allocations and leverages BLAS Level 3
 //'   operations for optimal performance.
 //'   
+//' @noRd
 // [[Rcpp::export]]
 arma::cube cpp_tprod_A_X_Bt(const arma::cube& X, const arma::mat& A, const arma::mat& B) {
   int n1 = A.n_rows;
@@ -113,22 +114,23 @@ arma::cube cpp_tprod_A_X_Bt(const arma::cube& X, const arma::mat& A, const arma:
 //'   
 //' @examples
 //' \dontrun{
-//' // In R:
+//' # In R:
 //' m <- 10; p <- 3
 //' W <- array(rnorm(m*m*p), dim=c(m,m,p))
-//' v <- c(1, 0.5, -0.3)  // Coefficients
+//' v <- c(1, 0.5, -0.3)  # Coefficients
 //' A <- cpp_amprod_W_v(W, v)
-//' // A is now the parameterized influence matrix
+//' # A is now the parameterized influence matrix
 //' }
 //' 
 //' @note The function checks for dimension compatibility and will throw an
 //'   error if v has incorrect length. Zero coefficients are detected and
 //'   skipped to improve performance when the model is sparse.
-//'   
+//' 
+//' @noRd
 // [[Rcpp::export]]
 arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
-    int m = W.n_rows;
-    int p = W.n_slices;
+    arma::uword m = W.n_rows;
+    arma::uword p = W.n_slices;
 
     if (v.n_elem != p) {
         stop("Dimension mismatch in cpp_amprod_W_v.");
@@ -140,7 +142,7 @@ arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
 
     // loop implementation (often clearer for small p)
     arma::mat result = arma::zeros<arma::mat>(m, m);
-    for(int k=0; k < p; ++k) {
+    for(arma::uword k=0; k < p; ++k) {
         if (v(k) != 0.0) {
             result += W.slice(k) * v(k);
         }
@@ -157,7 +159,7 @@ arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
 //' 
 //' @description
 //' Builds the design matrix for updating sender effects (alpha parameters) in the
-//' Alternating Least Squares algorithm, holding receiver effects (beta) fixed.
+//' alternating GLM/IRLS algorithm, holding receiver effects (beta) fixed.
 //' 
 //' @details
 //' In the ALS algorithm, when updating alpha with beta fixed, the model becomes
@@ -196,11 +198,12 @@ arma::mat cpp_amprod_W_v(const arma::cube& W, const arma::vec& v) {
 //'   
 //' @examples
 //' \dontrun{
-//' // Called internally by sir_alsfit during the alpha update step
-//' // After computing this design matrix, the update is:
-//' // glm(Y ~ -1 + cbind(Z_design, Wbeta_design), family=...)
+//' # Called internally by sir_alsfit during the alpha update step
+//' # After computing this design matrix, the update is:
+//' # glm(Y ~ -1 + cbind(Z_design, Wbeta_design), family=...)
 //' }
 //' 
+//' @noRd
 // [[Rcpp::export]]
 arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, const arma::vec& beta) {
     int m = W.n_rows;
@@ -229,7 +232,7 @@ arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, c
 //' 
 //' @description
 //' Builds the design matrix for updating receiver effects (beta parameters) in the
-//' Alternating Least Squares algorithm, holding sender effects (alpha) fixed.
+//' alternating GLM/IRLS algorithm, holding sender effects (alpha) fixed.
 //' 
 //' @details
 //' In the ALS algorithm, when updating beta with alpha fixed, the model becomes
@@ -261,10 +264,11 @@ arma::mat cpp_construct_Wbeta_design(const arma::cube& W, const arma::cube& X, c
 //'   
 //' @examples
 //' \dontrun{
-//' // Called internally by sir_alsfit during the beta update step
-//' // The GLM call becomes:
-//' // glm(Y ~ -1 + cbind(Z_design, Walpha_design), family=...)
+//' # Called internally by sir_alsfit during the beta update step
+//' # The GLM call becomes:
+//' # glm(Y ~ -1 + cbind(Z_design, Walpha_design), family=...)
 //' }
+//' @noRd
 // [[Rcpp::export]]
 arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, const arma::vec& alpha) {
     int m = W.n_rows;
@@ -302,6 +306,7 @@ arma::mat cpp_construct_Walpha_design(const arma::cube& W, const arma::cube& X, 
 //' @param beta Vector (p x 1) of current receiver parameters.
 //'
 //' @return Matrix (m*m*T x p) design matrix for alpha GLM step.
+//' @noRd
 // [[Rcpp::export]]
 arma::mat cpp_construct_Wbeta_design_dyn(const Rcpp::List& W_field, const arma::cube& X, const arma::vec& beta) {
     int T = X.n_slices;
@@ -336,6 +341,7 @@ arma::mat cpp_construct_Wbeta_design_dyn(const Rcpp::List& W_field, const arma::
 //' @param alpha Vector (p x 1) of current sender parameters.
 //'
 //' @return Matrix (m*m*T x p) design matrix for beta GLM step.
+//' @noRd
 // [[Rcpp::export]]
 arma::mat cpp_construct_Walpha_design_dyn(const Rcpp::List& W_field, const arma::cube& X, const arma::vec& alpha) {
     int T = X.n_slices;
@@ -377,6 +383,7 @@ arma::mat cpp_construct_Walpha_design_dyn(const Rcpp::List& W_field, const arma:
 //' @param family Distribution family string.
 //'
 //' @return List with grad, hess, shess (after identifiability projection).
+//' @noRd
 // [[Rcpp::export]]
 Rcpp::List cpp_mll_gH_dyn(const arma::vec& tab, const arma::cube& Y,
                            const Rcpp::List& W_field, const arma::cube& X,
@@ -456,6 +463,10 @@ Rcpp::List cpp_mll_gH_dyn(const arma::vec& tab, const arma::cube& Y,
             Weights.fill(1.0);
         } else if (family == "binomial") {
             Mu = 1.0 / (1.0 + arma::exp(-Eta));
+            // clamp mu away from 0/1 so the residual (mu - y) and the variance
+            // mu*(1-mu) in the gradient/Hessian cross term stay finite and
+            // well-conditioned at extreme eta
+            Mu = arma::clamp(Mu, 1e-10, 1.0 - 1e-10);
             Resid = Mu - Yt;
             Weights = Mu % (1.0 - Mu);
             Weights += 1e-16;
@@ -625,11 +636,12 @@ Rcpp::List cpp_mll_gH_dyn(const arma::vec& tab, const arma::cube& Y,
 //'   
 //' @examples
 //' \dontrun{
-//' // Called internally by optim() during optimization:
+//' # Called internally by optim() during optimization:
 //' result <- cpp_mll_gH(current_params, Y, W, X, Z_list, "poisson")
-//' // Use gradient for search direction
-//' // Use Hessian for step size (quasi-Newton methods)
+//' # Use gradient for search direction
+//' # Use Hessian for step size (quasi-Newton methods)
 //' }
+//' @noRd
 // [[Rcpp::export]]
 Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cube& W, const arma::cube& X,
                       const Rcpp::List& Z_list, const std::string& family) {
@@ -725,6 +737,10 @@ Rcpp::List cpp_mll_gH(const arma::vec& tab, const arma::cube& Y, const arma::cub
             Weights.fill(1.0);
         } else if (family == "binomial") {
             Mu = 1.0 / (1.0 + arma::exp(-Eta));
+            // clamp mu away from 0/1 so the residual (mu - y) and the variance
+            // mu*(1-mu) in the gradient/Hessian cross term stay finite and
+            // well-conditioned at extreme eta
+            Mu = arma::clamp(Mu, 1e-10, 1.0 - 1e-10);
             Resid = Mu - Yt;
             Weights = Mu % (1.0 - Mu);
             Weights += 1e-16;

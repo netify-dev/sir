@@ -21,6 +21,10 @@ A matrix with one row per parameter and columns for the lower
   and upper bounds, labeled by percentage.
 }
 \description{
-Computes percentile confidence intervals at the specified level from the
-bootstrap coefficient distribution.
+Computes confidence intervals from a \code{boot_sir} object. For \code{block}
+and \code{parametric} bootstraps these are percentile intervals from the
+replicate distribution. For the \code{dyad} jackknife they are normal
+(\code{estimate +/- z * se}) intervals from the jackknife standard error;
+the jackknife produces a covariance, not a replicate distribution, so
+percentiles do not apply.
 }

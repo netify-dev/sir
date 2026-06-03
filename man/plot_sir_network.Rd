@@ -22,15 +22,17 @@ or \code{"B"} for receiver effects.}
 are hidden. Default is 0.1. Increase for cleaner plots with dense
 networks.}
 
-\item{node_labels}{Optional character vector of node names. If NULL,
-nodes are labeled 1 through m.}
+\item{node_labels}{Optional character vector of node names. If NULL, labels
+are taken from the influence-matrix dimnames when present, otherwise nodes
+are labeled 1 through m.}
 
 \item{layout}{Character string specifying the graph layout algorithm.
 Default is \code{"fr"} (Fruchterman-Reingold). Other options include
 \code{"kk"} (Kamada-Kawai) and \code{"circle"}.}
 }
 \value{
-A \code{ggplot} object produced by \code{ggraph}. Returns NULL
+A \code{ggplot} object produced by \code{ggraph}. Arrows point from
+  the source/influencer node to the influenced node. Returns NULL
   if \code{igraph} or \code{ggraph} are not installed.
 }
 \description{
@@ -38,4 +40,14 @@ Draws the estimated influence matrix as a directed network graph, where
 edges represent influence weights between nodes. Edge color and width
 encode the sign and magnitude of influence. Requires the \code{igraph}
 and \code{ggraph} packages to be installed.
+}
+\examples{
+\donttest{
+if (requireNamespace("igraph", quietly = TRUE) &&
+    requireNamespace("ggraph", quietly = TRUE)) {
+  dat <- sim_sir(m = 10, T_len = 20, p = 2, q = 1, family = "poisson", seed = 1)
+  fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z, family = "poisson", seed = 1)
+  plot_sir_network(fit, matrix = "A", threshold = 0.1)
+}
+}
 }

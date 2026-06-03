@@ -44,20 +44,22 @@
 #'     \item 3+: Detailed debugging information
 #'   }
 #'   
-#' @param start Optional numeric vector of starting values [theta, alpha, beta].
-#'   Length must equal q + 2p. If NULL, uses smart initialization.
+#' @param start Optional numeric vector of starting values in the public
+#'   standard-model order \code{[theta, alpha_2:p, beta_1:p]}. Length must equal
+#'   \code{q + 2p - 1}. If NULL, uses smart initialization.
 #'   Good starting values dramatically improve convergence.
 #'   
-#' @return A list with class "sir_optim_fit" containing:
-#'   \item{tab}{Vector of optimized parameters [theta, alpha, beta]}
-#'   \item{A}{The m x m sender effects matrix}
-#'   \item{B}{The m x m receiver effects matrix}
-#'   \item{convergence}{Convergence code from optim (0 = success)}
-#'   \item{message}{Convergence message from optimizer}
+#' @return A plain list containing:
+#'   \item{tab}{Vector of optimized parameters in order
+#'     \code{[theta, alpha_2:p, beta_1:p]}.}
+#'   \item{theta}{Vector of direct-effect coefficients.}
+#'   \item{a}{Estimated alpha coefficients excluding the normalized baseline
+#'     \code{alpha_1}; empty when \code{p = 1}.}
+#'   \item{b}{Estimated beta coefficients.}
+#'   \item{convergence}{Convergence code from \code{optim} (0 = success).}
+#'   \item{message}{Convergence message from optimizer.}
 #'   \item{iterations}{Number of function evaluations}
-#'   \item{value}{Final negative log-likelihood}
-#'   \item{hessian}{Approximate Hessian at optimum (if requested)}
-#'   \item{gradient}{Final gradient (should be near zero)}
+#'   \item{value}{Final negative log-likelihood.}
 #'   
 #' @examples
 #' \dontrun{
@@ -89,13 +91,13 @@
 #' }
 #' @importFrom stats optim lm glm poisson binomial coef formula
 #' @importFrom cli cli_alert_info cli_alert_success cli_alert_warning
-#' @export
+#' @noRd
 sir_optfit <- function(Y, W, X, Z, family, trace=0, start=NULL) {
-  p <- if (is.null(W)) 0 else dim(W)[3]
-  q <- if (is.null(Z)) 0 else dim(Z)[3]
+	p <- if (is.null(W)) 0 else dim(W)[3]
+	q <- if (is.null(Z)) 0 else dim(Z)[3]
 
-  # initialization: GLM ignoring bilinear portion
-  if(is.null(start)) {
+	# initialization: GLM ignoring bilinear portion
+	if(is.null(start)) {
 	Y_flat <- flatten_Y(Y)
 	Z_flat <- flatten_Z(Z)
 
@@ -124,47 +126,47 @@ sir_optfit <- function(Y, W, X, Z, family, trace=0, start=NULL) {
 	} else {
 		start <- theta
 	}
-  }
+	}
 
-  # prepare Z list for C++
-  Z_list <- prepare_Z_list(Z)
+	# prepare Z list for C++
+	Z_list <- prepare_Z_list(Z)
 
-  # objective: negative log-likelihood
-  objfun <- function(par){
+	# objective: negative log-likelihood
+	objfun <- function(par){
 	mll_sir(par, Y, W, X, Z, family)
-  }
+	}
 
-  # gradient via C++ backend
-  gradfun <- function(par){
+	# gradient via C++ backend
+	gradfun <- function(par){
 	gH <- cpp_mll_gH(par, Y, W, X, Z_list, family)
 	as.numeric(gH$grad)
-  }
-
-  # run BFGS optimization
-  if (trace > 0) {
-	cli::cli_alert_info("Starting BFGS optimization with {.val {length(start)}} parameters")
-  }
-  
-  fit <- optim(par=start, fn=objfun, gr=gradfun, method="BFGS", control=list(trace=trace, maxit=500))
-  
-  if (trace > 0) {
-	if (fit$convergence == 0) {
-	  cli::cli_alert_success("Optimization converged: NLL = {.val {sprintf('%.4f', fit$value)}}, {.val {fit$counts[1]}} iterations")
-	} else {
-	  cli::cli_alert_warning("Optimization did not converge (code {.val {fit$convergence}})")
 	}
-  }
 
-  tab <- fit$par
+	# run BFGS optimization
+	if (trace > 0) {
+	cli::cli_alert_info("Starting BFGS optimization with {.val {length(start)}} parameters")
+	}
+	
+	fit <- optim(par=start, fn=objfun, gr=gradfun, method="BFGS", control=list(trace=trace, maxit=500))
+	
+	if (trace > 0 && fit$convergence == 0) {
+	cli::cli_alert_success("Optimization converged: NLL = {.val {sprintf('%.4f', fit$value)}}, {.val {fit$counts[1]}} iterations")
+	}
+	# surface non-convergence regardless of trace so it is never silent
+	if (fit$convergence != 0) {
+	cli::cli_warn("BFGS optimization did not converge (code {.val {fit$convergence}}; 1 = max iterations reached). Results may be unreliable; consider {.code method = 'ALS'} or supplying better starting values.")
+	}
 
-  # parse final parameters
-  if (q > 0) {
+	tab <- fit$par
+
+	# parse final parameters
+	if (q > 0) {
 	  theta <- tab[1:q]
-  } else {
+	} else {
 	  theta <- numeric(0)
-  }
+	}
 
-  if (p > 0) {
+	if (p > 0) {
 	  if (p > 1) {
 		  a_start <- q + 1
 		  a_end <- q + p - 1
@@ -174,12 +176,12 @@ sir_optfit <- function(Y, W, X, Z, family, trace=0, start=NULL) {
 	  }
 	  b_start <- q + p
 	  b <- tab[b_start:length(tab)]
-  } else {
+	} else {
 	  a <- numeric(0)
 	  b <- numeric(0)
-  }
+	}
 
-  list(
+	list(
 	theta=theta,
 	a=a,
 	b=b,
@@ -188,5 +190,5 @@ sir_optfit <- function(Y, W, X, Z, family, trace=0, start=NULL) {
 	convergence=fit$convergence,
 	counts=fit$counts,
 	iterations=fit$counts[1]
-  )
+	)
 }

@@ -7,9 +7,10 @@
 boot_sir(
   sir_fit,
   R = 200,
-  type = c("block", "parametric"),
+  type = c("block", "parametric", "dyad"),
   seed = NULL,
-  trace = FALSE
+  trace = FALSE,
+  cores = 1L
 )
 }
 \arguments{
@@ -18,14 +19,28 @@ boot_sir(
 \item{R}{Integer. Number of bootstrap replicates. Default is 200. Increase
 to 500-1000 for publication-quality intervals.}
 
-\item{type}{Character. Bootstrap type: \code{"block"} (default) resamples
-time periods with replacement; \code{"parametric"} simulates new outcomes
-from the fitted model.}
+\item{type}{Character. Inference type: \code{"block"} (default) resamples
+whole time periods as independent blocks, preserving within-period network
+dependence but not serial dependence; \code{"dyad"} is a delete-one-actor
+jackknife on the induced sub-network (captures dyadic dependence, and the
+only inference path for full-bilinear bipartite fits); \code{"parametric"}
+simulates new outcomes from the fitted model. \code{R} is ignored for
+\code{"dyad"} (it enumerates all actor deletions).}
 
 \item{seed}{Optional integer for reproducibility. Sets the random seed
-before resampling.}
+before resampling. For exact reproducibility when \code{cores > 1}, the
+"L'Ecuyer-CMRG" RNG is used so parallel workers draw independent streams;
+results are then reproducible given the same \code{seed} and \code{cores}.
+Serial runs (\code{cores = 1}) with the same \code{seed} are always
+reproducible.}
 
-\item{trace}{Logical. If TRUE, prints progress every 10 replicates.}
+\item{trace}{Logical. If TRUE, shows progress and prints a verbose message
+every 10 serial replicates. Ignored when \code{cores > 1}.}
+
+\item{cores}{Integer. Number of CPU cores to use. Default is 1 (serial). When
+greater than 1, replicates are run in parallel with
+\code{parallel::mclapply} (forking). Forking is unavailable on Windows, so
+there \code{cores > 1} falls back to serial with a one-time warning.}
 }
 \value{
 An object of class \code{"boot_sir"} with components:
@@ -51,34 +66,47 @@ is singular or ill-conditioned, which is common in models with bilinear
 influence terms (i.e., when \code{fix_receiver = FALSE}).
 }
 \details{
-Two bootstrap strategies are available:
+Three bootstrap strategies are available:
 \describe{
-  \item{block}{Resamples time periods with replacement. Preserves the
-    within-period dependence structure. Best when T is moderately large
-    (T >= 10).}
+  \item{block}{Resamples whole time periods with replacement as independent
+    period blocks. This preserves the within-period network dependence
+    structure but not serial dependence across adjacent periods. Best when T
+    is moderately large (T >= 10).}
+  \item{dyad}{A delete-one-actor jackknife: each actor is dropped in turn and
+    the model is refit on the induced sub-network, capturing the
+    cross-sectional dyadic dependence (shared-sender / shared-receiver
+    correlation) the block bootstrap ignores. Deletion (rather than
+    resampling with replacement) avoids duplicating actors into the bilinear
+    \eqn{A X B'} sums, which would attenuate the influence coefficients toward
+    zero. For a square directed network the same actor is dropped from both
+    axes together; for a bipartite network senders and receivers are dropped
+    separately and the two one-way jackknife covariances are summed. Standard
+    errors come from the jackknife covariance and intervals are normal
+    (\code{estimate +/- z * se}).}
   \item{parametric}{Simulates new outcome arrays from the fitted model
     using the estimated parameters and the specified family distribution.
     Better when T is small but the model is well-specified.}
 }
 
-Each replicate refits the full SIR model. Replicates that fail to converge
-are dropped and reported. Standard errors are column standard deviations
-of the successful replicates. Confidence intervals use the percentile
-method.
+For \code{block} and \code{parametric}, each replicate refits the full SIR
+model; replicates that fail to converge are dropped and reported, standard
+errors are the column standard deviations of the successful replicates, and
+confidence intervals use the percentile method. The \code{dyad} jackknife
+instead enumerates all delete-one-actor refits and reports the jackknife
+standard error and a normal interval.
 }
 \examples{
-\dontrun{
-model <- sir(Y, W, X, family = "poisson")
+\donttest{
+dat <- sim_sir(m = 8, T_len = 12, p = 2, q = 1, family = "poisson", seed = 1)
+model <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z,
+             family = "poisson", seed = 1)
 
-# block bootstrap with 200 replicates
-boot_result <- boot_sir(model, R = 200, seed = 42)
+# use a larger R (for example 500+) for publication-quality intervals
+boot_result <- boot_sir(model, R = 10, seed = 42)
 print(boot_result)
 
 # use bootstrap CIs with confint
 confint(model, boot = boot_result)
-
-# parametric bootstrap
-boot_par <- boot_sir(model, R = 200, type = "parametric")
 }
 
 }

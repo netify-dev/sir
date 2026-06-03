@@ -29,9 +29,11 @@ test_that("SIR handles single time point", {
 	X = array(rnorm(m * m * T_len), dim = c(m, m, T_len))
 	Z = array(rnorm(m * m * q * T_len), dim = c(m, m, q, T_len))
 
-	model = sir(Y = Y, W = W, X = X, Z = Z,
-				 family = "poisson", method = "ALS",
-				 calc_se = FALSE, trace = FALSE, max_iter = 5)
+	expect_warning({
+		model = sir(Y = Y, W = W, X = X, Z = Z,
+					 family = "poisson", method = "ALS",
+					 calc_se = FALSE, trace = FALSE, max_iter = 5)
+	}, "Only one time period")
 
 	expect_s3_class(model, "sir")
 })
@@ -49,10 +51,13 @@ test_that("SIR warns with T=1 and zero X", {
 	Z = array(rnorm(m * m * q * T_len), dim = c(m, m, q, T_len))
 
 	expect_warning(
-	sir(Y = Y, W = W, X = X, Z = Z,
-		family = "poisson", method = "ALS",
-		calc_se = FALSE, trace = FALSE, max_iter = 5),
-	"Only one time period"
+		expect_warning(
+		sir(Y = Y, W = W, X = X, Z = Z,
+			family = "poisson", method = "ALS",
+			calc_se = FALSE, trace = FALSE, max_iter = 5),
+		"Only one time period"
+		),
+		"Estimated alpha\\[1\\]"
 	)
 })
 
@@ -143,9 +148,11 @@ test_that("SIR handles sparse networks", {
 	X = array(rnorm(m * m * T_len), dim = c(m, m, T_len))
 	Z = array(rnorm(m * m * q * T_len), dim = c(m, m, q, T_len))
 	
-	model = sir(Y = Y, W = W, X = X, Z = Z, 
-				 family = "poisson", method = "ALS", 
-				 calc_se = FALSE, trace = FALSE, max_iter = 5)
+	expect_warning({
+		model = sir(Y = Y, W = W, X = X, Z = Z, 
+					 family = "poisson", method = "ALS", 
+					 calc_se = FALSE, trace = FALSE, max_iter = 5)
+	}, "ALS did not converge")
 	
 	expect_s3_class(model, "sir")
 })
@@ -163,9 +170,11 @@ test_that("SIR handles extreme values in Y", {
 	X = array(rnorm(m * m * T_len), dim = c(m, m, T_len))
 	Z = array(rnorm(m * m * q * T_len), dim = c(m, m, q, T_len))
 	
-	model = sir(Y = Y, W = W, X = X, Z = Z, 
-				 family = "poisson", method = "ALS", 
-				 calc_se = FALSE, trace = FALSE, max_iter = 5)
+	expect_warning({
+		model = sir(Y = Y, W = W, X = X, Z = Z, 
+					 family = "poisson", method = "ALS", 
+					 calc_se = FALSE, trace = FALSE, max_iter = 5)
+	}, "ALS did not converge")
 	
 	expect_s3_class(model, "sir")
 })
@@ -186,7 +195,7 @@ test_that("SIR rejects invalid inputs", {
 	# test invalid method
 	expect_error(
 	sir(Y = Y, family = "poisson", method = "invalid"),
-	"method must be"
+	"must be one of"
 	)
 	
 	# test non-square Y (bipartite - should work with fix_receiver)

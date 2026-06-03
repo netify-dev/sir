@@ -14,7 +14,7 @@ test_that("SIR works with complete data", {
 	# test with Poisson family
 	model_pois = sir(Y = Y, W = W, X = X, Z = Z, 
 					family = "poisson", method = "ALS", 
-					calc_se = FALSE, trace = FALSE, max_iter = 5)
+					calc_se = FALSE, trace = FALSE, max_iter = 100)
 	
 	expect_s3_class(model_pois, "sir")
 	expect_true(!is.null(model_pois$A))
@@ -26,7 +26,7 @@ test_that("SIR works with complete data", {
 	Y_normal = array(rnorm(m * m * T_len), dim = c(m, m, T_len))
 	model_norm = sir(Y = Y_normal, W = W, X = X, Z = Z, 
 					family = "normal", method = "ALS", 
-					calc_se = FALSE, trace = FALSE, max_iter = 5)
+					calc_se = FALSE, trace = FALSE, max_iter = 100)
 	
 	expect_s3_class(model_norm, "sir")
 	expect_true(!is.null(model_norm$sigma2))
@@ -35,7 +35,7 @@ test_that("SIR works with complete data", {
 	Y_binom = array(rbinom(m * m * T_len, 1, 0.5), dim = c(m, m, T_len))
 	model_binom = sir(Y = Y_binom, W = W, X = X, Z = Z, 
 					 family = "binomial", method = "ALS", 
-					 calc_se = FALSE, trace = FALSE, max_iter = 5)
+					 calc_se = FALSE, trace = FALSE, max_iter = 100)
 	
 	expect_s3_class(model_binom, "sir")
 })
@@ -80,7 +80,7 @@ test_that("SIR works without exogenous covariates (Z = NULL)", {
 	# should work with Z = NULL
 	model = sir(Y = Y, W = W, X = X, Z = NULL, 
 				 family = "poisson", method = "ALS", 
-				 calc_se = FALSE, trace = FALSE, max_iter = 5)
+				 calc_se = FALSE, trace = FALSE, max_iter = 100)
 	
 	expect_s3_class(model, "sir")
 	expect_true(!is.null(model$A))
@@ -238,4 +238,17 @@ test_that("Print method works", {
 	# should not error when printing (capture output to test it works)
 	output = capture.output(print(model))
 	expect_true(length(output) > 0)
+	expect_no_error(plot(model, which = 1:4, combine = FALSE))
+})
+
+test_that("Network plot helper runs when optional graph packages are installed", {
+	skip_if_not_installed("igraph")
+	skip_if_not_installed("ggraph")
+
+	dat = sim_sir(m = 8, T_len = 14, p = 2, q = 1, family = "poisson", seed = 124)
+	model = sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z,
+				 family = "poisson", method = "ALS",
+				 calc_se = FALSE, trace = FALSE, seed = 124)
+
+	expect_no_error(plot_sir_network(model, matrix = "A", threshold = 0))
 })

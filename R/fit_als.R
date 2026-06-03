@@ -1,11 +1,12 @@
 
-#' Fit SIR Model via Alternating Least Squares (ALS)
+#' Fit SIR Model via Alternating GLM/IRLS Updates
 #'
 #' @description
 #' Fits the SIR model by alternating between optimizing sender effects (alpha)
-#' with receiver effects fixed, and vice versa. Each sub-step is a standard
-#' GLM, making this approach more stable than direct optimization for
-#' high-dimensional problems.
+#' with receiver effects fixed, and vice versa. The working alpha/beta vectors
+#' are normalized to the public \code{alpha_1 = 1} parameterization at the end.
+#' Each sub-step is a standard GLM, making this approach more stable than direct
+#' optimization for high-dimensional problems.
 #'
 #' @details
 #' The algorithm exploits the bilinear structure: when B is fixed, the model
@@ -46,14 +47,16 @@
 #'   in deviance is less than this value. Default is 1e-8. Smaller values give more
 #'   accurate results but require more iterations.
 #'   
-#' @param max_iter Integer maximum number of ALS iterations. Default is 100.
+#' @param max_iter Integer maximum number of alternating iterations. Default is 100.
 #'   Each iteration consists of one A-step and one B-step. Increase for difficult
 #'   problems or when starting far from the optimum.
 #'
 #' @param fix_receiver Logical. If TRUE, fixes B = I (identity matrix) and
-#'   estimates only (theta, alpha) via a single GLM step. This eliminates the
-#'   bilinear identification problem by removing the receiver influence channel.
-#'   The model reduces to a standard GLM with well-conditioned standard errors.
+#'   estimates only (theta, alpha) via a single GLM step. This removes the
+#'   alpha/beta scaling ambiguity by removing the receiver influence channel, but
+#'   remaining coefficients still require adequate design rank and signal. The
+#'   model reduces to a standard GLM with model-based standard errors under the
+#'   usual GLM assumptions.
 #'   Default is FALSE.
 #'
 #' @param kron_mode Logical. If TRUE, replaces separate (alpha, beta) with a
@@ -63,19 +66,20 @@
 #'   (m x m x p x T) with time-varying influence covariates. Design matrices
 #'   are constructed in R rather than C++. Default is FALSE.
 #'
-#' @return A list with class "sir_als_fit" containing:
-#'   \item{tab}{Vector of all parameters [theta, alpha, beta] in order}
-#'   \item{A}{The m x m sender effects matrix}
-#'   \item{B}{The m x m receiver effects matrix}
-#'   \item{deviance}{Final deviance (-2 * log-likelihood + constant)}
+#' @return A plain list containing:
+#'   \item{theta}{Vector of direct-effect coefficients.}
+#'   \item{a}{Estimated alpha coefficients excluding the normalized baseline
+#'     \code{alpha_1}; empty when \code{p = 1}.}
+#'   \item{b}{Estimated beta coefficients.}
+#'   \item{tab}{Public parameter vector in order
+#'     \code{[theta, alpha_2:p, beta_1:p]}; for \code{fix_receiver = TRUE}, in
+#'     order \code{[theta, alpha_1:p]}.}
 #'   \item{iterations}{Number of iterations until convergence}
 #'   \item{converged}{Logical indicating successful convergence}
 #'   \item{THETA}{Matrix tracking theta parameters across iterations}
 #'   \item{ALPHA}{Matrix tracking alpha parameters across iterations}
 #'   \item{BETA}{Matrix tracking beta parameters across iterations}
 #'   \item{DEV}{Matrix tracking deviance across iterations}
-#'   \item{glm_alpha}{Final GLM object from the A-step}
-#'   \item{glm_beta}{Final GLM object from the B-step}
 #'
 #' @examples
 #' \dontrun{
@@ -92,7 +96,7 @@
 #' # Influence covariates (e.g., distance-based)
 #' W <- array(rnorm(m*m*p), dim=c(m,m,p))
 #' 
-#' # Fit using ALS
+#' # Fit using the alternating GLM/IRLS engine
 #' fit <- sir_alsfit(Y, W, X, Z=NULL, family="poisson", 
 #'                   trace=TRUE, tol=1e-6, max_iter=50)
 #' 
@@ -105,26 +109,26 @@
 #' }
 #' @importFrom stats glm lm poisson binomial coef deviance formula
 #' @importFrom cli cli_progress_bar cli_progress_update cli_progress_done cli_alert_info cli_alert_success
-#' @export
+#' @noRd
 sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 					   fix_receiver=FALSE, kron_mode=FALSE, dynamic_W=FALSE) {
-  p <- if (is.null(W)) 0 else dim(W)[3]
-  q <- if (is.null(Z)) 0 else dim(Z)[3]
-  n1 <- dim(Y)[1]
-  n2 <- dim(Y)[2]
-  m <- n1  # backward compat for square case
-  T_len <- dim(Y)[3]
-  N_flat <- n1 * n2 * T_len  # total number of entries in flattened Y
+	p <- if (is.null(W)) 0 else dim(W)[3]
+	q <- if (is.null(Z)) 0 else dim(Z)[3]
+	n1 <- dim(Y)[1]
+	n2 <- dim(Y)[2]
+	m <- n1  # backward compat for square case
+	T_len <- dim(Y)[3]
+	N_flat <- n1 * n2 * T_len  # total number of entries in flattened Y
 
-  # pre-convert 4D W to list-of-cubes for C++ when dynamic
-  W_field <- if (dynamic_W && p > 0) prepare_W_field(W) else NULL
+	# pre-convert 4D W to list-of-cubes for C++ when dynamic
+	W_field <- if (dynamic_W && p > 0) prepare_W_field(W) else NULL
 
-  # determine GLM function and family object
-  if (family == "normal") {
+	# determine GLM function and family object
+	if (family == "normal") {
 	glm_fun <- stats::lm
 	family_obj <- NULL
 	use_speedglm <- FALSE
-  } else {
+	} else {
 	# use speedglm if available
 	if (requireNamespace("speedglm", quietly = TRUE)) {
 		glm_fun <- speedglm::speedglm
@@ -137,13 +141,13 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 						 "poisson" = stats::poisson(),
 						 "binomial" = stats::binomial(),
 						 cli::cli_abort("Unsupported family for GLM: {.val {family}}."))
-  }
+	}
 
-  # initialization
-  Y_flat <- flatten_Y(Y)
-  Z_flat <- flatten_Z(Z)
+	# initialization
+	Y_flat <- flatten_Y(Y)
+	Z_flat <- flatten_Z(Z)
 
-  if (q > 0) {
+	if (q > 0) {
 	glm_data <- data.frame(Y = Y_flat, Z_flat)
 	form <- formula(paste0("Y ~ -1 + ", paste(colnames(Z_flat), collapse=" + ")))
 
@@ -157,7 +161,7 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 	theta[is.na(theta)] <- 0
 	dev_new <- if (family == "normal") sum(fit0$residuals^2) else deviance(fit0)
 
-  } else {
+	} else {
 	  theta <- numeric(0)
 	  # null deviance when q=0
 	  mean_Y <- mean(Y_flat, na.rm=TRUE)
@@ -173,28 +177,28 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 		  if (p0 >= 1) p0 <- 1 - 1e-6
 		  dev_new <- -2 * sum(Y_flat * log(p0) + (1-Y_flat) * log(1-p0), na.rm=TRUE)
 	  }
-  }
+	}
 
 
-  # initialize alpha, beta with small random values
-  if (p > 0) {
+	# initialize alpha, beta with small random values
+	if (p > 0) {
 	  alpha <- rnorm(p, sd=0.05)
 	  beta  <- rnorm(p, sd=0.05)
-  } else {
+	} else {
 	  alpha <- numeric(0)
 	  beta <- numeric(0)
-  }
+	}
 
 
-  # track iteration history
-  dev_old <- Inf
-  THETA <- matrix(theta, nrow=1)
-  ALPHA <- matrix(alpha, nrow=1)
-  BETA  <- matrix(beta, nrow=1)
-  DEV   <- matrix(c(dev_old, dev_new), nrow=1)
+	# track iteration history
+	dev_old <- Inf
+	THETA <- matrix(theta, nrow=1)
+	ALPHA <- matrix(alpha, nrow=1)
+	BETA  <- matrix(beta, nrow=1)
+	DEV   <- matrix(c(dev_old, dev_new), nrow=1)
 
-  # fix_receiver: single GLM with B = identity
-  if (fix_receiver && p > 0) {
+	# fit one glm with an identity receiver matrix
+	if (fix_receiver && p > 0) {
 	if (kron_mode) cli::cli_abort("Cannot use both {.arg fix_receiver} and {.arg kron_mode}.")
 
 	# build design matrix: column k = vec(W_k %*% X_t) across all t
@@ -237,8 +241,18 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 
 	dev_val <- if (family == "normal") sum(fit_fix$residuals^2) else deviance(fit_fix)
 
+	# read convergence from the glm backend
+	fix_converged <- glm_converged(fit_fix)
+
 	if (trace) {
-	  cli::cli_alert_success("fix_receiver: single GLM converged (deviance = {.val {sprintf('%.4f', dev_val)}})")
+	  if (fix_converged) {
+		cli::cli_alert_success("fix_receiver: single GLM converged (deviance = {.val {sprintf('%.4f', dev_val)}})")
+	  } else {
+		cli::cli_alert_warning("fix_receiver: single GLM did NOT converge (deviance = {.val {sprintf('%.4f', dev_val)}})")
+	  }
+	}
+	if (!fix_converged) {
+	  cli::cli_warn("fix_receiver GLM step did not converge. Results may be unreliable.")
 	}
 
 	return(list(
@@ -251,26 +265,31 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 	  THETA = matrix(theta, nrow = 1),
 	  DEV = matrix(c(Inf, dev_val), nrow = 1),
 	  iterations = 1,
-	  converged = TRUE,
-	  glm_fit = fit_fix
+	  converged = fix_converged,
+	  glm_fit = fit_fix,
+	  # store glm inputs for sandwich standard errors
+	  glm_X = X_design,
+	  glm_y = Y_flat
 	))
-  }
+	}
 
-  # kron_mode placeholder
-  if (kron_mode) cli::cli_abort("{.arg kron_mode} is not yet implemented.")
+	# guard unsupported kron mode
+	if (kron_mode) cli::cli_abort("{.arg kron_mode} is not yet implemented.")
 
-  # iterative ALS updates
-  iter <- 0L
-  if (trace && p > 0) {
+	# run alternating glm updates
+	iter <- 0L
+	numerical_failure <- FALSE
+	glm_steps_converged <- TRUE
+	rel_change <- Inf
+	if (trace && p > 0) {
 	cli::cli_progress_bar("Fitting SIR model via ALS", total = max_iter)
-  }
+	}
 
-  for (iter in 1:max_iter) {
+	for (iter in 1:max_iter) {
 
 	if (p == 0) break
 
-	# fix beta, update (theta, alpha)
-	# construct Wbeta design matrix
+	# hold beta and update theta and alpha
 	if (dynamic_W) {
 		Wbeta_flat <- cpp_construct_Wbeta_design_dyn(W_field, X, beta)
 	} else {
@@ -288,6 +307,7 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 
 	start_vals <- c(theta, alpha)
 	fit_a <- fit_glm_wrapper(form1, glm_data, family, family_obj, glm_fun, use_speedglm, start_vals, trace)
+	glm_steps_converged <- glm_steps_converged && glm_converged(fit_a)
 
 	co_a  <- coef(fit_a)
 	co_a[is.na(co_a)] <- 0
@@ -299,8 +319,7 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 		alpha <- co_a
 	}
 
-	# fix alpha, update (theta, beta)
-	# construct Walpha design matrix
+	# hold alpha and update theta and beta
 	if (dynamic_W) {
 		Walpha_flat <- cpp_construct_Walpha_design_dyn(W_field, X, alpha)
 	} else {
@@ -318,6 +337,7 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 
 	start_vals <- c(theta, beta)
 	fit_b <- fit_glm_wrapper(form2, glm_data, family, family_obj, glm_fun, use_speedglm, start_vals, trace)
+	glm_steps_converged <- glm_steps_converged && glm_converged(fit_b)
 
 	co_b  <- coef(fit_b)
 	co_b[is.na(co_b)] <- 0
@@ -338,8 +358,9 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 		if (trace) {
 		  cli::cli_progress_done()
 		}
-		cli::cli_warn("Deviance became NA at iteration {.val {iter}}, stopping.")
+		cli::cli_warn("Deviance became NA at iteration {.val {iter}}, stopping. Fit did not converge.")
 		dev_new <- dev_old
+		numerical_failure <- TRUE
 		break
 	}
 
@@ -349,34 +370,41 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 	BETA  <- rbind(BETA, beta)
 	DEV   <- rbind(DEV, c(dev_old, dev_new))
 
+	rel_change <- (dev_old - dev_new) / (abs(dev_old) + 0.1)
+
 	if(trace){
 	  cli::cli_progress_update()
-	  cli::cli_alert_info("Iteration {.val {iter}}: Deviance = {.val {sprintf('%.4f', dev_new)}}, Change = {.val {sprintf('%.6f', abs(dev_old - dev_new)/(abs(dev_old) + 0.1))}}")
+	  cli::cli_alert_info("Iteration {.val {iter}}: Deviance = {.val {sprintf('%.4f', dev_new)}}, Change = {.val {sprintf('%.6f', rel_change)}}")
 	}
 
-	# stopping criterion
-	if( abs(dev_old - dev_new) / (abs(dev_old) + 0.1) < tol ) {
+	# stop after a small nonnegative deviance change
+	if(is.finite(rel_change) && rel_change >= 0 && rel_change < tol) {
 		if (trace) {
 		  cli::cli_progress_done()
 		  cli::cli_alert_success("ALS converged after {.val {iter}} iterations")
 		}
 		break
 	}
-  }
+	}
 
-  # determine convergence
-  als_converged <- (p == 0) ||
-	  (abs(dev_old - dev_new) / (abs(dev_old) + 0.1) < tol)
+	# report convergence only when all solver pieces converged
+	als_converged <- !numerical_failure &&
+	  glm_steps_converged &&
+	  ((p == 0) ||
+	   (is.finite(rel_change) && rel_change >= 0 && rel_change < tol))
 
-  if (!als_converged && p > 0) {
+	if (!als_converged && p > 0) {
 	  if (trace) {
 		cli::cli_progress_done()
 	  }
 	  cli::cli_warn("ALS did not converge within the maximum number of iterations.")
-  }
+	  if (!glm_steps_converged) {
+		  cli::cli_warn("At least one ALS GLM subproblem did not converge.")
+	  }
+	}
 
-  # impose alpha_1=1 constraint and rescale
-  if (p > 0) {
+	# impose alpha_1=1 constraint and rescale
+	if (p > 0) {
 	  if (abs(alpha[1]) < 1e-8) {
 		  cli::cli_warn("Estimated alpha[1] is near zero. Rescaling might be unstable. Using pseudoinverse stabilization.")
 		  # stabilize near-zero alpha[1]
@@ -393,13 +421,13 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 		a <- numeric(0)
 	  }
 	  b <- beta * a1
-  } else {
+	} else {
 	  a <- numeric(0)
 	  b <- numeric(0)
-  }
+	}
 
 
-  list(
+	list(
 	theta=theta,
 	a=a,
 	b=b,
@@ -410,7 +438,16 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 	DEV=DEV,
 	iterations = iter,
 	converged = als_converged
-  )
+	)
+}
+
+# extract the convergence status from a fitted GLM object across backends.
+# stats::glm uses $converged; speedglm uses $convergence; lm (normal) has
+# neither (direct solve) and is treated as converged.
+glm_converged <- function(fit) {
+	if (!is.null(fit$converged))   return(isTRUE(fit$converged))
+	if (!is.null(fit$convergence)) return(isTRUE(fit$convergence))
+	TRUE
 }
 
 # helper for GLM fitting with fallback on failure
@@ -423,19 +460,20 @@ fit_glm_wrapper <- function(form, data, family, family_obj, glm_fun, use_speedgl
 			 if (trace) cli::cli_warn("Start values length mismatch. Using default initialization.")
 			 fit <- glm_fun(form, data=data, family=family_obj)
 		} else {
-			# try start values, fall back on failure
-			tryCatch({
-				fit <- glm_fun(form, data=data, family=family_obj, start=start_vals)
-			}, error = function(e) {
+			# try start values, fall back on failure. capture each fit via the
+			# tryCatch return value so no name leaks to an enclosing/global env.
+			fit <- tryCatch(
+				glm_fun(form, data=data, family=family_obj, start=start_vals),
+				error = function(e) {
 				if (trace) cli::cli_warn("GLM fitting failed with start values ({e$message}), falling back to default initialization.")
 				# fallback without start values
-				tryCatch({
-					 fit <<- glm_fun(form, data=data, family=family_obj)
-				}, error = function(e2) {
+				tryCatch(
+					glm_fun(form, data=data, family=family_obj),
+					error = function(e2) {
 					# final fallback to stats::glm
 					if (use_speedglm) {
 						if (trace) cli::cli_warn("{.pkg speedglm} failed entirely, falling back to {.fn stats::glm}.")
-						fit <<- stats::glm(form, data=data, family=family_obj)
+						stats::glm(form, data=data, family=family_obj)
 					} else {
 						cli::cli_abort("{.fn stats::glm} failed during ALS iteration: {e2$message}")
 					}

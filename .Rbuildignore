@@ -11,3 +11,9 @@
 ^_pkgdown\.yml$
 ^pkgdown$
 ^docs$
+^data-raw$
+^.*\.tar\.gz$
+^.*_cache$
+^.*_files$
+^tests/testthat/_problems$
+^tests/testthat/testthat-problems\.rds$

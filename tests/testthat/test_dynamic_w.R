@@ -33,8 +33,10 @@ test_that("dynamic W with full bilinear (fix_receiver = FALSE)", {
 	X = array(0, dim = c(m, m, T_len))
 	for (t in 2:T_len) X[,,t] = log(Y[,,t-1] + 1)
 
-	fit = sir(Y, W, X, family = "poisson",
-			 fix_receiver = FALSE, calc_se = FALSE, max_iter = 5)
+	expect_warning({
+		fit = sir(Y, W, X, family = "poisson",
+				 fix_receiver = FALSE, calc_se = FALSE, max_iter = 5)
+	}, "ALS did not converge")
 
 	expect_s3_class(fit, "sir")
 	expect_true(fit$dynamic_W)
@@ -62,6 +64,25 @@ test_that("dynamic W prediction works", {
 	expect_true(all(pred >= 0, na.rm = TRUE))
 })
 
+test_that("rectangular bipartite dynamic W uses sender-by-sender dimensions", {
+	set.seed(43)
+	n1 = 5
+	n2 = 7
+	T_len = 4
+	p = 2
+
+	Y = array(rpois(n1 * n2 * T_len, 2), dim = c(n1, n2, T_len))
+	W = array(rnorm(n1 * n1 * p * T_len), dim = c(n1, n1, p, T_len))
+	X = array(rnorm(n1 * n2 * T_len), dim = c(n1, n2, T_len))
+
+	fit = sir(Y, W, X, family = "poisson",
+			  fix_receiver = FALSE, calc_se = FALSE, max_iter = 5)
+	expect_true(fit$bipartite)
+	expect_true(fit$dynamic_W)
+	expect_equal(dim(fit$A), c(n1, n1, T_len))
+	expect_equal(dim(fit$B), c(n2, n2, T_len))
+})
+
 test_that("dynamic W forces ALS method", {
 	set.seed(42)
 	m = 5
@@ -74,11 +95,13 @@ test_that("dynamic W forces ALS method", {
 	for (t in 2:T_len) X[,,t] = log(Y[,,t-1] + 1)
 
 	# dynamic W with method="optim" should switch to ALS
-	expect_message({
-	fit = sir(Y, W, X, family = "poisson",
-				 method = "optim", fix_receiver = FALSE,
-				 calc_se = FALSE, max_iter = 3)
-	}, "ALS")
+	suppressWarnings(
+		expect_message({
+		fit = sir(Y, W, X, family = "poisson",
+					 method = "optim", fix_receiver = FALSE,
+					 calc_se = FALSE, max_iter = 3)
+		}, "ALS")
+	)
 	expect_equal(fit$method, "ALS")
 })
 
@@ -103,4 +126,6 @@ test_that("summary and plot work with dynamic W", {
 	# print should not error
 	output = capture.output(print(fit))
 	expect_true(length(output) > 0)
+
+	expect_no_error(plot(fit, which = 1:4, combine = FALSE))
 })

@@ -10,11 +10,20 @@
 \item{object}{A fitted \code{sir} object from \code{\link{sir}}.}
 
 \item{newdata}{Optional named list with components \code{W} (3D or 4D
-array), \code{X} (3D array), and/or \code{Z} (3D or 4D array) for
-counterfactual prediction. Dimensions must match the original fit. Any
-component not supplied is taken from the original fit. If NULL (default),
-returns predictions for the training data. Note: unlike many R predict
-methods, \code{newdata} is a list of arrays, not a data frame.}
+array; 3D only for full-bilinear bipartite fits), \code{X} (3D array),
+\code{Z} (3D or 4D array), and for
+full-bilinear bipartite fits \code{W_recv} (3D receiver-side array), for
+scenario prediction. Dimensions must match the original fit. Any
+component not supplied is taken from the original fit. All supplied
+time-varying components must agree on the number of time periods, and
+\code{Z} must carry the same number of covariates as the fit; a genuine
+mismatch is an error rather than being silently recycled. If NULL
+(default), returns predictions for the training data. Note: unlike many R
+predict methods, \code{newdata} is a list of arrays, not a data frame.
+For a full-bilinear bipartite fit, supply \code{newdata$W_recv} to vary the
+receiver-side influence structure; otherwise the fitted \code{W_recv} is
+reused. Unlike the square one-mode case the bipartite diagonal is a genuine
+prediction and is not set to NA.}
 
 \item{type}{Character string: \code{"link"} for linear predictor (eta)
 or \code{"response"} for expected values on the original scale.
@@ -31,24 +40,18 @@ for new data. Predictions can be on the link scale (linear predictor) or
 the response scale (expected counts, probabilities, or means).
 }
 \details{
-For scenario (counterfactual) analysis, supply modified arrays in
-\code{newdata}. For example, to see how the network would change if a
-covariate increased by one unit, pass the modified Z array while keeping
-W and X from the original fit.
+For model-implied scenario analysis, supply modified arrays in
+\code{newdata}. For example, to see how fitted values change when a covariate
+is increased by one unit, pass the modified Z array while keeping W and X
+from the original fit. Causal counterfactual interpretation requires
+additional design assumptions.
 }
 \examples{
-\dontrun{
-model <- sir(Y, W, X, Z = Z, family = "poisson")
-
-# In-sample fitted values
-pred <- predict(model)
-
-# Scenario: what if Z increases by 1 unit?
-Z_shift <- Z + 1
-pred_scenario <- predict(model, newdata = list(Z = Z_shift))
-
-# Compare mean predictions
-mean(pred, na.rm = TRUE)
-mean(pred_scenario, na.rm = TRUE)
-}
+dat <- sim_sir(m = 10, T_len = 20, p = 2, q = 1, family = "poisson", seed = 1)
+fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z, family = "poisson", seed = 1)
+# in-sample fitted values (response scale)
+pred <- predict(fit)
+# scenario: only W/X/Z are read from newdata (Y is ignored)
+Zcf <- dat$Z; Zcf[, , 1, ] <- Zcf[, , 1, ] + 1
+pred_cf <- predict(fit, newdata = list(W = dat$W, X = dat$X, Z = Zcf))
 }

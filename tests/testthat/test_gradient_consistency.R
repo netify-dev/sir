@@ -29,8 +29,8 @@ test_that("C++ gradient matches numerical gradient (Poisson)", {
 	tab_minus = tab
 	tab_plus[i] = tab[i] + eps
 	tab_minus[i] = tab[i] - eps
-	nll_plus = mll_sir(tab_plus, Y, W, X, Z, "poisson")
-	nll_minus = mll_sir(tab_minus, Y, W, X, Z, "poisson")
+	nll_plus = sir:::mll_sir(tab_plus, Y, W, X, Z, "poisson")
+	nll_minus = sir:::mll_sir(tab_minus, Y, W, X, Z, "poisson")
 	numerical_grad[i] = (nll_plus - nll_minus) / (2 * eps)
 	}
 
@@ -64,8 +64,8 @@ test_that("C++ gradient matches numerical gradient (Normal)", {
 	tab_minus = tab
 	tab_plus[i] = tab[i] + eps
 	tab_minus[i] = tab[i] - eps
-	nll_plus = mll_sir(tab_plus, Y, W, X, Z, "normal")
-	nll_minus = mll_sir(tab_minus, Y, W, X, Z, "normal")
+	nll_plus = sir:::mll_sir(tab_plus, Y, W, X, Z, "normal")
+	nll_minus = sir:::mll_sir(tab_minus, Y, W, X, Z, "normal")
 	numerical_grad[i] = (nll_plus - nll_minus) / (2 * eps)
 	}
 
@@ -99,8 +99,8 @@ test_that("C++ gradient matches numerical gradient (Binomial)", {
 	tab_minus = tab
 	tab_plus[i] = tab[i] + eps
 	tab_minus[i] = tab[i] - eps
-	nll_plus = mll_sir(tab_plus, Y, W, X, Z, "binomial")
-	nll_minus = mll_sir(tab_minus, Y, W, X, Z, "binomial")
+	nll_plus = sir:::mll_sir(tab_plus, Y, W, X, Z, "binomial")
+	nll_minus = sir:::mll_sir(tab_minus, Y, W, X, Z, "binomial")
 	numerical_grad[i] = (nll_plus - nll_minus) / (2 * eps)
 	}
 
@@ -115,7 +115,7 @@ test_that("Diagonal exclusion is consistent between mll_sir and cpp_mll_gH", {
 	p = 2
 	q = 1
 
-	# y with NON-NA diagonals (the bug scenario)
+	# y with non-na diagonals
 	Y = array(rpois(m * m * T_len, lambda = 2), dim = c(m, m, T_len))
 	# do NOT set diagonal to NA — test that both R and C++ handle this consistently
 	W = array(rnorm(m * m * p, sd = 0.3), dim = c(m, m, p))
@@ -136,8 +136,8 @@ test_that("Diagonal exclusion is consistent between mll_sir and cpp_mll_gH", {
 	tab_minus = tab
 	tab_plus[i] = tab[i] + eps
 	tab_minus[i] = tab[i] - eps
-	nll_plus = mll_sir(tab_plus, Y, W, X, Z, "poisson")
-	nll_minus = mll_sir(tab_minus, Y, W, X, Z, "poisson")
+	nll_plus = sir:::mll_sir(tab_plus, Y, W, X, Z, "poisson")
+	nll_minus = sir:::mll_sir(tab_minus, Y, W, X, Z, "poisson")
 	numerical_grad[i] = (nll_plus - nll_minus) / (2 * eps)
 	}
 
@@ -172,8 +172,8 @@ test_that("C++ gradient matches numerical gradient with p=1", {
 	tab_minus = tab
 	tab_plus[i] = tab[i] + eps
 	tab_minus[i] = tab[i] - eps
-	nll_plus = mll_sir(tab_plus, Y, W, X, Z, "poisson")
-	nll_minus = mll_sir(tab_minus, Y, W, X, Z, "poisson")
+	nll_plus = sir:::mll_sir(tab_plus, Y, W, X, Z, "poisson")
+	nll_minus = sir:::mll_sir(tab_minus, Y, W, X, Z, "poisson")
 	numerical_grad[i] = (nll_plus - nll_minus) / (2 * eps)
 	}
 

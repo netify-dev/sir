@@ -15,7 +15,7 @@ test_that("eta_tab calculates linear predictor correctly", {
 	b = rnorm(p)     # beta
 	tab = c(theta, a, b)
 	
-	eta = eta_tab(tab, W, X, Z)
+	eta = sir:::eta_tab(tab, W, X, Z)
 	
 	expect_equal(dim(eta), c(m, m, T_len))
 	expect_false(any(is.na(eta)))
@@ -39,7 +39,7 @@ test_that("mll_sir calculates negative log-likelihood", {
 	b = rnorm(p)
 	tab = c(theta, a, b)
 	
-	nll = mll_sir(tab, Y, W, X, Z, "poisson")
+	nll = sir:::mll_sir(tab, Y, W, X, Z, "poisson")
 	
 	expect_true(is.numeric(nll))
 	expect_true(length(nll) == 1)

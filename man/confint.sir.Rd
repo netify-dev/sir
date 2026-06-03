@@ -4,7 +4,14 @@
 \alias{confint.sir}
 \title{Confidence Intervals for SIR Model Parameters}
 \usage{
-\method{confint}{sir}(object, parm = NULL, level = 0.95, boot = NULL, ...)
+\method{confint}{sir}(
+  object,
+  parm = NULL,
+  level = 0.95,
+  boot = NULL,
+  se.type = c("cluster", "classical", "robust", "twoway", "dyad"),
+  ...
+)
 }
 \arguments{
 \item{object}{A fitted \code{sir} object from \code{\link{sir}}.}
@@ -18,6 +25,15 @@ include. If NULL (default), returns intervals for all parameters.}
 When provided, percentile intervals from the bootstrap distribution are
 used instead of Wald intervals.}
 
+\item{se.type}{Character. For Wald intervals, which standard errors to use:
+\code{"cluster"} (default; multiway sender, receiver, and time clustering
+for supported static fits), \code{"classical"} (inverse-Hessian),
+\code{"robust"} (HC0 sandwich), \code{"twoway"} (alias for
+\code{"cluster"}), or \code{"dyad"} (directed-dyad clustering). Cluster
+intervals still rely on the Hessian bread being stable. Ignored
+when \code{boot} is supplied. Non-classical types require \code{calc_se =
+TRUE}; cluster types are unavailable for dynamic (4D) \code{W}.}
+
 \item{...}{Additional arguments (unused).}
 }
 \value{
@@ -26,9 +42,10 @@ A matrix with one row per parameter and columns for the lower
   \code{"97.5 \%"}).
 }
 \description{
-Computes confidence intervals using either Wald-based intervals (from the
-Hessian standard errors) or bootstrap percentile intervals. Wald intervals
-are the default and require that the model was fit with \code{calc_se = TRUE}.
+Computes confidence intervals using either Wald-based intervals (cluster-
+robust by default for supported static fits) or bootstrap percentile
+intervals. Wald intervals require that the model was fit with
+\code{calc_se = TRUE}.
 Bootstrap intervals require a \code{\link{boot_sir}} result and tend to
 be more reliable when the Hessian is ill-conditioned.
 }
