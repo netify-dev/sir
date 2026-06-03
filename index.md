@@ -1,208 +1,174 @@
-# sir: Social Influence Regression Models
+# sir
 
-## Motivation
+Social Influence Regression (SIR) for longitudinal network data.
 
-Relational outcomes in political and social systems are rarely
-independent. When country $i$ initiates conflict with country $k$ at
-time $t$, that action may reshape the likelihood that country $j$ does
-the same at time $t + 1$, particularly if $i$ and $j$ share an alliance,
-geographic proximity, or a common adversary. Standard regression
-approaches to network data treat each directed dyad as an independent
-observation, conditioning on covariates but discarding the higher-order
-dependencies that constitute network influence.
+## Overview
 
-The Social Influence Regression (SIR) model addresses this limitation
-directly. Rather than treating network influence as a nuisance or a
-latent quantity to be absorbed by random effects, the model estimates
-influence as a function of observable covariates. The framework operates
-on longitudinal network data (a time series of $n \times n$ relational
-matrices) and asks how past interactions across the network predict
-current outcomes, and what dyad-level or actor-level covariates account
-for those predictive patterns. The methodological framework is
-introduced in Minhas and Hoff (2025), “Decomposing Network Dynamics:
-Social Influence Regression,” *Political Analysis*.
+The `sir` package implements the Social Influence Regression model of
+Minhas & Hoff (2025) for directed relational data observed over time. It
+explains network **influence** – lagged, model-implied channels through
+which one actor’s past behavior predicts another’s future behavior –
+using observable covariates, via a bilinear (low-rank) regression.
 
-## Model specification
+The linear predictor is
 
-The SIR model specifies the expected outcome for directed edge $(i,j)$
-at time $t$ as:
+    eta_ijt = g(mu_ijt) = theta^T z_ijt + sum_{k,l} x_klt a_ik b_jl
 
-$$\mu_{i,j,t} = \mathbf{z}_{i,j,t}^{T}{\mathbf{θ}} + \sum\limits_{k,\ell}x_{k,\ell,t}a_{i,k}b_{j,\ell}$$
+where `a_ik = sum_r alpha_r W_r[i,k]` and `b_jl = sum_r beta_r W_r[j,l]`
+express the sender/receiver influence matrices `A` and `B` through
+influence covariates `W`. Equivalently
+`eta = theta^T z + (A X_t B^T)_{ij}`, and `mu = g^{-1}(eta)`.
 
-The first term is a standard regression of the outcome on exogenous
-covariates $\mathbf{z}_{i,j,t}$ with coefficients $\mathbf{θ}$. The
-second term captures network influence: $a_{i,k}$ measures how
-predictive node $k$’s past sending behavior is of node $i$’s current
-sending, $b_{j,\ell}$ captures an analogous relationship on the receiver
-side, and the network state $x_{k,\ell,t}$ (typically lagged outcomes)
-carries the influence signal through these matrices.
+SIR estimates conditional temporal association unless your design
+justifies a causal interpretation. Treat “influence” as a model term
+unless temporal ordering, exogeneity of `W`/`Z`, unmeasured confounding,
+lag construction, and the proposed intervention are defensible for the
+substantive question.
 
-The influence matrices $\mathbf{A}$ and $\mathbf{B}$ are parameterized
-through known influence covariates $\mathbf{W}_{r}$ (geographic
-distance, alliance ties, shared attributes):
+The main inputs play distinct roles:
 
-$$\mathbf{A} = \sum\limits_{r = 1}^{p}\alpha_{r}\mathbf{W}_{r},\quad\alpha_{1} = 1{\mspace{6mu}\text{(fixed for identifiability)}}$$$$\mathbf{B} = \sum\limits_{r = 1}^{p}\beta_{r}\mathbf{W}_{r}$$
-
-This parameterization reduces the parameter count from
-$O\left( n^{2} \right)$ to $O(p)$, where $p$ is the number of influence
-covariates. More importantly, it makes the estimated influence patterns
-directly interpretable: the $\alpha$ and $\beta$ coefficients identify
-which covariates matter for influence and by how much.
+| Input | Dimension | Role |
+|----|----|----|
+| `Y` | `n1 x n2 x T` | outcome network (counts, continuous, or 0/1) |
+| `X` | `n1 x n2 x T` | lagged signal that flows through influence (e.g. `log(Y_{t-1}+1) / infl_scale` for forecast-compatible count models) |
+| `W` | `n1 x n1 x p` | sender-side influence covariates that parameterize `A` (and `B` for one-mode fits) |
+| `W_recv` | `n2 x n2 x p2` | optional receiver-side influence covariates for full-bilinear bipartite fits |
+| `Z` | `n1 x n2 x q x T` | exogenous dyadic covariates with direct effects (`theta`) |
 
 ## Installation
 
-### From GitHub releases
-
-Pre-built binaries are available from the [releases
-page](https://github.com/netify-dev/sir/releases):
-
 ``` r
-# windows
-install.packages("sir_0.1.0_windows.zip", repos = NULL, type = "binary")
 
-# macOS (apple silicon)
-install.packages("sir_0.1.0_macos-arm64.tgz", repos = NULL, type = "binary")
-
-# macOS (intel)
-install.packages("sir_0.1.0_macos-intel.tgz", repos = NULL, type = "binary")
-
-# linux (source)
-install.packages("sir_0.1.0_linux.tar.gz", repos = NULL, type = "source")
-```
-
-### From GitHub (development version)
-
-``` r
-if (!requireNamespace("remotes", quietly = TRUE)) {
-    install.packages("remotes")
-}
+install.packages("remotes")
 remotes::install_github("netify-dev/sir")
-```
 
-### From source
-
-``` r
-install.packages(".", repos = NULL, type = "source")
-# or
+# from a local checkout
+install.packages("devtools")
 devtools::install(".")
 ```
 
 ## Usage
 
 ``` r
+
 library(sir)
 
-# data inputs:
-# Y: m x m x T array of network outcomes
-# W: m x m x p array of influence covariates
-# X: m x m x T array of lagged network state
-# Z: m x m x q x T array of exogenous covariates
+# simulate a small example (or use your own Y/W/X/Z, or data(icews))
+dat <- sim_sir(m = 14, T_len = 80, p = 2, q = 2, family = "poisson", seed = 42)
 
-model = sir(
-    Y = Y, W = W, X = X, Z = Z,
-    family = "poisson",
-    method = "ALS",
-    trace = TRUE
+fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z, family = "poisson", seed = 1)
+
+ci <- confint(fit)             # cluster-robust by default when supported
+coef_table <- data.frame(
+  term = names(coef(fit)),
+  estimate = round(unname(coef(fit)), 3),
+  cluster_low = round(ci[, 1], 3),
+  cluster_high = round(ci[, 2], 3),
+  row.names = NULL
 )
+print(coef_table, row.names = FALSE)
+#>         term estimate cluster_low cluster_high
+#>       (Z) Z1    0.231       0.213        0.250
+#>       (Z) Z2   -0.369      -0.379       -0.358
+#>  (alphaW) W2    0.309       0.206        0.412
+#>   (betaW) W1   -0.162      -0.176       -0.148
+#>   (betaW) W2    0.115       0.110        0.121
 
-summary(model)
-plot(model)
+mu0 <- predict(fit)             # fitted expected counts
+W_scen <- dat$W                 # preserve the observed W structure
+W1 <- W_scen[, , 1]
+off <- row(W1) != col(W1)
+W1[off] <- W1[off] + sd(W1[off], na.rm = TRUE)
+W_scen[, , 1] <- W1
+mu1 <- predict(fit, newdata = list(W = W_scen, X = dat$X, Z = dat$Z))
+delta <- mu1 - mu0
+scenario_table <- data.frame(
+  baseline_mean = mean(mu0, na.rm = TRUE),
+  scenario_mean = mean(mu1, na.rm = TRUE),
+  mean_change = mean(delta, na.rm = TRUE),
+  median_change = median(delta, na.rm = TRUE),
+  p90_abs_change = unname(quantile(abs(delta), 0.9, na.rm = TRUE)),
+  row.names = NULL
+)
+print(signif(scenario_table, 4), row.names = FALSE)
+#>  baseline_mean scenario_mean mean_change median_change p90_abs_change
+#>          1.129        0.4291     -0.7004       -0.6081          1.278
 
-# extract components
-coef(model)          # parameter estimates
-model$A              # sender influence matrix
-model$B              # receiver influence matrix
-confint(model)       # confidence intervals
+A <- fit$A                      # rows = influenced i, columns = source k
+diag(A) <- NA                   # self-influence is not modeled
+ord <- order(abs(A), decreasing = TRUE, na.last = NA)[1:5]
+influence_table <- data.frame(
+  source_node = ((ord - 1) %/% nrow(A)) + 1,
+  influenced_node = ((ord - 1) %% nrow(A)) + 1,
+  influence = round(A[ord], 3)
+)
+print(influence_table, row.names = FALSE)
+#>  source_node influenced_node influence
+#>            1              14    -2.682
+#>            4              13    -2.592
+#>            9               2     2.507
+#>            3               7    -2.497
+#>            2               1    -2.287
+
+plot(fit, which = 1:4)          # influence heatmaps + distributions
 ```
 
-## Estimation
+![SIR diagnostic plots](reference/figures/readme-diagnostics.png)
 
-The package provides two estimation approaches. The default, Alternating
-Least Squares (ALS), exploits the bilinear structure of the model by
-iterating between GLM sub-problems for $({\mathbf{θ}},{\mathbf{α}})$ and
-$({\mathbf{θ}},{\mathbf{β}})$. Each sub-problem is a standard
-generalized linear model, so the full estimation reduces to a sequence
-of low-dimensional optimizations. This is generally more stable for
-high-dimensional problems and substantially faster than the Bayesian
-approach originally used for bilinear network autoregressions. A direct
-BFGS optimizer (`method = "optim"`) is also available and uses
-analytical gradients computed via C++; it can converge faster for small
-networks but tends to be less stable when the number of influence
-covariates is large.
+SIR diagnostic plots
 
-Standard errors are computed from the Hessian (classical) and the
-sandwich estimator (robust). When the Hessian is ill-conditioned, which
-is common in bilinear models,
-[`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
-provides bootstrap standard errors via block resampling of time periods
-or parametric simulation.
+`vcov(fit)`, `confint(fit)`, and `tidy(fit, conf.int = TRUE)` use
+cluster-robust uncertainty by default for supported static directed
+fits. If a fit cannot support analytic cluster-robust inference, the
+accessor errors directly; use `boot_sir(fit, type = "dyad")` for
+full-bilinear bipartite fits.
 
-## Distribution families
-
-The model supports Poisson (count outcomes with log link), Normal
-(continuous outcomes with identity link), and Binomial (binary outcomes
-with logit link) families.
+The bundled `icews` dataset (50 countries x 95 months of inter-state
+conflict) provides a larger real-data example:
 
 ``` r
-model_poisson  = sir(Y, W, X, Z, family = "poisson")
-model_normal   = sir(Y, W, X, Z, family = "normal")
-model_binomial = sir(Y, W, X, Z, family = "binomial")
+
+data(icews)
+ifit <- sir(icews$Y, W = icews$W, X = icews$X, Z = icews$Z, family = "poisson", seed = 1)
+c(converged = ifit$convergence, se_reliable = ifit$se_reliable)
 ```
 
-## S3 methods
+See
+[`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md)
+for a full walkthrough from simulation to substantive interpretation.
 
-``` r
-summary(model)                  # coefficient table with standard errors
-coef(model)                     # parameter estimates
-fitted(model)                   # fitted values on response scale
-residuals(model, type = "deviance")  # deviance residuals
-logLik(model)                   # log-likelihood
-AIC(model); BIC(model)          # information criteria
-vcov(model, type = "robust")    # sandwich variance-covariance
-confint(model)                  # Wald confidence intervals
-predict(model, newdata, type = "response")
-plot(model, which = 1:6)        # diagnostic plots
-```
+## Estimation methods
 
-## Additional features
+- **Alternating GLM/IRLS** (`method = "ALS"`, default): alternates
+  GLM/IRLS updates for sender and receiver influence. The `"ALS"` method
+  name is retained for API compatibility.
+- **BFGS** (`method = "optim"`): direct optimization of the full
+  likelihood.
 
-The package supports symmetric (undirected) networks via
-`symmetric = TRUE`, bipartite (rectangular) networks via
-`bipartite = TRUE` or automatic detection from non-square $\mathbf{Y}$,
-dynamic (time-varying) influence covariates via 4D `W` arrays,
-counterfactual scenario construction via
-[`get_scen_vals()`](https://netify-dev.github.io/sir/reference/get_scen_vals.md)
-and
-[`get_scen_array()`](https://netify-dev.github.io/sir/reference/get_scen_array.md),
-and the
-[`cast_array()`](https://netify-dev.github.io/sir/reference/cast_array.md)
-utility for converting edge-list data to the required array format.
+## Features
 
-## Citation
+- Poisson, Normal, and Binomial families
+- Directed one-mode, symmetric/undirected, bipartite/rectangular, and
+  full-bilinear bipartite (`W_recv`) networks
+- Static and dynamic (time-varying) influence covariates
+- Cluster-robust inference by default for supported static fits;
+  classical, HC0 sandwich, bootstrap, and jackknife inference remain
+  available via [`vcov()`](https://rdrr.io/r/stats/vcov.html) /
+  [`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
+- Model-implied scenario prediction via `predict(fit, newdata = ...)`
+  and scenario helpers
+  [`get_scen_vals()`](https://netify-dev.github.io/sir/reference/get_scen_vals.md)
+  /
+  [`get_scen_array()`](https://netify-dev.github.io/sir/reference/get_scen_array.md)
+- Network visualization via
+  [`plot_sir_network()`](https://netify-dev.github.io/sir/reference/plot_sir_network.md)
+- broom support:
+  [`tidy()`](https://generics.r-lib.org/reference/tidy.html),
+  [`glance()`](https://generics.r-lib.org/reference/glance.html),
+  [`augment()`](https://generics.r-lib.org/reference/augment.html) for
+  modelsummary / tidyverse
 
-``` bibtex
-@article{minhas:hoff:2025,
-  title={Decomposing Network Dynamics: Social Influence Regression},
-  author={Minhas, Shahryar and Hoff, Peter},
-  journal={Political Analysis},
-  year={2025},
-}
+## Reference
 
-@Manual{sir-package,
-  title = {sir: Social Influence Regression Models},
-  author = {Shahryar Minhas and Peter Hoff},
-  year = {2025},
-  note = {R package version 0.1.0},
-  url = {https://github.com/netify-dev/sir}
-}
-```
-
-## Authors
-
-Shahryar Minhas (Michigan State University) and Peter Hoff (Duke
-University).
-
-## License
-
-MIT License. See [LICENSE](https://netify-dev.github.io/sir/LICENSE) for
-details.
+Minhas, S. & Hoff, P. D. (2025). Decomposing Network Influence: Social
+Influence Regression. *Political Analysis*.

@@ -36,8 +36,9 @@ plot_sir_network(
 
 - node_labels:
 
-  Optional character vector of node names. If NULL, nodes are labeled 1
-  through m.
+  Optional character vector of node names. If NULL, labels are taken
+  from the influence-matrix dimnames when present, otherwise nodes are
+  labeled 1 through m.
 
 - layout:
 
@@ -47,5 +48,20 @@ plot_sir_network(
 
 ## Value
 
-A `ggplot` object produced by `ggraph`. Returns NULL if `igraph` or
-`ggraph` are not installed.
+A `ggplot` object produced by `ggraph`. Arrows point from the
+source/influencer node to the influenced node. Returns NULL if `igraph`
+or `ggraph` are not installed.
+
+## Examples
+
+``` r
+# \donttest{
+if (requireNamespace("igraph", quietly = TRUE) &&
+    requireNamespace("ggraph", quietly = TRUE)) {
+  dat <- sim_sir(m = 10, T_len = 20, p = 2, q = 1, family = "poisson", seed = 1)
+  fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z, family = "poisson", seed = 1)
+  plot_sir_network(fit, matrix = "A", threshold = 0.1)
+}
+
+# }
+```

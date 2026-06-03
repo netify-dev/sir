@@ -24,7 +24,12 @@ coef(object, ...)
 
 ## Value
 
-Named numeric vector of estimated coefficients.
+Named numeric vector of estimated coefficients. Names use the `(Z)` /
+`(alphaW)` / `(betaW)` tagging from
+[`summary()`](https://rdrr.io/r/base/summary.html): `(Z)` = exogenous
+direct effects (theta); `(alphaW)` = sender-influence weights
+(alpha_2..alpha_p, since alpha_1 = 1 is fixed for identifiability);
+`(betaW)` = receiver- influence weights (beta).
 
 ## See also
 

@@ -56,15 +56,14 @@ to 3). Suitable for passing directly as the `Z` argument to
 ## Examples
 
 ``` r
-if (FALSE) { # \dontrun{
-# Build relational covariates from trade data
-Z_trade <- rel_covar(trade_array, "trade")
-dim(Z_trade)  # m x m x 3 x T
+dat <- sim_sir(m = 8, T_len = 10, p = 2, q = 1, family = "poisson", seed = 1)
+# relational covariates from the (lagged) network: main, reciprocal, transitive
+Zrel <- rel_covar(dat$X, "conflict")
+dim(Zrel)  # m x m x 3 x T
+#> [1]  8  8  3 10
 
-# Use only main and reciprocal effects
-Z_simple <- rel_covar(trade_array, "trade", effects = c("main", "reciprocal"))
-
-# Pass to sir() as exogenous covariates
-fit <- sir(Y, W, X, Z = Z_trade, family = "poisson")
-} # }
+# only main and reciprocal effects
+Zsimple <- rel_covar(dat$X, "conflict", effects = c("main", "reciprocal"))
+dim(Zsimple)
+#> [1]  8  8  2 10
 ```

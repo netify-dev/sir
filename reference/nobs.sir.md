@@ -1,8 +1,9 @@
 # Extract Number of Observations from a SIR Model
 
 Returns the number of non-missing dyad-time observations used in
-fitting. For square networks, diagonal entries (self-loops) are excluded
-from this count.
+fitting. For one-mode square networks, diagonal entries (self-loops) are
+excluded from this count. Square bipartite fits keep diagonal cells
+because rows and columns are distinct actor sets.
 
 ## Usage
 

@@ -20,7 +20,8 @@ sim_sir(
   theta = NULL,
   W = NULL,
   sigma = 1,
-  seed = NULL
+  seed = NULL,
+  ...
 )
 ```
 
@@ -51,7 +52,8 @@ sim_sir(
 
   Numeric vector of length p for sender influence weights. The first
   element (alpha_1) is fixed at 1 for identifiability; only alpha_2:p
-  are free. If NULL (default), drawn from N(0, 0.3).
+  are free. If NULL (default), drawn from N(0, 0.3). Use `seed` for
+  reproducibility.
 
 - beta:
 
@@ -66,7 +68,9 @@ sim_sir(
 - W:
 
   Optional 3D array (m x m x p) of influence covariates. If NULL
-  (default), generated with standard normal entries.
+  (default), generated with standard normal entries (a dense,
+  well-conditioned influence design). The diagonal is set to zero
+  because self-ties are not part of the one-mode SIR likelihood.
 
 - sigma:
 
@@ -74,7 +78,13 @@ sim_sir(
 
 - seed:
 
-  Optional integer for reproducibility.
+  Optional integer for reproducibility. When supplied, the seed is set
+  locally and the caller's global RNG state is restored on exit, so a
+  subsequent draw (e.g. `runif`) in the caller is left unperturbed.
+
+- ...:
+
+  Unused; catches mistyped arguments and reports a clear error.
 
 ## Value
 
@@ -90,8 +100,9 @@ A list with components:
 
 - X:
 
-  3D array (m x m x T_len) of lagged network state. For Poisson family,
-  X is log(Y + 1) to prevent explosive dynamics.
+  3D array (m x m x T_len) of the (scaled) lagged network state used in
+  the bilinear mean: `X[,,t]` is `log(Y[,,t-1] + 1)` (Poisson) or
+  `Y[,,t-1]` (otherwise), divided by `(m - 1)`.
 
 - Z:
 
@@ -122,14 +133,24 @@ A list with components:
 
   The distribution family used.
 
+## Details
+
+The influence-carrying state `X` is scaled by `1 / (m - 1)` before it
+enters the bilinear mean. The bilinear term \\A X_t B^\top\\ sums over
+all \\(m-1)\\ off-diagonal partners on each side, so without this
+scaling the linear predictor would grow with network size and (for the
+Poisson/log link) the conditional mean would saturate, making the
+influence parameters unrecoverable. The returned `X` already includes
+this scaling, so a plain
+[`sir`](https://netify-dev.github.io/sir/reference/sir.md) fit on
+`(Y, W, X, Z)` recovers the same `A`, `B` used to generate the data.
+
 ## Examples
 
 ``` r
 if (FALSE) { # \dontrun{
-# Simulate Poisson network
-dat <- sim_sir(m = 15, T_len = 10, p = 2, q = 1, family = "poisson", seed = 42)
-
-# Fit model to recover parameters
+# Simulate Poisson network and recover the parameters
+dat <- sim_sir(m = 15, T_len = 30, p = 2, q = 1, family = "poisson", seed = 42)
 fit <- sir(dat$Y, dat$W, dat$X, dat$Z, family = "poisson")
 cbind(true = c(dat$theta, dat$alpha[-1], dat$beta), estimated = coef(fit))
 } # }

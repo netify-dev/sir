@@ -1,9 +1,11 @@
 # Social Influence Regression (SIR) Model
 
-Fits a Social Influence Regression model for network data with social
-influence effects. The SIR model captures how network connections
-influence outcomes through bilinear interaction terms, allowing for both
-sender and receiver effects in directed networks.
+Fits a Social Influence Regression model for network data with lagged,
+model-implied association channels. The SIR model captures how prior
+network states predict later outcomes through bilinear interaction
+terms, allowing for both sender and receiver channels in directed
+networks. Causal interpretation requires additional research-design
+assumptions.
 
 The model decomposes network influence into two components:
 
@@ -27,7 +29,9 @@ sir(
   fix_receiver = FALSE,
   symmetric = FALSE,
   bipartite = NULL,
+  W_recv = NULL,
   kron_mode = FALSE,
+  seed = NULL,
   ...
 )
 ```
@@ -39,26 +43,32 @@ sir(
   A three-dimensional array of dimensions (m x m x T) containing the
   network outcomes. Y\[i,j,t\] represents the directed outcome from node
   i to node j at time t. Can contain NA values for missing observations.
-  The diagonal (self-loops) can be included or excluded depending on the
-  application.
+  For one-mode square networks, self-tie diagonals are excluded from
+  fitting, likelihood evaluation, and reported observation counts.
 
 - W:
 
   Optional influence covariate array, either:
 
-  - **3D array** (m x m x p): Static influence covariates. W\[i,j,r\]
-    represents the r-th covariate for the edge from i to j. The same W
-    is used for all time periods.
+  - **3D array** (m x m x p): Static influence covariates. W\[i,k,r\]
+    represents the r-th covariate for the channel by which source node k
+    can shape target node i; the same orientation is used for the
+    receiver-side matrix B\[j,l\]. Directed W slices therefore need the
+    same target-by-source orientation as A and B, not necessarily the
+    same sender-to-receiver orientation as Y\[i,j,t\]. The same W is
+    used for all time periods.
 
   - **4D array** (m x m x p x T): Dynamic (time-varying) influence
-    covariates. W\[i,j,r,t\] allows the influence structure to change
+    covariates. W\[i,k,r,t\] allows the influence structure to change
     over time. Parameters (alpha, beta) are still estimated jointly
     across all periods, but the influence matrices A_t and B_t vary
     with t. Only ALS method is supported for 4D W.
 
   Common choices include graph Laplacians, geographic distance matrices,
-  or node-level covariates expanded to edge-level. If NULL or p=0, the
-  model uses only identity matrices (no network influence structure).
+  or node-level covariates expanded to edge-level. For one-mode square
+  networks, W diagonals are set to zero so self-influence channels are
+  not estimated. If NULL or p=0, no network influence structure is
+  included.
 
 - X:
 
@@ -88,9 +98,9 @@ sir(
 
 - method:
 
-  Character string specifying the estimation method. Either "ALS"
-  (Alternating Least Squares) or "optim" (direct optimization via BFGS).
-  Default is "ALS" which is generally more stable.
+  Character string specifying the estimation method. Either `"ALS"` (the
+  default alternating GLM/IRLS engine; the name is retained for API
+  compatibility) or `"optim"` (direct optimization via BFGS).
 
 - calc_se:
 
@@ -104,17 +114,21 @@ sir(
   Logical. If TRUE, fixes B = I (identity matrix) and estimates only
   (theta, alpha). This eliminates the bilinear identification problem
   (scaling ambiguity between A and B) by removing the receiver influence
-  channel. The model becomes a standard GLM, yielding proper standard
-  errors. Appropriate when receiver effects are negligible. Default is
-  FALSE.
+  channel. The model becomes a standard GLM, yielding model-based
+  standard errors under the usual GLM assumptions. Appropriate when
+  receiver effects are negligible. Default is FALSE.
 
 - symmetric:
 
   Logical. If TRUE, treats the network as undirected (symmetric). The
-  function symmetrizes Y by averaging upper and lower triangles, uses
-  only upper-triangle observations for fitting, and sets
-  `fix_receiver = TRUE` (since sender/receiver distinction is
-  meaningless for undirected networks). Default is FALSE.
+  function uses only upper-triangle observations for fitting and sets
+  `fix_receiver = TRUE`, giving an upper-triangle, sender-side
+  representation of undirected data rather than a fully order-invariant
+  undirected bilinear model. Continuous asymmetric outcomes are averaged
+  across upper and lower triangles; Poisson and Binomial outcomes must
+  already be symmetric so averaging does not create invalid non-integer
+  or non-binary observations. Influence covariates W must also be
+  symmetric. Default is FALSE.
 
 - bipartite:
 
@@ -124,14 +138,38 @@ sir(
   treated as bipartite. Set to TRUE explicitly for square arrays where
   senders and receivers are nonetheless distinct populations. Setting
   FALSE on a non-square Y raises an error. Bipartite networks require
-  `fix_receiver = TRUE`.
+  `fix_receiver = TRUE` unless a separate `W_recv` is supplied (see
+  below).
+
+- W_recv:
+
+  Optional receiver-side influence covariate array (n2 x n2 x p2) for a
+  **full-bilinear bipartite** fit. When supplied, the sender influence
+  `A` is built from `W` (n1 x n1 x p) and the receiver influence `B`
+  from `W_recv`, fitting the complete \\A X B'\\ model for two-mode data
+  via alternating GLM (rather than collapsing to `B = I`). `alpha_1 = 1`
+  pins the scale; all `beta` are free. Works for both rectangular (n1 !=
+  n2) and square two-mode networks. This path uses a pure-R
+  alternating-GLM estimator (it does not call the C++ likelihood
+  kernel), so it is slower than the square one-mode path for large
+  networks; it draws random restarts (see `n_restarts` in `...`,
+  default 5) and respects `seed`. Analytic standard errors are not
+  available; use
+  [`boot_sir`](https://netify-dev.github.io/sir/reference/boot_sir.md)
+  with `type = "dyad"`. Default NULL.
 
 - kron_mode:
 
-  Logical. If TRUE, replaces separate (alpha, beta) with a single p x p
-  coefficient matrix C, where C\[r,s\] is the weight on W_r X W_s'. This
-  is a general fix for the bilinear identification problem. Not yet
-  implemented. Default is FALSE.
+  Logical. **Not yet implemented** (reserved for a future release):
+  would estimate an unconstrained p x p coefficient matrix C instead of
+  the rank-at-most-one alpha beta' factorization. Setting
+  `kron_mode = TRUE` currently raises an error. Default is FALSE.
+
+- seed:
+
+  Optional integer. If supplied, sets the random seed before fitting so
+  that runs are reproducible (the estimators use random starting
+  values). The global RNG state is restored on exit. Default NULL.
 
 - ...:
 
@@ -142,6 +180,9 @@ sir(
   - `tol`: Convergence tolerance for ALS (default 1e-8).
 
   - `max_iter`: Maximum ALS iterations (default 100).
+
+  - `n_restarts`: Random restarts for the full-bilinear bipartite
+    (`W_recv`) estimator (default 5); the lowest-deviance fit is kept.
 
 ## Value
 
@@ -159,20 +200,23 @@ An object of class `"sir"` with the following components:
   Sender influence matrix. For static W: n1 x n1 matrix. For dynamic
   (4D) W: n1 x n1 x T array. Off-diagonal entry A\[i,k\] measures how
   much node k's behavior (via X) shapes node i's outgoing ties. Diagonal
-  is set to zero.
+  is set to zero for one-mode square fits; for a full-bilinear bipartite
+  fit (`W_recv`) A is the dense `sum_k alpha_k W[,,k]` with all
+  sender-side entries retained.
 
 - B:
 
-  Receiver influence matrix. Same dimensions as A. Off-diagonal entry
-  B\[j,l\] measures how node l's position shapes node j's incoming ties.
-  Identity when `fix_receiver = TRUE`. Diagonal is zeroed.
+  Receiver influence matrix. Identity when `fix_receiver = TRUE`;
+  `n1 x n1` (same shape as A) for the square model; `n2 x n2` built from
+  `W_recv` for a full-bilinear bipartite fit.
 
 - tab:
 
   Numeric vector of all estimated parameters in order: \[theta_1, ...,
   theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p\]. When
   `fix_receiver = TRUE`: \[theta_1, ..., theta_q, alpha_1, ...,
-  alpha_p\].
+  alpha_p\]. For a full-bilinear bipartite fit: \[theta_1, ..., theta_q,
+  alpha_2, ..., alpha_p, beta_1, ..., beta_p2\].
 
 - theta:
 
@@ -185,8 +229,14 @@ An object of class `"sir"` with the following components:
 
 - beta:
 
-  Coefficients for receiver influence covariates (length p). Empty when
+  Coefficients for receiver influence covariates (length p, or length p2
+  for a full-bilinear bipartite fit from `W_recv`). Empty when
   `fix_receiver = TRUE`.
+
+- p2:
+
+  Number of receiver-side influence covariates (only present for a
+  full-bilinear bipartite fit).
 
 - ll:
 
@@ -223,7 +273,13 @@ An object of class `"sir"` with the following components:
 
 - bipartite:
 
-  Logical, TRUE if the network is bipartite (n1 != n2).
+  Logical, TRUE if the network is treated as bipartite (non-square `Y`,
+  `bipartite = TRUE`, or a `W_recv` fit).
+
+- full_bilinear:
+
+  Logical, TRUE for a full-bilinear bipartite fit (`W_recv` supplied);
+  such fits have no analytic SEs.
 
 - n_periods:
 
@@ -309,10 +365,15 @@ An object of class `"sir"` with the following components:
 The SIR model specifies the expected outcome for the directed edge from
 node i to node j at time t as:
 
-\$\$\mu\_{i,j,t} = \theta^T z\_{i,j,t} + \sum\_{k,l} X\_{k,l,t} A\_{i,k}
-B\_{j,l}\$\$
+\$\$g(\mu\_{i,j,t}) = \theta^T z\_{i,j,t} + \sum\_{k,l} X\_{k,l,t}
+A\_{i,k} B\_{j,l}\$\$
 
 Where:
+
+- \\g(\cdot)\\ is the family link function (identity for normal, log for
+  poisson, logit for binomial). The exogenous and bilinear terms enter
+  the *linear predictor*, not the mean directly, so for poisson and
+  binomial they act on the log / logit scale.
 
 - \\\mu\_{i,j,t}\\ is the expected value of the outcome Y_ijt
 
@@ -344,9 +405,10 @@ to \\O(p)\\, where \\p \ll m\\.
 
 ## Estimation Methods
 
-**Alternating Least Squares (ALS):**
+**Alternating GLM/IRLS updates (method = "ALS"):**
 
-- Iteratively optimizes A given B, then B given A
+- Iteratively updates the sender and receiver influence coefficients
+  with GLM/IRLS subproblems
 
 - Generally more stable for high-dimensional problems
 
@@ -363,6 +425,18 @@ to \\O(p)\\, where \\p \ll m\\.
 - May provide better solutions when good starting values are available
 
 - More prone to numerical issues in high dimensions
+
+Both engines report the same public parameterization with \\\alpha_1 =
+1\\. BFGS optimizes that reduced vector directly; the default
+alternating engine updates working alpha/beta coordinates with GLM/IRLS
+subproblems and then normalizes to \\\alpha_1 = 1\\ when possible. The
+full bilinear log-likelihood is often flat along a ridge: the
+alternating engine and BFGS typically reach the same log-likelihood (to
+well within 1%) yet can return parameter vectors that differ by a few
+tenths on weakly identified influence coefficients. Compare fits by
+log-likelihood / fitted values rather than by raw coefficients, and use
+`fix_receiver = TRUE` to remove the alpha/beta scaling ambiguity when a
+simpler sender-side channel is substantively adequate.
 
 ## Distribution Families
 
@@ -412,15 +486,16 @@ print(model)
 #> Social Influence Regression Model
 #> 8 nodes, 5 time periods (directed)
 #> Config: poisson | ALS
-#> Status: converged | N = 280 | Log-Lik: -576.96 | AIC: 1159.9
+#> Status: converged | N = 280 | Log-Lik: -575.48 | AIC: 1157
 #> Coefficients:
 #>             Estimate
-#> (alphaW) W2   3.9283
-#> (betaW) W1    0.0010
-#> (betaW) W2    0.0020
+#> (alphaW) W2  -0.0912
+#> (betaW) W1   -0.0037
+#> (betaW) W2   -0.0066
 #> (SEs not computed)
 #> Use `summary()` for detailed results
 coef(model)
-#> [1] 3.928314350 0.001010846 0.001972906
+#>  (alphaW) W2   (betaW) W1   (betaW) W2 
+#> -0.091192198 -0.003650105 -0.006634265 
 # }
 ```

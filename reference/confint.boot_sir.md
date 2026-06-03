@@ -1,7 +1,11 @@
 # Confidence Intervals from Bootstrap SIR Results
 
-Computes percentile confidence intervals at the specified level from the
-bootstrap coefficient distribution.
+Computes confidence intervals from a `boot_sir` object. For `block` and
+`parametric` bootstraps these are percentile intervals from the
+replicate distribution. For the `dyad` jackknife they are normal
+(`estimate +/- z * se`) intervals from the jackknife standard error; the
+jackknife produces a covariance, not a replicate distribution, so
+percentiles do not apply.
 
 ## Usage
 

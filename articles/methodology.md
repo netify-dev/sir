@@ -1,190 +1,190 @@
-# Model framework and methodology
+# SIR Methodology
 
-## The problem
+## The Social Influence Regression model
 
-Actors in political and social networks do not behave independently.
-When a state initiates conflict with a particular target, that action
-may reshape how other states behave toward the same or related targets
-in subsequent periods. Alliance partners may follow suit, rivals may
-escalate, and third parties may recalibrate their own strategies in
-response. These dynamics generate higher-order dependencies across the
-network that standard regression approaches cannot capture. The
-fundamental challenge is not merely that observations are correlated,
-but that the structure of influence itself is substantively meaningful:
-understanding *who* influences *whom*, and through what channels, is
-often the central question.
+This vignette is the mathematical companion to
+[`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md).
+Substantive readers can use the overview first, then return here for the
+model scale, identification, and inference assumptions. The recurring
+symbols are:
 
-Traditional latent variable models for networks describe the overall
-structure of interactions, positioning actors in a social space based on
-transitivity or stochastic equivalence. However, while these models can
-effectively characterize broad network patterns, they frequently fall
-short in providing detailed explanations for the specific influence that
-actors exert on one another. The factors driving influence are left
-unexplored, attributed to latent dimensions rather than to the
-observable actor-level and dyad-level covariates that substantive
-theories emphasize. To address this limitation, the Social Influence
-Regression (SIR) model regresses influence patterns directly on
-observable covariates. The model operates on longitudinal network data
-(a time series of $n \times n$ relational matrices) and estimates how
-past interactions across the network predict current outcomes as a
-function of covariates such as alliances, trade ties, and geographic
-proximity.
+| Symbol/input             | Meaning                                          |
+|:-------------------------|:-------------------------------------------------|
+| `Y`                      | outcome network                                  |
+| `X`                      | lagged network signal                            |
+| `W`                      | covariates that build the influence matrices     |
+| `Z`                      | exogenous dyadic covariates with direct effects  |
+| `A`, `B`                 | sender-side and receiver-side influence matrices |
+| `alpha`, `beta`, `theta` | coefficients for `W` in `A`, `W` in `B`, and `Z` |
 
-The methodological framework is introduced in:
+Social Influence Regression (SIR) models directed relational data
+observed over time. For a network of $`m`$ actors observed at $`T`$ time
+points, let $`Y_{ijt}`$ denote the relation sent from actor $`i`$ to
+actor $`j`$ at time $`t`$, with conditional mean
+$`\mu_{ijt} = g^{-1}(\eta_{ijt})`$ for a link $`g`$ (log for Poisson,
+identity for Normal, logit for Binomial).
 
-> Minhas, S. & Hoff, P.D. (2025). *Decomposing Network Dynamics: Social
-> Influence Regression.* Political Analysis.
+The linear predictor combines exogenous direct effects with a bilinear
+influence term:
 
-## Model specification
+``` math
+\eta_{ijt} = \theta^\top z_{ijt} + (A X_t B^\top)_{ij}
+    = \theta^\top z_{ijt} + \sum_{k,l} A_{ik} X_{klt} B_{jl}.
+```
 
-Let $Y = \{ Y_{t}:t = 1,\ldots,T\}$ be a time series of $n \times n$
-relational matrices, where $y_{i,j,t}$ represents the directed outcome
-from node $i$ to node $j$ at time $t$. The SIR model specifies:
+where
 
-$$\mu_{i,j,t} = {\mathbf{θ}}^{\top}\mathbf{z}_{i,j,t} + {\mathbf{α}}^{\top}{\widetilde{X}}_{i,j,t}{\mathbf{β}}$$
+- $`z_{ijt}`$ are exogenous dyadic covariates with direct-effect
+  coefficients $`\theta`$;
+- $`X_t`$ is the lagged network state that carries influence (typically
+  $`X_t = \log(Y_{t-1}+1)`$ for counts);
+- $`A`$ (sender-side) and $`B`$ (receiver-side) are
+  $`m \times m`$**influence matrices**.
 
-The first term is a standard regression: $\mathbf{z}_{i,j,t}$ collects
-exogenous covariates for dyad $(i,j)$ at time $t$ (geographic distance,
-alliance status, trade flows), and $\mathbf{θ}$ gives their direct
-effects on the outcome. The second term is where the model departs from
-standard approaches. The quantity ${\widetilde{X}}_{i,j,t}$ is
-constructed from the lagged network state interacted with influence
-covariates $\mathbf{W}$, and the bilinear form
-${\mathbf{α}}^{\top}{\widetilde{X}}_{i,j,t}{\mathbf{β}}$ allows each
-dyad’s outcome to depend on the *entire* prior network, weighted by
-sender ($\mathbf{α}$) and receiver ($\mathbf{β}$) influence parameters.
-This structure is what allows the model to capture third-order
-dependencies: how one actor’s past behavior toward a third party
-predicts another actor’s current behavior.
+The defining SIR step is to **parameterize the influence matrices by
+covariates** $`W_r`$ (the slices of `W`):
 
-For any pair of actors $(i,i\prime)$, the entry $a_{i,i\prime}$ tells us
-how predictive $i\prime$’s past sending behavior is of $i$’s current
-sending behavior. If $a_{\text{GBR},\text{USA}} > 0$ in a conflict
-network, it indicates that countries the USA initiated conflict with in
-period $t - 1$ tend to also face conflict from the UK in period $t$. The
-influence is directional and asymmetric: the USA’s conflict behavior is
-predictive of the UK’s, but the reverse need not hold with the same
-magnitude.
+``` math
+A = \sum_{r=1}^{p} \alpha_r W_r,
+\qquad
+B = \sum_{r=1}^{p} \beta_r W_r.
+```
 
-### Influence matrices
+Substituting gives the compact form
+$`\eta_{ijt} = \theta^\top z_{ijt} + \alpha^\top \tilde X_{ijt} \beta`$,
+where the reduced $`p \times p`$ matrix $`\tilde X_{ijt}`$ (distinct
+from the $`m \times m`$ lagged state $`X_t`$) has entries
+$`(\tilde X_{ijt})_{rs} = \sum_{k,l} W_{r,ik} X_{klt} W_{s,jl}`$. The
+two forms are identical; the explicit double-sum above is the one used
+throughout the other vignettes.
 
-The influence parameters $a_{i,i\prime}$ and $b_{j,j\prime}$ are not
-estimated freely for every pair, as that would require
-$O\left( n^{2} \right)$ parameters. Instead, the model explains
-influence in terms of covariates:
+Equivalently this is a **rank-at-most-one matrix regression**: the
+otherwise arbitrary $`p \times p`$ coefficient matrix $`C`$ multiplying
+$`\tilde X`$ is restricted to $`C = \alpha\beta^\top`$.
 
-$$a_{i,i\prime} = \alpha^{\top}w_{i,i\prime}\qquad b_{j,j\prime} = \beta^{\top}w_{j,j\prime}$$
+In regression terms, $`\tilde X_{ijt}`$ is the table of all
+sender-channel by receiver-channel lagged signals for dyad $`(i,j)`$ at
+time $`t`$. SIR does not estimate an unrestricted coefficient for every
+entry in that table; it restricts those interaction coefficients to
+products of sender-side weights and receiver-side weights.
 
-where $w_{i,i\prime}$ is a vector of covariates describing the
-relationship between actors $i$ and $i\prime$ (distance, alliance
-status, trade ties). The full influence matrices are then:
+## Identifiability
 
-$$\mathbf{A} = \sum\limits_{r = 1}^{p}\alpha_{r}\mathbf{W}_{r}\qquad\mathbf{B} = \sum\limits_{r = 1}^{p}\beta_{r}\mathbf{W}_{r}$$
-
-with $\alpha_{1} = 1$ fixed for identifiability. This parameterization
-brings the parameter count down to $O(p)$ where $p$ is the number of
-influence covariates, typically a handful. The $\alpha$ and $\beta$
-coefficients tell us which covariates matter for influence and by how
-much: a positive $\alpha$ on the alliance covariate, for instance, would
-indicate that allied countries tend to initiate conflict with the same
-targets. This emphasis on covariate-driven explanation is what
-distinguishes the SIR framework from latent variable approaches. Rather
-than describing influence through unobserved dimensions, the model links
-influence directly to measured actor and dyad attributes.
-
-### Distribution families
-
-The framework is based on a generalized bilinear model and extends
-naturally to different outcome types:
-
-| Family   | Link                         | Example                                         |
-|:---------|:-----------------------------|:------------------------------------------------|
-| Poisson  | $g(\mu) = \log(\mu)$         | Monthly conflict event counts between countries |
-| Normal   | $g(\mu) = \mu$               | Bilateral trade volumes                         |
-| Binomial | $g(\mu) = \text{logit}(\mu)$ | Presence or absence of a diplomatic tie         |
-
-### Identifiability
-
-The bilinear term ${\mathbf{α}}^{\top}X{\mathbf{β}}$ has a scale
-ambiguity: multiplying $\mathbf{α}$ by $1/c$ and $\mathbf{β}$ by $c$
-yields the same product for any nonzero scalar $c$. To resolve this, the
-first element of $\mathbf{α}$ is fixed at 1. The package handles this
-constraint automatically during estimation.
-
-A simpler alternative is to fix $\mathbf{B} = \mathbf{I}$ entirely
-(`fix_receiver = TRUE`), which removes the identification issue and
-reduces the model to a standard GLM. This is a useful starting point
-when the research question concerns sender-side influence alone, and it
-produces well-conditioned standard errors without requiring bootstrap
-corrections.
+The scale of $`\alpha`$ and $`\beta`$ is not separately identified: for
+any $`c \neq 0`$, $`(c\alpha,\ \beta/c)`$ gives the identical
+$`C = \alpha\beta^\top`$ and hence the same likelihood. The package
+fixes $`\alpha_1 = 1`$ to resolve this, so the reported
+$`\alpha_2,\dots,\alpha_p`$ are read relative to that baseline and
+$`\alpha_1`$ is omitted from the coefficient table. The scale-invariant
+target is the rank-at-most-one matrix $`C = \alpha\beta^\top`$ (and the
+fitted means), subject to adequate design rank and signal. When
+assessing recovery, compare $`C`$ rather than $`\alpha,\beta`$
+separately. In applied work, put a theoretically central, nonzero
+baseline channel first in `W`; all reported `alpha` coefficients are
+relative to that first slice.
 
 ## Estimation
 
-Estimating $\{{\mathbf{θ}},{\mathbf{α}},{\mathbf{β}}\}$ jointly is
-difficult because the model is bilinear in $\mathbf{α}$ and
-$\mathbf{β}$. The package addresses this with an iterative block
-coordinate descent algorithm that exploits a key structural property:
-for fixed $\mathbf{β}$, the model is linear in $\mathbf{θ}$ and
-$\mathbf{α}$ (and vice versa). The procedure initializes $\mathbf{β}$,
-then alternates between two steps: first, fixing $\mathbf{β}$ and
-estimating $({\mathbf{θ}},{\mathbf{α}})$ via GLM; second, fixing
-$\mathbf{α}$ and estimating $({\mathbf{θ}},{\mathbf{β}})$ via GLM.
-Iteration continues until the relative change in deviance falls below a
-tolerance. Each sub-problem is a standard generalized linear model
-solved by iterative weighted least squares, so the full estimation
-reduces to a sequence of low-dimensional optimizations. This is
-substantially faster than the Bayesian approach originally used for
-bilinear network autoregressions.
+Two estimation approaches are available:
 
-The package also provides a direct BFGS method (`method = "optim"`) that
-optimizes all parameters simultaneously using analytical gradients
-computed via C++. This approach can converge faster for small networks
-but tends to be less stable when $p$ is large.
+- **Alternating GLM/IRLS** (`method = "ALS"`, the default): alternates
+  between updating $`(\theta, \alpha)`$ with $`\beta`$ fixed and
+  $`(\theta, \beta)`$ with $`\alpha`$ fixed. Holding one influence
+  vector fixed makes the model linear in the other, so each update is a
+  GLM/IRLS subproblem. The `"ALS"` method name is retained for API
+  compatibility.
+- **optim**: maximizes the full log-likelihood jointly using BFGS with
+  analytic gradients.
 
-## Inference
+The alternating GLM/IRLS engine is generally more stable and is the
+default.
 
-Standard errors come from the Hessian of the log-likelihood at the MLE.
-The package computes classical standard errors from the observed
-information matrix $H^{- 1}$ as well as robust (sandwich) standard
-errors $H^{- 1}SH^{- 1}$, where $S$ is the empirical score covariance.
-The sandwich estimator remains valid under model misspecification.
+## Standard errors
 
-The Hessian can be ill-conditioned in bilinear models, and the package
-warns when this occurs. In such cases, bootstrap standard errors via
-[`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
-provide a more reliable basis for inference. The bootstrap supports both
-block resampling of time periods and parametric simulation from the
-fitted model.
+Several uncertainty summaries are available:
 
-## Choosing a model configuration
+- **Classical**: the inverse Hessian, valid when the model is correctly
+  specified, the Hessian is well conditioned, and dyad-period scores are
+  independent.
+- **Robust (HC0)**: a sandwich estimator for heteroskedasticity or
+  overdispersion; it does not model shared-actor dyadic dependence.
+- **Cluster**: a multiway cluster-robust sandwich on sender, receiver,
+  and time margins; this is the usual starting point for directed
+  network data when the Hessian bread is stable.
+- **Bootstrap/jackknife**: `boot_sir(type = "block")` resamples whole
+  periods as independent blocks, preserving within-period network
+  dependence but not serial dependence, while `boot_sir(type = "dyad")`
+  is a delete-one-actor jackknife.
 
-| Consideration                                      | Full bilinear | Fixed receiver |
-|:---------------------------------------------------|:-------------:|:--------------:|
-| Both sender and receiver influence                 |       ✓       |                |
-| Standard GLM with well-conditioned standard errors |               |       ✓        |
-| Bilinear identification resolved                   |               |       ✓        |
-| Richer influence structure                         |       ✓       |                |
-| Fewer parameters                                   |               |       ✓        |
+If the Hessian is numerically singular the package falls back to a
+generalized inverse and warns. A *near*-singular (but invertible)
+Hessian will not trigger a warning, so also watch for a large gap
+between the classical and robust SEs as a practical signal of weak
+identification. Cluster SEs address dependence in the score, not weak
+identification in the Hessian; when `se_reliable` is `FALSE`, prefer
+refitting, simplifying the model, or using the dyad jackknife as a
+sensitivity check. See
+[`vignette("sir_inference")`](https://netify-dev.github.io/sir/articles/sir_inference.md)
+for worked examples.
 
-For exploratory analysis, the fixed-receiver specification is a
-reasonable starting point: fewer parameters, no identification issues,
-and proper standard errors from the GLM. The full bilinear model is
-appropriate when there is reason to believe that both sender and
-receiver channels contribute to influence dynamics.
+## When to use SIR
 
-| Consideration                       | ALS | Direct optimization |
-|:------------------------------------|:---:|:-------------------:|
-| High-dimensional problems           |  ✓  |                     |
-| Small problems (fast convergence)   |     |          ✓          |
-| Numerical stability                 |  ✓  |                     |
-| Simultaneous parameter optimization |     |          ✓          |
+SIR is appropriate when you have a directed network observed over time
+and want to explain lagged, model-implied *temporal influence* – how the
+prior network predicts future ties through observed channels – using
+**observed** actor/dyad covariates. It is complementary to the main
+latent relational models:
 
-## Citation
+- **SIR**: influence is a function of measured covariates `W` (alliance,
+  distance, shared membership, …). Use it when you can name the features
+  you think drive influence and want interpretable coefficients for
+  them.
+- **Latent space models (LSM)**: place actors in an unobserved geometric
+  space; good for visualizing positions/clustering when you cannot
+  specify the drivers.
+- **AMEN / latent factor models**: capture additive sender/receiver
+  effects and multiplicative (stochastic-equivalence) structure with
+  latent factors; good for flexible dependence when covariate
+  explanation is secondary.
+- **ERGM**: models the network via local configuration statistics
+  (reciprocity, triangles); a cross-sectional generative model, less
+  geared to temporal covariate-driven influence.
 
-If you use this package in your research, please cite:
+A key limitation to weigh: **SIR has no contemporaneous
+latent-dependence term.** Influence enters only through the *lagged*
+state $`X_t`$, and the model carries no latent sender/receiver effects
+or multiplicative factors for the *residual* dyadic structure within a
+time period. Consequently SIR’s inference assumes dyadic independence
+given the covariates — any leftover within-period dependence
+(reciprocity, degree heterogeneity, stochastic equivalence) is unmodeled
+and can bias the reported standard errors. AMEN and latent-space models
+are preferable when that residual relational dependence is itself of
+interest, or when it is strong enough that ignoring it would distort
+uncertainty estimates; in applied work multiway cluster SEs and
+`boot_sir(type = "dyad")` are the package’s dyad-aware sensitivity
+checks. HC0 robust SEs only address heteroskedasticity/overdispersion
+under dyad-period score independence.
 
-> Minhas, S. & Hoff, P.D. (2025). Decomposing Network Dynamics: Social
-> Influence Regression. Political Analysis.
+For causal language, SIR needs the same discipline as any longitudinal
+observational design: temporal ordering, exogeneity of the included
+covariates, plausible control for time-varying confounding, and an
+intervention or scenario that is coherent for `X`, `W`, and `Z`. Without
+those assumptions, interpret the model as conditional temporal
+association.
 
-The package source code and documentation are available at
-<https://github.com/netify-dev/sir>.
+An operational noncausal report should state how `X` was constructed,
+list the direct covariates in `Z`, report cluster-robust intervals (with
+dyad jackknife or bootstrap checks for key coefficients), and present
+named model-implied scenarios as sensitivity comparisons on the response
+scale rather than as interventions.
+
+SIR also handles **undirected** networks (set `symmetric = TRUE`, which
+fixes $`B = I`$) and **bipartite / rectangular** outcomes where senders
+and receivers are distinct populations. The default bipartite fit
+estimates sender-side influence only; supplying `W_recv` estimates a
+full bilinear sender-and-receiver model, with dyad jackknife inference
+recommended; see
+[`vignette("sir_extensions")`](https://netify-dev.github.io/sir/articles/sir_extensions.md).
+
+Reach for SIR when the question is “*which observable features make
+actors influential over time, and on whom?*”
