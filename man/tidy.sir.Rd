@@ -8,7 +8,7 @@
   x,
   conf.int = FALSE,
   conf.level = 0.95,
-  se.type = c("cluster", "classical", "robust", "twoway", "dyad"),
+  se.type = c("cluster", "classical", "robust"),
   ...
 )
 }
@@ -21,10 +21,9 @@ Wald interval columns. Default \code{FALSE}.}
 \item{conf.level}{Confidence level for the interval. Default 0.95.}
 
 \item{se.type}{Which standard errors to report: \code{"cluster"} (default;
-multiway sender, receiver, and time clustering for supported static fits),
-\code{"classical"} (inverse-Hessian), \code{"robust"} (HC0 sandwich),
-\code{"twoway"} (alias for \code{"cluster"}), or \code{"dyad"}
-(directed-dyad clustering).}
+actor-clustered sandwich, each cell scored onto both endpoint actors, for
+supported static fits), \code{"classical"} (inverse-Hessian), or
+\code{"robust"} (HC0 sandwich).}
 
 \item{...}{Unused, for generic compatibility.}
 }
@@ -37,8 +36,8 @@ A data frame with columns \code{term}, \code{component},
 Returns a data frame with one row per estimated parameter, in the layout
 expected by \pkg{broom} consumers such
 as \pkg{modelsummary} and \pkg{gtsummary}. Each parameter is tagged by its
-role (\code{component}: exogenous \code{theta}, sender \code{alpha}, or
-receiver \code{beta}).
+role (\code{component}: exogenous \code{theta}, sender \code{alpha}, receiver
+\code{beta}, or shared \code{gamma} for a symmetric fit).
 }
 \examples{
 dat <- sim_sir(m = 10, T_len = 20, p = 2, q = 1, family = "poisson", seed = 1)

@@ -16,6 +16,8 @@ sim_sir(
   W = NULL,
   sigma = 1,
   seed = NULL,
+  symmetric = FALSE,
+  gain = NULL,
   ...
 )
 }
@@ -32,10 +34,11 @@ Set to 0 for no exogenous covariates.}
 \item{family}{Character string: \code{"poisson"} (default), \code{"normal"},
 or \code{"binomial"}.}
 
-\item{alpha}{Numeric vector of length p for sender influence weights.
-The first element (alpha_1) is fixed at 1 for identifiability; only
-alpha_2:p are free. If NULL (default), drawn from N(0, 0.3).
-Use \code{seed} for reproducibility.}
+\item{alpha}{Numeric vector of length p for sender influence weights. For a
+directed process the first element (alpha_1) is fixed at 1 for
+identifiability; for \code{symmetric = TRUE} all elements are kept as given
+(the anchor need not be 1). If NULL (default), drawn from N(0, 0.3) with
+alpha_1 = 1. Use \code{seed} for reproducibility.}
 
 \item{beta}{Numeric vector of length p for receiver influence weights.
 If NULL (default), drawn from N(0, 0.3).}
@@ -54,6 +57,25 @@ part of the one-mode SIR likelihood.}
 set locally and the caller's global RNG state is restored on exit, so a
 subsequent draw (e.g. \code{runif}) in the caller is left unperturbed.}
 
+\item{symmetric}{Logical. If TRUE, simulate a genuine \strong{undirected}
+network: \code{W} is symmetrized, \code{beta} is tied to \code{alpha} so
+\code{B = A}, and each \code{Y}/\code{Z} slice is symmetric. For the
+count/continuous recursion the influence covariates are rescaled (when
+auto-generated) so the symmetric gain \eqn{\rho(A)^2/(m-1)} stays below 1.
+Pairs with \code{sir(..., symmetric = TRUE)}, which fits and reports the
+shared operator as \code{gamma}; \code{sim_sir} stores that same vector in
+\code{$alpha} (which equals \code{$beta} here). Default FALSE.}
+
+\item{gain}{Optional numeric in (0, 1). Target spectral gain
+\eqn{\rho(A)\rho(B)/(m-1)} for the Poisson/Normal lagged recursion. When
+supplied, the influence operators are rescaled to hit it exactly (scaling
+\code{beta}/\code{B} for directed fits, the shared operator for symmetric,
+leaving \code{alpha_1 = 1} intact), so the influence term carries a chosen,
+strong-but-stationary share of the dynamics. Use a larger value (e.g. 0.9)
+for a strong, recoverable influence signal; values near 1 approach
+non-stationarity. NULL (default) keeps the conservative auto-rescaling.
+Ignored for \code{family = "binomial"}.}
+
 \item{...}{Unused; catches mistyped arguments and reports a clear error.}
 }
 \value{
@@ -66,7 +88,9 @@ A list with components:
       (Poisson) or \code{Y[,,t-1]} (otherwise), divided by \code{(m - 1)}.}
     \item{Z}{4D array (m x m x q x T_len) of exogenous covariates, or
       NULL if q = 0.}
-    \item{alpha}{True alpha vector (length p, with alpha_1 = 1).}
+    \item{alpha}{True alpha vector (length p; alpha_1 = 1 for directed, kept
+      as supplied for symmetric). For symmetric fits this equals \code{beta}
+      and is the shared operator reported by the fit as gamma.}
     \item{beta}{True beta vector (length p).}
     \item{theta}{True theta vector (length q).}
     \item{A}{True sender influence matrix (m x m).}
@@ -89,6 +113,18 @@ the conditional mean would saturate, making the influence parameters
 unrecoverable. The returned \code{X} already includes this scaling, so a plain
 \code{\link{sir}} fit on \code{(Y, W, X, Z)} recovers the same \code{A}, \code{B}
 used to generate the data.
+
+For the Poisson and Normal families the lagged recursion is stationary only
+when the spectral gain \eqn{\rho(A)\rho(B)/(m-1)} is below 1. By default,
+auto-generated coefficients are rescaled to a conservative gain (at most 0.8) so
+simulations are reliably stable, and user-supplied coefficients are used exactly
+as given (a gain \eqn{\ge 1} triggers an explosive-series warning). Set
+\code{gain} to target a specific value: the influence operators are then
+rescaled so \eqn{\rho(A)\rho(B)/(m-1)} equals \code{gain} exactly, letting the
+bilinear term carry a chosen, strong-but-stationary share of the dynamics. A
+larger \code{gain} (say 0.9) makes the influence mechanism dominate the lagged
+dynamics while still recovering cleanly; values near 1 approach
+non-stationarity. Binomial outcomes are bounded, so \code{gain} does not apply.
 }
 \examples{
 \dontrun{

@@ -116,7 +116,7 @@ sir_alsfit <- function(Y, W, X, Z, family, trace=FALSE, tol=1e-8, max_iter=100,
 	q <- if (is.null(Z)) 0 else dim(Z)[3]
 	n1 <- dim(Y)[1]
 	n2 <- dim(Y)[2]
-	m <- n1  # backward compat for square case
+	m <- n1  # square-case alias
 	T_len <- dim(Y)[3]
 	N_flat <- n1 * n2 * T_len  # total number of entries in flattened Y
 

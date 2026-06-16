@@ -17,3 +17,5 @@
 ^.*_files$
 ^tests/testthat/_problems$
 ^tests/testthat/testthat-problems\.rds$
+^figure$
+^.*\.out$

@@ -159,15 +159,25 @@
 #'   effects are negligible.
 #'   Default is FALSE.
 #'
-#' @param symmetric Logical. If TRUE, treats the network as undirected
-#'   (symmetric). The function uses only upper-triangle observations for
-#'   fitting and sets \code{fix_receiver = TRUE}, giving an upper-triangle,
-#'   sender-side representation of undirected data rather than a fully
-#'   order-invariant undirected bilinear model. Continuous asymmetric outcomes
-#'   are averaged across upper and lower triangles; Poisson and Binomial
-#'   outcomes must already be symmetric so averaging does not create invalid
-#'   non-integer or non-binary observations. Influence covariates W must also be
-#'   symmetric. Default is FALSE.
+#' @param symmetric Logical. If TRUE, fits the genuine \strong{undirected}
+#'   model with a single shared influence operator \eqn{A = B = \sum_k \gamma_k
+#'   W_k}, so the bilinear term is the quadratic form \eqn{A X A'}, symmetric in
+#'   \eqn{(i,j)} by construction. All \eqn{\gamma_k} are estimated (the quadratic
+#'   form's scale is identified by the data); \eqn{A} is identified only up to its
+#'   overall sign (\eqn{A X A' = (-A) X (-A)'}), fixed so the largest-magnitude
+#'   \eqn{\gamma_k} is positive. Requires a square network and symmetric,
+#'   zero-diagonal influence covariates \code{W} (non-zero W diagonals are
+#'   zeroed, since the quadratic form must be self-feedback-free); static (3D) or
+#'   dynamic (4D, time-varying) \code{W} are both supported, the dynamic case
+#'   giving a per-period operator \eqn{A_t X_t A_t'}. Continuous
+#'   asymmetric \code{Y} is averaged across triangles; Poisson/Binomial \code{Y}
+#'   must already be symmetric. Estimation is BFGS with an analytic gradient over
+#'   the upper-triangle off-diagonal cells; \code{confint()}/\code{vcov()}/
+#'   \code{tidy()} default to the actor-clustered cluster-robust SE (the same
+#'   estimator used for directed fits, with a \eqn{t(G-1)} reference), while
+#'   \code{summary()} prints the classical SE. Request classical intervals with
+#'   \code{se.type = "classical"} (see \code{\link{confint.sir}}). Cannot be
+#'   combined with \code{fix_receiver}. Default is FALSE.
 #'
 #' @param bipartite Logical or NULL. Indicates whether the network is
 #'   bipartite (senders and receivers are distinct node sets). If NULL
@@ -216,7 +226,11 @@
 #'       \code{se} (classical SE), \code{rse} (robust/sandwich SE),
 #'       \code{t_se} (z-statistic using classical SE),
 #'       \code{t_rse} (z-statistic using robust SE). Row names identify each
-#'       parameter.}
+#'       parameter. The \code{rse}/\code{t_rse} columns are \code{NA} for fits
+#'       with no separate HC0 path (notably symmetric/undirected fits; all SE
+#'       columns are \code{NA} for full-bilinear bipartite fits). The default
+#'       cluster-robust SEs/intervals come from \code{sqrt(diag(vcov(fit)))} and
+#'       \code{confint(fit)}, not from \code{summ}.}
 #'     \item{A}{Sender influence matrix. For static W: n1 x n1 matrix.
 #'       For dynamic (4D) W: n1 x n1 x T array. Off-diagonal entry A[i,k]
 #'       measures how much node k's behavior (via X) shapes node i's outgoing
@@ -230,6 +244,9 @@
 #'     \item{tab}{Numeric vector of all estimated parameters in order:
 #'       [theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p].
 #'       When \code{fix_receiver = TRUE}: [theta_1, ..., theta_q, alpha_1, ..., alpha_p].
+#'       For a symmetric fit: [theta_1, ..., theta_q, gamma_1, ..., gamma_p]
+#'       (all gamma estimated; A is identified up to global sign, fixed so the
+#'       largest-magnitude gamma is positive).
 #'       For a full-bilinear bipartite fit:
 #'       [theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p2].}
 #'     \item{theta}{Coefficients for exogenous covariates Z (length q).}
@@ -279,6 +296,18 @@
 #'     \item{convergence}{Logical, TRUE if the algorithm converged.}
 #'     \item{call}{The matched function call.}
 #'     \item{sigma2}{Estimated error variance (only for \code{family = "normal"}).}
+#'     \item{se_reliable}{Logical, FALSE if the Hessian was ill-conditioned so
+#'       the classical SEs should be treated with caution.}
+#'     \item{dynamic_W}{Logical, TRUE if W was time-varying (4D).}
+#'     \item{symmetric/gamma/operator/rho_A/gain/stationary}{Present for symmetric
+#'       (A = B) fits: \code{symmetric = TRUE}, \code{operator = "symmetric"};
+#'       \code{gamma} is the full shared-influence vector (length p, all estimated,
+#'       identified up to global sign, largest-magnitude gamma fixed positive);
+#'       \code{rho_A} is the
+#'       spectral radius of A (the max over periods for dynamic W),
+#'       \code{gain = rho_A^2 / (n - 1)} is the stationarity gain, and
+#'       \code{stationary} is \code{FALSE} when \code{gain >= 1} (the operator is
+#'       explosive and estimates may be degenerate).}
 #'   }
 #'   
 #' @references
@@ -305,8 +334,18 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 				fix_receiver=FALSE, symmetric=FALSE, bipartite=NULL,
 				W_recv=NULL, kron_mode=FALSE, seed=NULL, ...) {
 
+	if (missing(family) || is.null(family)) {
+	  cli::cli_abort(c(
+		  "{.arg family} is required.",
+		  "i" = "Choose {.val poisson} (counts), {.val normal} (continuous), or {.val binomial} (0/1 ties)."
+	  ))
+	}
 	if (!family %in% c("poisson", "normal", "binomial")) {
-	  cli::cli_abort("family must be one of {.val poisson}, {.val normal}, {.val binomial} (got {.val {family}}).")
+	  hint <- c(gaussian = "normal", gauss = "normal", logistic = "binomial",
+				bernoulli = "binomial", binary = "binomial", count = "poisson")[tolower(family)]
+	  cli::cli_abort(c(
+		  "family must be one of {.val poisson}, {.val normal}, {.val binomial} (got {.val {family}}).",
+		  if (!is.na(hint)) c("i" = "Did you mean {.val {unname(hint)}}?")))
 	}
 
 	# kron_mode is documented but not yet implemented; fail early and clearly.
@@ -315,6 +354,14 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 		  "{.arg kron_mode} is not yet implemented.",
 		  "i" = "Use the default rank-at-most-one model ({.code kron_mode = FALSE}); the unconstrained-C estimator is planned for a future release."
 	  ))
+	}
+
+	# symmetric ties A = B, fix_receiver sets B = I; the two are contradictory
+	if (isTRUE(symmetric) && isTRUE(fix_receiver)) {
+		cli::cli_abort(c(
+			"{.code symmetric = TRUE} and {.code fix_receiver = TRUE} are incompatible.",
+			"i" = "Symmetric fits tie {.code A = B}; {.code fix_receiver} sets {.code B = I}. Use one or the other."
+		))
 	}
 
 	# route full-bilinear bipartite fits
@@ -484,6 +531,137 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 		return(res)
 	}
 
+	# route undirected (A = B) fits to the symmetric estimator; fix_receiver gives
+	# the B = I path instead
+	if (isTRUE(symmetric) && !isTRUE(fix_receiver)) {
+		if (isTRUE(bipartite)) {
+			cli::cli_abort("{.arg symmetric} = TRUE is not compatible with {.arg bipartite}.")
+		}
+		dimsY <- dim(Y)
+		if (length(dimsY) != 3) cli::cli_abort("Y must be a 3D array (n x n x T).")
+		n1 <- dimsY[1]; n2 <- dimsY[2]; T_len <- dimsY[3]
+		if (n1 != n2) cli::cli_abort("{.arg symmetric} = TRUE requires a square network (n1 == n2).")
+		if (is.null(W) || is.null(X)) cli::cli_abort("Symmetric fits require both {.arg W} and {.arg X}.")
+		# input validation (the symmetric path returns before the main-path block):
+		# abort on non-finite Y/W/Z, validate the family domain of Y, zero-fill NA
+		# in X. mirrors the directed path so malformed input fails loudly, not with
+		# an opaque base-R error or a silent corrupt-success fit.
+		if (any(is.infinite(Y) | is.nan(Y), na.rm = TRUE)) {
+			cli::cli_abort("Y contains non-finite values (Inf/NaN). Remove or impute these before fitting.")
+		}
+		Y_obs <- Y[!is.na(Y)]
+		if (family == "binomial" && any(Y_obs != 0 & Y_obs != 1)) {
+			cli::cli_abort("Binomial family requires Bernoulli outcomes coded 0/1.")
+		}
+		if (family == "poisson") {
+			if (any(Y_obs < 0)) cli::cli_abort("Poisson family requires non-negative Y values.")
+			if (any(abs(Y_obs - round(Y_obs)) > 1e-8)) {
+				cli::cli_abort("Poisson family requires integer count outcomes.")
+			}
+		}
+		if (any(is.infinite(W) | is.nan(W), na.rm = TRUE)) {
+			cli::cli_abort("W contains non-finite values (Inf/NaN). Remove or impute these before fitting.")
+		}
+		if (any(is.infinite(X) | is.nan(X), na.rm = TRUE)) {
+			cli::cli_abort("X contains non-finite values (Inf/NaN). Remove or impute these before fitting.")
+		}
+		if (anyNA(X)) {
+			n_na_x <- sum(is.na(X))
+			cli::cli_inform("Replacing {.val {n_na_x}} NA value{?s} in {.arg X} with 0.")
+			X[is.na(X)] <- 0
+		}
+		if (!is.null(Z) && any(is.infinite(Z) | is.nan(Z), na.rm = TRUE)) {
+			cli::cli_abort("Z contains non-finite values (Inf/NaN). Remove or impute these before fitting.")
+		}
+		W_dynamic <- length(dim(W)) == 4
+		if (W_dynamic && dim(W)[4] != T_len) {
+			cli::cli_abort("Dynamic (4D) {.arg W} has {.val {dim(W)[4]}} time slices but Y has {.val {T_len}}.")
+		}
+		# all p gammas are free, so p >= 1 always leaves something to estimate
+		# undirected discrete outcomes must already be symmetric (no averaging)
+		sym_dev <- abs(Y - aperm(Y, c(2, 1, 3)))
+		Y_sym_diff <- if (all(is.na(sym_dev))) 0 else max(sym_dev, na.rm = TRUE)
+		if (Y_sym_diff > 1e-8) {
+			if (family %in% c("poisson", "binomial")) {
+				cli::cli_abort(c(
+					"For {.arg symmetric} = TRUE with {.val {family}} outcomes, {.arg Y} must already be symmetric.",
+					"i" = "Averaging asymmetric discrete outcomes can create invalid non-integer or non-binary values."
+				))
+			}
+			cli::cli_inform("Symmetrizing {.arg Y}: max|Y - Y'| = {.val {sprintf('%.4f', Y_sym_diff)}}.")
+			Y <- (Y + aperm(Y, c(2, 1, 3))) / 2
+		}
+		# an asymmetric X would make the quadratic form A X A' asymmetric, so
+		# symmetrize the influence-carrying state the same way as Y
+		x_dev <- abs(X - aperm(X, c(2, 1, 3)))
+		X_sym_diff <- if (all(is.na(x_dev))) 0 else max(x_dev, na.rm = TRUE)
+		if (is.finite(X_sym_diff) && X_sym_diff > 1e-8) {
+			cli::cli_inform("Symmetrizing {.arg X}: max|X - X'| = {.val {sprintf('%.4f', X_sym_diff)}}.")
+			X <- (X + aperm(X, c(2, 1, 3))) / 2
+		}
+		# W must be symmetric and zero-diagonal (each slice, every period) so
+		# diag(A) = 0. handle static (3D) and dynamic (4D) W uniformly.
+		p_sym <- dim(W)[3]
+		w_slice <- function(k, t) if (W_dynamic) W[, , k, t] else W[, , k]
+		t_seq <- if (W_dynamic) seq_len(T_len) else 1L
+		for (k in seq_len(p_sym)) for (tt in t_seq) {
+			if (max(abs(w_slice(k, tt) - t(w_slice(k, tt)))) > 1e-8) {
+				cli::cli_abort("For {.arg symmetric} = TRUE, every slice of {.arg W} must be symmetric.")
+			}
+		}
+		diag_nonzero <- function(M) sum(abs(diag(M)) > 1e-12)
+		n_wdiag <- 0
+		for (k in seq_len(p_sym)) for (tt in t_seq) n_wdiag <- n_wdiag + diag_nonzero(w_slice(k, tt))
+		if (n_wdiag > 0) {
+			cli::cli_inform("Zeroing {.val {n_wdiag}} non-zero diagonal entr{?y/ies} in {.arg W} (self-influence is not modelled).")
+			if (W_dynamic) { for (k in seq_len(p_sym)) for (tt in seq_len(T_len)) diag(W[, , k, tt]) <- 0 }
+			else { for (k in seq_len(p_sym)) diag(W[, , k]) <- 0 }
+		}
+		anchor1 <- if (W_dynamic) W[, , 1, 1] else W[, , 1]
+		a1_offdiag <- anchor1[upper.tri(anchor1)]
+		if (length(a1_offdiag) > 1 && var(a1_offdiag) < 1e-12) {
+			cli::cli_warn("The first influence covariate {.arg W[,,1]} has near-constant off-diagonal; its loading may be weakly identified.")
+		}
+		# with one period (or an all-zero X) the bilinear term A X A' carries no
+		# information, so the influence operator is unidentified
+		x_finite <- X[is.finite(X)]
+		if (T_len == 1 || (length(x_finite) && all(abs(x_finite) < 1e-12))) {
+			cli::cli_warn(c(
+				"The influence term {.code A X A'} contributes nothing (T = 1 or {.arg X} is all zeros).",
+				"i" = "The influence operator is not identified; check that {.arg X} carries the lagged network state."
+			))
+		}
+		# the symmetric likelihood uses the upper triangle only, so a directed
+		# (asymmetric) Z would have its lower triangle ignored. warn rather than
+		# silently drop half the covariate.
+		if (!is.null(Z)) {
+			Zsd <- max(abs(Z - aperm(Z, c(2, 1, seq_along(dim(Z))[-(1:2)]))), na.rm = TRUE)
+			if (is.finite(Zsd) && Zsd > 1e-8) {
+				cli::cli_warn(c(
+					"{.arg Z} is not symmetric, but a symmetric fit uses each dyad once (upper triangle).",
+					"i" = "Only the upper triangle of {.arg Z} enters the fit; symmetrize it first (e.g. a sum, mean, or absolute difference of the directed values) if the lower triangle matters."
+				))
+			}
+		}
+		if (!is.null(seed)) {
+			if (!is.numeric(seed) || length(seed) != 1) cli::cli_abort("{.arg seed} must be a single number or NULL.")
+			if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+				old_seed <- get(".Random.seed", envir = globalenv(), inherits = FALSE)
+				on.exit(assign(".Random.seed", old_seed, envir = globalenv()), add = TRUE)
+			}
+			set.seed(seed)
+		}
+		dots <- list(...)
+		res <- .sir_symmetric(Y, W, X, Z, family,
+			max_iter = if (!is.null(dots$max_iter)) dots$max_iter else 200L,
+			tol = if (!is.null(dots$tol)) dots$tol else 1e-8,
+			n_restarts = if (!is.null(dots$n_restarts)) dots$n_restarts else 5L,
+			trace = isTRUE(dots$trace), calc_se = isTRUE(calc_se))
+		res$seed <- seed
+		res$call <- match.call()
+		return(res)
+	}
+
 	# normalize the estimation method
 	method <- switch(tolower(method[1]),
 	als = "ALS",
@@ -599,34 +777,6 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 	# warn when T=1 and influence structure is requested
 	if (T_len == 1 && !is.null(W) && !all(dim(W)[3] == 0)) {
 	  cli::cli_warn("Only one time period (T = 1). If X is all zeros the influence term A*X*B' contributes nothing. Consider whether the model is identified.")
-	}
-
-	# symmetric network handling
-	if (symmetric) {
-	  # check symmetry before masking the triangle
-	  Y_sym_diff <- max(abs(Y - aperm(Y, c(2,1,3))), na.rm = TRUE)
-	  if (Y_sym_diff > 1e-10) {
-		  if (family %in% c("poisson", "binomial")) {
-			  cli::cli_abort(c(
-				  "For {.arg symmetric} = TRUE with {.val {family}} outcomes, {.arg Y} must already be symmetric.",
-				  "i" = "Averaging asymmetric discrete outcomes can create invalid non-integer or non-binary values."
-			  ))
-		  }
-		  cli::cli_inform("Symmetrizing Y: max|Y - Y'| = {.val {sprintf('%.4f', Y_sym_diff)}}. Averaging upper and lower triangles.")
-		  Y <- (Y + aperm(Y, c(2,1,3))) / 2
-	  }
-	  # use only upper-triangle observations
-	  for (t in 1:T_len) {
-		  Y[,,t][lower.tri(Y[,,t])] <- NA
-		  diag(Y[,,t]) <- NA
-	  }
-	  # symmetrize X if provided
-	  if (!is.null(X)) {
-		  X <- (X + aperm(X, c(2,1,3))) / 2
-		  X[is.na(X)] <- 0
-	  }
-	  # undirected: only sender-side influence estimated
-	  fix_receiver <- TRUE
 	}
 
 	# detect dynamic (4D) vs static (3D) W
@@ -1372,11 +1522,30 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 	  N_obs <- sum(!is.na(Y))
 	}
 	
+	# stationarity gain rho(A) rho(B) / (m - 1) for one-mode square poisson/normal
+	# fits; a gain >= 1 means the lagged autoregression is explosive
+	dir_gain_matters <- one_mode_square && !isTRUE(fix_receiver) &&
+		family %in% c("poisson", "normal")
+	rho_one <- function(M) tryCatch(max(abs(eigen(M, only.values = TRUE)$values)),
+									error = function(e) NA_real_)
+	dir_rho_A <- if (dir_gain_matters) rho_one(A) else NA_real_
+	dir_rho_B <- if (dir_gain_matters) rho_one(B) else NA_real_
+	dir_gain <- if (dir_gain_matters && is.finite(dir_rho_A) && is.finite(dir_rho_B)) {
+		dir_rho_A * dir_rho_B / max(m - 1, 1)
+	} else NA_real_
+	dir_stationary <- if (dir_gain_matters) !(is.finite(dir_gain) && dir_gain >= 1) else NA
+	if (isFALSE(dir_stationary)) {
+		cli::cli_warn("Estimated operator is non-stationary: spectral gain rho(A) rho(B)/(m-1) = {.val {sprintf('%.2f', dir_gain)}} >= 1.")
+	}
+
 	# prepare output
 	result <- list(
 	summ = summ,
 	A    = A,
 	B    = B,
+	stationary = dir_stationary,
+	gain = dir_gain,
+	rho_A = dir_rho_A,
 	ll   = ll,
 	family = family,
 	method = method,

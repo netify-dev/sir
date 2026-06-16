@@ -14,8 +14,10 @@
 \value{
 An object of class \code{"summary.sir"} containing:
   \describe{
-    \item{coefficients}{Data frame with columns \code{coef}, \code{se},
-      \code{p.value}, and significance codes.}
+    \item{coefficients}{Data frame with columns \code{coef}, \code{se}
+      (classical SE), \code{rse} (cluster-robust SE), \code{t_se} (classical z,
+      the printed "z value"), \code{t_rse} (robust z), \code{p.value}, and
+      \code{sig} (significance codes). The printed z/p/stars are classical.}
     \item{loglik}{Log-likelihood at convergence.}
     \item{aic}{AIC value.}
     \item{bic}{BIC value.}

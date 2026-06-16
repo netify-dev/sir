@@ -75,3 +75,7 @@ fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z, family = "poisson", seed = 1)
 cv <- cv_sir(fit, initial = 12, origins = c(12, 15, 18))
 cv
 }
+\seealso{
+\code{\link{forecast.sir_fit}} for the one-off forecasts CV scores,
+  \code{\link{score_sir}} for the scoring rules used.
+}

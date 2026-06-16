@@ -9,7 +9,7 @@
   parm = NULL,
   level = 0.95,
   boot = NULL,
-  se.type = c("cluster", "classical", "robust", "twoway", "dyad"),
+  se.type = c("cluster", "classical", "robust"),
   ...
 )
 }
@@ -26,13 +26,13 @@ When provided, percentile intervals from the bootstrap distribution are
 used instead of Wald intervals.}
 
 \item{se.type}{Character. For Wald intervals, which standard errors to use:
-\code{"cluster"} (default; multiway sender, receiver, and time clustering
-for supported static fits), \code{"classical"} (inverse-Hessian),
-\code{"robust"} (HC0 sandwich), \code{"twoway"} (alias for
-\code{"cluster"}), or \code{"dyad"} (directed-dyad clustering). Cluster
-intervals still rely on the Hessian bread being stable. Ignored
-when \code{boot} is supplied. Non-classical types require \code{calc_se =
-TRUE}; cluster types are unavailable for dynamic (4D) \code{W}.}
+\code{"cluster"} (default; actor-clustered cluster-robust, with a
+\code{t(G - 1)} reference, the same estimator for directed and symmetric
+fits), \code{"classical"} (inverse-Hessian, with a normal reference -- valid
+and tighter when dyads are independent), or \code{"robust"} (HC0 for directed
+fits; maps to cluster for symmetric fits). Cluster intervals rely on the
+Hessian bread being stable. Ignored when \code{boot} is supplied; cluster is
+unavailable for dynamic (4D) \code{W}.}
 
 \item{...}{Additional arguments (unused).}
 }

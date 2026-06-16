@@ -82,15 +82,25 @@ standard errors under the usual GLM assumptions. Appropriate when receiver
 effects are negligible.
 Default is FALSE.}
 
-\item{symmetric}{Logical. If TRUE, treats the network as undirected
-(symmetric). The function uses only upper-triangle observations for
-fitting and sets \code{fix_receiver = TRUE}, giving an upper-triangle,
-sender-side representation of undirected data rather than a fully
-order-invariant undirected bilinear model. Continuous asymmetric outcomes
-are averaged across upper and lower triangles; Poisson and Binomial
-outcomes must already be symmetric so averaging does not create invalid
-non-integer or non-binary observations. Influence covariates W must also be
-symmetric. Default is FALSE.}
+\item{symmetric}{Logical. If TRUE, fits the genuine \strong{undirected}
+model with a single shared influence operator \eqn{A = B = \sum_k \gamma_k
+W_k}, so the bilinear term is the quadratic form \eqn{A X A'}, symmetric in
+\eqn{(i,j)} by construction. All \eqn{\gamma_k} are estimated (the quadratic
+form's scale is identified by the data); \eqn{A} is identified only up to its
+overall sign (\eqn{A X A' = (-A) X (-A)'}), fixed so the largest-magnitude
+\eqn{\gamma_k} is positive. Requires a square network and symmetric,
+zero-diagonal influence covariates \code{W} (non-zero W diagonals are
+zeroed, since the quadratic form must be self-feedback-free); static (3D) or
+dynamic (4D, time-varying) \code{W} are both supported, the dynamic case
+giving a per-period operator \eqn{A_t X_t A_t'}. Continuous
+asymmetric \code{Y} is averaged across triangles; Poisson/Binomial \code{Y}
+must already be symmetric. Estimation is BFGS with an analytic gradient over
+the upper-triangle off-diagonal cells; \code{confint()}/\code{vcov()}/
+\code{tidy()} default to the actor-clustered cluster-robust SE (the same
+estimator used for directed fits, with a \eqn{t(G-1)} reference), while
+\code{summary()} prints the classical SE. Request classical intervals with
+\code{se.type = "classical"} (see \code{\link{confint.sir}}). Cannot be
+combined with \code{fix_receiver}. Default is FALSE.}
 
 \item{bipartite}{Logical or NULL. Indicates whether the network is
 bipartite (senders and receivers are distinct node sets). If NULL
@@ -140,7 +150,11 @@ An object of class \code{"sir"} with the following components:
       \code{se} (classical SE), \code{rse} (robust/sandwich SE),
       \code{t_se} (z-statistic using classical SE),
       \code{t_rse} (z-statistic using robust SE). Row names identify each
-      parameter.}
+      parameter. The \code{rse}/\code{t_rse} columns are \code{NA} for fits
+      with no separate HC0 path (notably symmetric/undirected fits; all SE
+      columns are \code{NA} for full-bilinear bipartite fits). The default
+      cluster-robust SEs/intervals come from \code{sqrt(diag(vcov(fit)))} and
+      \code{confint(fit)}, not from \code{summ}.}
     \item{A}{Sender influence matrix. For static W: n1 x n1 matrix.
       For dynamic (4D) W: n1 x n1 x T array. Off-diagonal entry A[i,k]
       measures how much node k's behavior (via X) shapes node i's outgoing
@@ -154,6 +168,9 @@ An object of class \code{"sir"} with the following components:
     \item{tab}{Numeric vector of all estimated parameters in order:
       [theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p].
       When \code{fix_receiver = TRUE}: [theta_1, ..., theta_q, alpha_1, ..., alpha_p].
+      For a symmetric fit: [theta_1, ..., theta_q, gamma_1, ..., gamma_p]
+      (all gamma estimated; A is identified up to global sign, fixed so the
+      largest-magnitude gamma is positive).
       For a full-bilinear bipartite fit:
       [theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p2].}
     \item{theta}{Coefficients for exogenous covariates Z (length q).}
@@ -203,6 +220,18 @@ An object of class \code{"sir"} with the following components:
     \item{convergence}{Logical, TRUE if the algorithm converged.}
     \item{call}{The matched function call.}
     \item{sigma2}{Estimated error variance (only for \code{family = "normal"}).}
+    \item{se_reliable}{Logical, FALSE if the Hessian was ill-conditioned so
+      the classical SEs should be treated with caution.}
+    \item{dynamic_W}{Logical, TRUE if W was time-varying (4D).}
+    \item{symmetric/gamma/operator/rho_A/gain/stationary}{Present for symmetric
+      (A = B) fits: \code{symmetric = TRUE}, \code{operator = "symmetric"};
+      \code{gamma} is the full shared-influence vector (length p, all estimated,
+      identified up to global sign, largest-magnitude gamma fixed positive);
+      \code{rho_A} is the
+      spectral radius of A (the max over periods for dynamic W),
+      \code{gain = rho_A^2 / (n - 1)} is the stationarity gain, and
+      \code{stationary} is \code{FALSE} when \code{gain >= 1} (the operator is
+      explosive and estimates may be degenerate).}
   }
 }
 \description{

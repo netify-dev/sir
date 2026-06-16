@@ -54,3 +54,33 @@ test_that("sim_sir output can be fit by sir()", {
 	expect_s3_class(fit, "sir")
 	expect_equal(length(coef(fit)), 1 + 2)  # q=1 theta + p=2 alpha
 })
+
+test_that("sim_sir gain argument targets the spectral gain and strengthens influence", {
+	m = 20
+	realized_gain = function(d) {
+		ra = max(abs(eigen(d$A, only.values = TRUE)$values))
+		rb = max(abs(eigen(d$B, only.values = TRUE)$values))
+		ra * rb / (m - 1)
+	}
+
+	# targeted gain is hit exactly
+	d_strong = sim_sir(m = m, T_len = 60, p = 2, q = 2, family = "poisson",
+					   gain = 0.9, seed = 7)
+	expect_equal(realized_gain(d_strong), 0.9, tolerance = 1e-6)
+
+	# strong-gain influence stays stationary (no explosion) and recovers
+	expect_true(max(d_strong$Y) < 1e5)
+	fit = sir(d_strong$Y, W = d_strong$W, X = d_strong$X, Z = d_strong$Z,
+			  family = "poisson", calc_se = FALSE, seed = 1)
+	truth = c(d_strong$theta, d_strong$alpha[-1], d_strong$beta)
+	expect_lt(max(abs(unname(coef(fit)) - truth)), 0.1)
+
+	# default (NULL) keeps the conservative auto-cap below 0.8
+	d_default = sim_sir(m = m, T_len = 60, p = 2, q = 2, family = "poisson",
+						seed = 7)
+	expect_lt(realized_gain(d_default), 0.8 + 1e-8)
+
+	# invalid gain is rejected
+	expect_error(sim_sir(m = 8, T_len = 5, gain = 1.5, seed = 1), "gain")
+	expect_error(sim_sir(m = 8, T_len = 5, gain = -0.1, seed = 1), "gain")
+})

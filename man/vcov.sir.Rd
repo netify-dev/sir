@@ -4,26 +4,31 @@
 \alias{vcov.sir}
 \title{Variance-Covariance Matrix for SIR Model Parameters}
 \usage{
-\method{vcov}{sir}(object, type = c("cluster", "classical", "robust", "twoway", "dyad"), ...)
+\method{vcov}{sir}(object, type = c("cluster", "classical", "robust"), ...)
 }
 \arguments{
 \item{object}{A fitted \code{sir} object from \code{\link{sir}}.}
 
 \item{type}{Character string:
 \itemize{
-  \item \code{"cluster"} (default) --- multiway cluster-robust covariance
-    on sender, receiver, and time margins for directed-network data when
-    the Hessian bread is stable.
-  \item \code{"classical"} --- inverse-Hessian covariance.
-  \item \code{"robust"} --- HC0 sandwich; corrects heteroskedasticity /
-    overdispersion only, \emph{not} dyadic dependence.
-  \item \code{"twoway"} --- alias for \code{"cluster"}.
-  \item \code{"dyad"} --- clusters the directed dyad across time.
+  \item \code{"cluster"} (default) --- actor-clustered cluster-robust
+    covariance: each cell's score is stacked onto both endpoint actors and
+    summed within actor, with an HC1 small-sample factor. This is a
+    conservative actor-margin sandwich (not textbook two-way CGM), used
+    identically for directed and symmetric fits. The returned matrix carries
+    a \code{"cluster_df"} attribute (number of actor clusters minus one) that
+    \code{confint}/\code{tidy} use for the \code{t(G - 1)} reference.
+  \item \code{"classical"} --- inverse-Hessian covariance; valid when dyads
+    are independent, and tighter, but it undercovers under dyadic dependence.
+  \item \code{"robust"} --- the HC0 sandwich for directed fits; for
+    symmetric fits (which have no separate HC0 path) it aliases to
+    \code{"cluster"}.
 }
-The cluster types require the classical covariance as their bread
-(\code{calc_se = TRUE}, the default) and are unavailable for dynamic (4D)
+The cluster type requires the classical covariance as its bread
+(\code{calc_se = TRUE}, the default) and is unavailable for dynamic (4D)
 \code{W} and for full-bilinear bipartite fits (use
-\code{boot_sir(type = "dyad")} there).}
+\code{boot_sir(type = "dyad")} there). \code{confint} pairs it with a
+\code{t(G - 1)} reference (G = number of actors).}
 
 \item{...}{Additional arguments (unused).}
 }

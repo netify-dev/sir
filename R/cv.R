@@ -32,6 +32,8 @@
 #' a <- matrix(rpois(100, 2), 10, 10); diag(a) <- NA
 #' p <- a + 0.5
 #' score_sir(a, p, "poisson")
+#' @seealso \code{\link{cv_sir}} for cross-validated scoring,
+#'   \code{\link{forecast.sir_fit}} for producing the predictions to score.
 #' @export
 score_sir <- function(actual, predicted, family = c("poisson", "normal", "binomial"),
 					  drop_diagonal = TRUE) {
@@ -172,6 +174,8 @@ score_sir <- function(actual, predicted, family = c("poisson", "normal", "binomi
 #' fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z, family = "poisson", seed = 1)
 #' cv <- cv_sir(fit, initial = 12, origins = c(12, 15, 18))
 #' cv
+#' @seealso \code{\link{forecast.sir_fit}} for the one-off forecasts CV scores,
+#'   \code{\link{score_sir}} for the scoring rules used.
 #' @export
 cv_sir <- function(object, initial = NULL, horizon = 1L, origins = NULL,
 				   baseline = TRUE, ...) {

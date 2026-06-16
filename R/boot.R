@@ -14,6 +14,7 @@
 	P <- length(sir_fit$tab)
 	bipartite <- isTRUE(sir_fit$bipartite)
 	fr <- isTRUE(sir_fit$fix_receiver)
+	sym <- isTRUE(sir_fit$symmetric)
 	dynamic_W <- isTRUE(sir_fit$dynamic_W)
 
 	z_sub <- function(i1, i2) {
@@ -30,16 +31,33 @@
 					 W = if (dynamic_W) W[i1, i1, , , drop = FALSE] else W[i1, i1, , drop = FALSE],
 					 X = X[i1, i2, , drop = FALSE], Z = z_sub(i1, i2),
 					 family = family, method = "ALS", calc_se = FALSE,
-					 bipartite = bipartite,
+					 bipartite = bipartite, symmetric = sym,
 					 fix_receiver = fr, max_iter = 100, tol = 1e-6)
 		if (!is.null(W_recv)) args$W_recv <- W_recv[i2, i2, , drop = FALSE]
-		tab <- tryCatch({
+		# per-refit warnings (small-subnetwork gain, etc.) are expected across
+		# delete-one fits and would flood the console, so silence them here
+		tab <- tryCatch(suppressWarnings({
 			fit <- do.call(sir, args)
 			if (!isTRUE(fit$convergence)) return(NULL)
 			fit$tab
-		}, error = function(e) NULL)
+		}), error = function(e) NULL)
 		if (is.null(tab) || length(tab) != P) NULL else tab
 	}
+	# symmetric A is identified up to global sign; flip each refit's gamma block to
+	# agree with the point estimate so resampled signs do not cancel in the variance
+	align_sign <- function(mat) {
+		if (!sym || is.null(mat) || !nrow(mat)) return(mat)
+		q <- if (is.null(sir_fit$q)) 0L else sir_fit$q
+		p <- if (is.null(sir_fit$p)) 0L else sir_fit$p
+		gidx <- q + seq_len(p)
+		if (ncol(mat) < max(gidx)) return(mat)
+		pg <- sir_fit$tab[gidx]
+		flip <- vapply(seq_len(nrow(mat)),
+					   function(k) sum(mat[k, gidx] * pg, na.rm = TRUE) < 0, logical(1))
+		mat[flip, gidx] <- -mat[flip, gidx]
+		mat
+	}
+
 	# jackknife covariance from the delete-one estimates of one margin
 	jk_cov <- function(mat) {
 		g <- nrow(mat)
@@ -52,10 +70,10 @@
 
 		if (bipartite || n1 != n2) {
 			# bipartite: drop senders and receivers separately, sum the covariances
-			Ms <- do.call(rbind, Filter(Negate(is.null),
-				lapply(seq_len(n1), function(a) refit(setdiff(seq_len(n1), a), seq_len(n2)))))
-			Mr <- do.call(rbind, Filter(Negate(is.null),
-				lapply(seq_len(n2), function(a) refit(seq_len(n1), setdiff(seq_len(n2), a)))))
+			Ms <- align_sign(do.call(rbind, Filter(Negate(is.null),
+				lapply(seq_len(n1), function(a) refit(setdiff(seq_len(n1), a), seq_len(n2))))))
+			Mr <- align_sign(do.call(rbind, Filter(Negate(is.null),
+				lapply(seq_len(n2), function(a) refit(seq_len(n1), setdiff(seq_len(n2), a))))))
 			gs <- if (is.null(Ms)) 0L else nrow(Ms)
 			gr <- if (is.null(Mr)) 0L else nrow(Mr)
 			n_valid <- gs + gr
@@ -67,8 +85,8 @@
 			}
 		} else {
 			# square directed: drop the same actor from both axes together
-			M <- do.call(rbind, Filter(Negate(is.null),
-				lapply(seq_len(n1), function(a) { k <- setdiff(seq_len(n1), a); refit(k, k) })))
+			M <- align_sign(do.call(rbind, Filter(Negate(is.null),
+				lapply(seq_len(n1), function(a) { k <- setdiff(seq_len(n1), a); refit(k, k) }))))
 			n_valid <- if (is.null(M)) 0L else nrow(M)
 			n_total <- n1
 			V <- jk_cov(M)
@@ -282,9 +300,12 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric", "dyad"),
 			# resample W's time dimension for dynamic (4D) W
 			W_b <- if (dynamic_W) W[,,, t_idx, drop = FALSE] else W
 		} else {
-			# parametric: simulate from fitted model. full-bilinear bipartite fits
-			# need the two-sided linear predictor (B is not the identity).
-			eta <- if (!is.null(W_recv)) {
+			# parametric: simulate from fitted model. symmetric fits use the
+			# quadratic-form predictor; full-bilinear bipartite fits need the
+			# two-sided linear predictor (B is not the identity).
+			eta <- if (isTRUE(sir_fit$symmetric)) {
+				eta_tab_symmetric(sir_fit$tab, W, X, Z, sir_fit$p, sir_fit$q)
+			} else if (!is.null(W_recv)) {
 				eta_tab_bipartite(sir_fit$tab, W, W_recv, X, Z,
 								  sir_fit$p, sir_fit$p2, sir_fit$q)
 			} else {
@@ -316,6 +337,7 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric", "dyad"),
 			tryCatch({
 				refit_args <- list(Y_b, W_b, X_b, Z_b, family = family,
 								   method = "ALS", calc_se = FALSE,
+								   symmetric = isTRUE(sir_fit$symmetric),
 								   fix_receiver = isTRUE(sir_fit$fix_receiver),
 								   bipartite = isTRUE(sir_fit$bipartite),
 								   kron_mode = isTRUE(sir_fit$kron_mode),
@@ -367,6 +389,22 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric", "dyad"),
 	}
 	if (n_valid < 2) {
 		cli::cli_abort("Bootstrap produced fewer than 2 valid replicates; intervals and SEs are undefined.")
+	}
+
+	# symmetric A is identified up to global sign; align each replicate's gamma
+	# block to the point estimate so resampled signs do not cancel
+	if (isTRUE(sir_fit$symmetric)) {
+		q <- if (is.null(sir_fit$q)) 0L else sir_fit$q
+		p <- if (is.null(sir_fit$p)) 0L else sir_fit$p
+		gidx <- q + seq_len(p)
+		if (ncol(boot_coefs) >= max(gidx)) {
+			pg <- point_est[gidx]
+			for (b in which(valid)) {
+				if (sum(boot_coefs[b, gidx] * pg, na.rm = TRUE) < 0) {
+					boot_coefs[b, gidx] <- -boot_coefs[b, gidx]
+				}
+			}
+		}
 	}
 
 	boot_se <- apply(boot_coefs[valid, , drop = FALSE], 2, sd)

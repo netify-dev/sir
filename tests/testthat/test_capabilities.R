@@ -166,7 +166,7 @@ test_that("sim_sir catches mistyped time arguments and handles T_len = 1", {
   expect_equal(dim(d$Y)[3], 1)
 })
 
-# --- regression tests for the 15-agent review findings ---
+# --- predictive spine, bipartite, and inference regression checks ---
 
 test_that("F20: sir()/cv_sir() do not clobber a global variable named 'fit'", {
   dat <- sim_sir(m = 8, T_len = 14, p = 2, q = 1, family = "poisson", seed = 3)
@@ -421,4 +421,22 @@ test_that("discrete families reject impossible outcome domains", {
 	Y_bin <- array(0, dim = c(4, 4, 3))
 	Y_bin[1, 2, 1] <- 0.5
 	expect_error(sir(Y_bin, W = NULL, X = NULL, family = "binomial"), "0/1")
+})
+
+test_that("directed + symmetric share one actor-clustered SE default (t reference)", {
+	# directed fit: default vcov/confint are the actor cluster sandwich
+	dd = sim_sir(m = 12, T_len = 25, p = 2, q = 1, family = "poisson", seed = 21)
+	fd = suppressWarnings(sir(dd$Y, W = dd$W, X = dd$X, Z = dd$Z, family = "poisson", seed = 1))
+	vd = vcov(fd)                      # default
+	expect_true(all(is.finite(vd)))
+	expect_equal(vd, vcov(fd, type = "cluster"))      # default == cluster
+	# cluster carries the t(G-1) df attribute
+	expect_true(is.finite(attr(vcov(fd, type = "cluster"), "cluster_df")))
+	# classical still distinct and available
+	expect_false(isTRUE(all.equal(vd, vcov(fd, type = "classical"))))
+
+	# symmetric fit: same unified default
+	ds = sim_sir(m = 12, T_len = 40, p = 2, q = 1, family = "normal", symmetric = TRUE, seed = 7)
+	fs = suppressWarnings(sir(ds$Y, W = ds$W, X = ds$X, Z = ds$Z, family = "normal", symmetric = TRUE, seed = 1))
+	expect_equal(confint(fs), confint(fs, se.type = "cluster"))
 })

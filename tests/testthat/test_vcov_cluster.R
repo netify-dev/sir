@@ -31,25 +31,4 @@ test_that("cluster-robust vcov is a valid PSD covariance, exposed via vcov/confi
 	ci = confint(fit, se.type = "cluster")
 	expect_equal(nrow(ci), length(coef(fit)))
 	expect_true(all(is.finite(ci)))
-
-	# dyad clustering also produces a valid covariance
-	Vd = vcov(fit, type = "dyad")
-	expect_true(all(is.finite(Vd)))
-})
-
-test_that("cluster and twoway aliases agree", {
-	set.seed(3)
-	dat = sim_sir(m = 9, T_len = 18, p = 2, q = 2, family = "poisson", seed = 3)
-	fit = sir(
-		dat$Y,
-		W = dat$W,
-		X = dat$X,
-		Z = dat$Z,
-		family = "poisson",
-		calc_se = TRUE,
-		seed = 3
-	)
-
-	expect_equal(vcov(fit, type = "cluster"), vcov(fit, type = "twoway"))
-	expect_true(all(is.finite(vcov(fit, type = "dyad"))))
 })

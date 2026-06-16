@@ -3,7 +3,7 @@
 # temporal recursion that turns a predicted mean into the next-period lag X.
 
 #' @importFrom generics forecast
-#' @importFrom stats predict
+#' @importFrom stats predict qlogis var
 #' @export
 generics::forecast
 
@@ -75,6 +75,9 @@ generics::forecast
 #' fc1 <- forecast(fit, h = 1, Z_future = Z_next)
 #' dim(fc1)
 #' score_sir(dat$Y[, , train_t + 1, drop = FALSE], fc1, "poisson")
+#' @seealso \code{\link{cv_sir}} for rolling-origin cross-validation,
+#'   \code{\link{score_sir}} for scoring forecasts, \code{\link{predict.sir}}
+#'   for in-sample / scenario predictions.
 #' @export
 forecast.sir_fit <- function(object, h = 1L, Z_future = NULL, W_future = NULL,
 							 Y_last = NULL, infl_scale = NULL, ...) {
@@ -121,7 +124,14 @@ forecast.sir_fit <- function(object, h = 1L, Z_future = NULL, W_future = NULL,
 	if (object$p > 0L && object$n_periods >= 2 &&
 		!is.null(object$X) && !is.null(object$Y)) {
 		t_chk <- object$n_periods
-		implied <- to_lag(object$Y[, , t_chk - 1])
+		Yprev_chk <- object$Y[, , t_chk - 1]
+		# symmetric fits mask the lower triangle of Y; reflect it so the implied
+		# lag matches the (symmetric) X the model was actually fit on
+		if (isTRUE(object$symmetric)) {
+			lo <- lower.tri(Yprev_chk)
+			Yprev_chk[lo] <- t(Yprev_chk)[lo]
+		}
+		implied <- to_lag(Yprev_chk)
 		stored  <- object$X[, , t_chk]
 		off <- if (n1 == n2 && !bipartite) (row(implied) != col(implied)) else array(TRUE, dim(implied))
 		denom <- max(stats::sd(stored[off]), 1e-8)
@@ -156,6 +166,13 @@ forecast.sir_fit <- function(object, h = 1L, Z_future = NULL, W_future = NULL,
 	# seed the first lag from the last observed outcome
 	if (is.null(Y_last)) {
 		Y_last <- object$Y[, , object$n_periods]
+		# symmetric fits store Y with the lower triangle masked to NA; reflect the
+		# upper triangle back so the lag X is the full symmetric matrix, not a
+		# half-zeroed one
+		if (isTRUE(object$symmetric)) {
+			lo <- lower.tri(Y_last)
+			Y_last[lo] <- t(Y_last)[lo]
+		}
 	} else if (!is.matrix(Y_last) || nrow(Y_last) != n1 || ncol(Y_last) != n2) {
 		cli::cli_abort("{.arg Y_last} must be a {n1} x {n2} matrix.")
 	}

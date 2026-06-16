@@ -101,3 +101,8 @@ fc1 <- forecast(fit, h = 1, Z_future = Z_next)
 dim(fc1)
 score_sir(dat$Y[, , train_t + 1, drop = FALSE], fc1, "poisson")
 }
+\seealso{
+\code{\link{cv_sir}} for rolling-origin cross-validation,
+  \code{\link{score_sir}} for scoring forecasts, \code{\link{predict.sir}}
+  for in-sample / scenario predictions.
+}

@@ -18,18 +18,17 @@ generics::augment
 #' Returns a data frame with one row per estimated parameter, in the layout
 #' expected by \pkg{broom} consumers such
 #' as \pkg{modelsummary} and \pkg{gtsummary}. Each parameter is tagged by its
-#' role (\code{component}: exogenous \code{theta}, sender \code{alpha}, or
-#' receiver \code{beta}).
+#' role (\code{component}: exogenous \code{theta}, sender \code{alpha}, receiver
+#' \code{beta}, or shared \code{gamma} for a symmetric fit).
 #'
 #' @param x A fitted \code{sir} object from \code{\link{sir}}.
 #' @param conf.int Logical; if \code{TRUE}, add \code{conf.low}/\code{conf.high}
 #'   Wald interval columns. Default \code{FALSE}.
 #' @param conf.level Confidence level for the interval. Default 0.95.
 #' @param se.type Which standard errors to report: \code{"cluster"} (default;
-#'   multiway sender, receiver, and time clustering for supported static fits),
-#'   \code{"classical"} (inverse-Hessian), \code{"robust"} (HC0 sandwich),
-#'   \code{"twoway"} (alias for \code{"cluster"}), or \code{"dyad"}
-#'   (directed-dyad clustering).
+#'   actor-clustered sandwich, each cell scored onto both endpoint actors, for
+#'   supported static fits), \code{"classical"} (inverse-Hessian), or
+#'   \code{"robust"} (HC0 sandwich).
 #' @param ... Unused, for generic compatibility.
 #'
 #' @return A data frame with columns \code{term}, \code{component},
@@ -44,27 +43,45 @@ generics::augment
 #' @importFrom generics tidy
 #' @export
 tidy.sir <- function(x, conf.int = FALSE, conf.level = 0.95,
-					 se.type = c("cluster", "classical", "robust", "twoway", "dyad"), ...) {
+					 se.type = c("cluster", "classical", "robust"), ...) {
+	default_se <- missing(se.type)
 	se.type <- match.arg(se.type)
+	# dynamic w has no cluster sandwich, so the default call falls back to classical
+	if (default_se && se.type == "cluster" &&
+		!is.null(x$W) && length(dim(x$W)) == 4L) {
+		cli::cli_inform("Cluster-robust SEs are unavailable for dynamic (4D) W; using classical Wald SEs (see {.fn confint}).")
+		se.type <- "classical"
+	}
 	summ <- x$summ
 	term <- rownames(summ)
 	if (is.null(term)) term <- paste0("p", seq_len(nrow(summ)))
 
-	# component from the (Z)/(alphaW)/(betaW)/(betaWr) name tags sir attaches.
-	# the receiver side of a bipartite fit is tagged (betaWr), so match (betaW
-	# without requiring the closing paren immediately after.
+	# map the name tag to a component; ^\(betaW catches both (betaW) and (betaWr)
 	component <- ifelse(grepl("^\\(alphaW", term), "alpha",
-				 ifelse(grepl("^\\(betaW", term), "beta", "theta"))
+				 ifelse(grepl("^\\(betaW", term), "beta",
+				 ifelse(grepl("^\\(gammaW", term), "gamma", "theta")))
 
+	# se + reference distribution mirror confint.sir: cluster sandwich SEs use a
+	# t(G-1) reference (df on the vcov "cluster_df" attr), classical/HC0 use normal
+	is_sym <- isTRUE(x$symmetric) && identical(x$operator, "symmetric")
+	crit_df <- Inf
 	se <- if (se.type == "classical") {
 		if (isFALSE(x$se_reliable)) rep(NA_real_, nrow(summ)) else summ$se
-	} else if (se.type == "robust") {
+	} else if (se.type == "robust" && !is_sym) {
 		if (isFALSE(x$se_reliable)) rep(NA_real_, nrow(summ)) else summ$rse
 	} else {
-		sqrt(diag(vcov(x, type = se.type)))
+		Vc <- vcov(x, type = se.type)
+		crit_df <- attr(Vc, "cluster_df")
+		sqrt(diag(Vc))
 	}
 	tstat <- if (!is.null(se)) summ$coef / se else rep(NA_real_, nrow(summ))
-	pval <- if (!is.null(se)) 2 * stats::pnorm(abs(tstat), lower.tail = FALSE) else rep(NA_real_, nrow(summ))
+	pval <- if (is.null(se)) {
+		rep(NA_real_, nrow(summ))
+	} else if (is.null(crit_df) || !is.finite(crit_df) || crit_df < 1) {
+		2 * stats::pnorm(abs(tstat), lower.tail = FALSE)
+	} else {
+		2 * stats::pt(abs(tstat), df = crit_df, lower.tail = FALSE)
+	}
 
 	# flag the silent all-NA-inference case so it doesn't land unnoticed in a
 	# publication table (happens when the fit used calc_se = FALSE)

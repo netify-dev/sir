@@ -1,5 +1,5 @@
 #' @importFrom cli cli_h1 cli_h2 cli_text cli_ul cli_alert_success cli_alert_warning cli_rule cli_abort cli_warn cli_inform
-#' @importFrom stats printCoefmat deviance quantile pnorm symnum AIC BIC logLik fitted residuals coef confint nobs qnorm sd
+#' @importFrom stats printCoefmat deviance quantile pnorm symnum AIC BIC logLik fitted residuals coef confint nobs qnorm qt sd
 #' @keywords internal
 NULL
 
@@ -13,12 +13,12 @@ NULL
 #'
 #' @param object A fitted \code{sir} object from \code{\link{sir}}.
 #' @param ... Additional arguments (unused).
-#' @return Named numeric vector of estimated coefficients. Names use the
-#'   \code{(Z)} / \code{(alphaW)} / \code{(betaW)} tagging from
+#' @return Named numeric vector of estimated coefficients, tagged as in
 #'   \code{summary()}: \code{(Z)} = exogenous direct effects (theta);
-#'   \code{(alphaW)} = sender-influence weights (alpha_2..alpha_p, since
-#'   alpha_1 = 1 is fixed for identifiability); \code{(betaW)} = receiver-
-#'   influence weights (beta).
+#'   \code{(alphaW)} = sender-influence weights (alpha_2..alpha_p for a directed
+#'   fit, since alpha_1 = 1 is fixed); \code{(betaW)} = receiver-influence weights
+#'   (beta); \code{(gammaW)} = shared undirected weights for a symmetric fit (all
+#'   gamma_1..gamma_p estimated, identified up to sign).
 #' @seealso \code{\link{confint.sir}} for confidence intervals,
 #'   \code{\link{vcov.sir}} for the variance-covariance matrix.
 #' @export
@@ -58,7 +58,10 @@ fitted.sir <- function(object, ...) {
 #'   (default), \code{"pearson"}, or \code{"response"}.
 #' @param ... Additional arguments (unused).
 #' @return An array with the same dimensions as \code{Y} containing the
-#'   requested residuals. Contains NA where \code{Y} is missing.
+#'   requested residuals. Contains NA where \code{Y} is missing. For a symmetric
+#'   fit only the upper-triangle off-diagonal cells (the ones in the likelihood)
+#'   are populated; the lower triangle and diagonal are NA, whereas
+#'   \code{fitted()} returns the full symmetric matrix.
 #' @export
 residuals.sir <- function(object, type = c("deviance", "pearson", "response"), ...) {
 	type <- match.arg(type)
@@ -172,8 +175,10 @@ BIC.sir <- function(object, ...) {
 #' @param ... Additional arguments (unused).
 #' @return An object of class \code{"summary.sir"} containing:
 #'   \describe{
-#'     \item{coefficients}{Data frame with columns \code{coef}, \code{se},
-#'       \code{p.value}, and significance codes.}
+#'     \item{coefficients}{Data frame with columns \code{coef}, \code{se}
+#'       (classical SE), \code{rse} (cluster-robust SE), \code{t_se} (classical z,
+#'       the printed "z value"), \code{t_rse} (robust z), \code{p.value}, and
+#'       \code{sig} (significance codes). The printed z/p/stars are classical.}
 #'     \item{loglik}{Log-likelihood at convergence.}
 #'     \item{aic}{AIC value.}
 #'     \item{bic}{BIC value.}
@@ -196,6 +201,7 @@ summary.sir <- function(object, ...) {
 	ans$fix_receiver <- isTRUE(object$fix_receiver)
 	ans$se_reliable <- object$se_reliable
 	ans$convergence <- isTRUE(object$convergence)
+	ans$stationary <- object$stationary
 
 	# model dimensions
 	ans$m <- if (!is.null(object$m)) object$m else nrow(object$A)
@@ -229,8 +235,6 @@ summary.sir <- function(object, ...) {
 	ans$loglik <- object$ll
 	ans$aic <- AIC(object)
 	ans$bic <- BIC(object)
-	ans$deviance <- if (!is.null(object$deviance)) object$deviance else -2 * object$ll
-	ans$null.deviance <- object$null.deviance
 
 	# residual deviance and (poisson/binomial) dispersion from observed vs fitted.
 	# computed on the same cells the likelihood uses: drop NA and, for square
@@ -386,7 +390,7 @@ print.summary.sir <- function(x, digits = max(3L, getOption("digits") - 3L),
 	  } else {
 		print(round(coef_mat, digits))
 	  }
-		  cli::cli_text("{.emph Std. errors above are classical (Hessian-based) and assume independent dyad-periods. For reported intervals, use {.code confint(fit)}; cluster-robust intervals are the default for supported static fits.}")
+		  cli::cli_text("{.emph Std. Error, z value, Pr(>|z|) and significance stars above are classical (Hessian-based) and may overstate significance under dyadic dependence. NOTE: {.code confint(fit)}/{.code tidy(fit)} default to {.emph cluster-robust} inference (actor-clustered, t(G-1) reference) --- the same estimator for directed and symmetric fits; request classical intervals with {.code confint(se.type = \"classical\")} if dyads are independent.}")
 		} else {
 	  # no SEs available
 	  coef_mat <- as.matrix(x$coefficients[, "coef", drop = FALSE])
@@ -402,6 +406,19 @@ print.summary.sir <- function(x, digits = max(3L, getOption("digits") - 3L),
 	}
 	} else {
 	cli::cli_text("{.emph No coefficients estimated.}")
+	}
+
+	# legend for the coefficient name prefixes (only those present in this fit)
+	if (nrow(x$coefficients) > 0) {
+		terms <- rownames(x$coefficients)
+		leg <- c(
+			if (any(grepl("^\\(Z\\)", terms))) "(Z) = direct covariate effect",
+			if (any(grepl("^\\(alphaW\\)", terms))) "(alphaW) = sender influence",
+			if (any(grepl("^\\(betaW\\)", terms))) "(betaW) = receiver influence",
+			if (any(grepl("^\\(betaWr\\)", terms))) "(betaWr) = receiver influence (bipartite)",
+			if (any(grepl("^\\(gammaW\\)", terms))) "(gammaW) = shared undirected influence"
+		)
+		if (length(leg)) cli::cli_text("{.emph {paste(leg, collapse = '; ')}}")
 	}
 
 	cli::cli_rule()
@@ -438,11 +455,18 @@ print.summary.sir <- function(x, digits = max(3L, getOption("digits") - 3L),
 	cli::cli_alert_warning("Dispersion {sprintf('%.2f', x$dispersion)} > 1 suggests overdispersion relative to the {x$family} variance assumption.")
 	}
 
-	# convergence
+	# convergence (iteration count is not tracked on the BFGS/optim paths)
 	if (x$converged) {
-	cli::cli_alert_success("Converged in {.val {x$iterations}} iterations")
+	if (!is.null(x$iterations) && is.finite(x$iterations)) {
+		cli::cli_alert_success("Converged in {.val {x$iterations}} iterations")
+	} else {
+		cli::cli_alert_success("Converged")
+	}
 	} else {
 	cli::cli_alert_warning("Did not converge")
+	}
+	if (isFALSE(x$stationary)) {
+	cli::cli_alert_warning("Operator is non-stationary (spectral gain >= 1); estimates may be degenerate")
 	}
 
 	cli::cli_rule()
@@ -464,7 +488,8 @@ print.summary.sir <- function(x, digits = max(3L, getOption("digits") - 3L),
 			 sprintf("%.4f", x$A.summary$range[2]), "]")
 	))
 
-	if (!isTRUE(x$fix_receiver)) {
+	# the symmetric operator has B = A, so do not repeat it
+	if (!isTRUE(x$fix_receiver) && !isTRUE(x$symmetric)) {
 	  cli::cli_text("{.strong B matrix (receiver effects):}")
 	  cli::cli_ul(c(
 		paste0("Mean: ", sprintf("%.4f", x$B.summary$mean)),
@@ -518,6 +543,10 @@ print.sir <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 	cli::cli_text("Status: {.field converged} | N = {.val {n_obs}} | Log-Lik: {.val {round(x$ll, 2)}} | AIC: {.val {round(AIC(x), 1)}}")
 	} else {
 	cli::cli_text("Status: {.emph not converged} | N = {.val {n_obs}} | Log-Lik: {.val {round(x$ll, 2)}}")
+	}
+	# the operator can converge to a non-stationary (explosive) regime
+	if (isFALSE(x$stationary)) {
+	cli::cli_alert_warning("Operator is non-stationary (spectral gain >= 1); estimates may be degenerate.")
 	}
 
 	# coefficients as formatted table
@@ -737,6 +766,23 @@ predict.sir <- function(object, newdata = NULL,
 						type = c("response", "link"), ...) {
 	type <- match.arg(type)
 
+	# counterfactual arrays must come through newdata; catch them passed bare (named
+	# in ...) or positionally (an unnamed array where newdata is expected)
+	dots <- list(...)
+	bad <- intersect(names(dots), c("W", "X", "Z", "W_recv"))
+	if (length(bad)) {
+		cli::cli_abort(c(
+			"{.arg {bad}} cannot be passed directly to {.fn predict}.",
+			"i" = "Pass scenario arrays via {.code newdata = list(W = ., X = ., Z = .)}."
+		))
+	}
+	if (!is.null(newdata) && !is.list(newdata)) {
+		cli::cli_abort(c(
+			"{.arg newdata} must be a named list, e.g. {.code list(W = ., X = ., Z = .)}.",
+			"i" = "You supplied a {.cls {class(newdata)[1]}}."
+		))
+	}
+
 	# full-bilinear bipartite fits carry a receiver-side W_recv and need the
 	# two-sided linear predictor; B is not the identity here.
 	if (!is.null(object$W_recv)) {
@@ -760,6 +806,27 @@ predict.sir <- function(object, newdata = NULL,
 				eta))
 		}
 		return(eta)
+	}
+
+	# symmetric (A = B) fits: shared eta_tab_symmetric helper for the A X A' form
+	if (isTRUE(object$symmetric) && identical(object$operator, "symmetric")) {
+		if (!is.null(newdata)) {
+			W_new <- if (!is.null(newdata$W)) newdata$W else object$W
+			W_new <- set_square_diagonal(W_new, 0)
+			X_new <- if (!is.null(newdata$X)) newdata$X else object$X
+			Z_new <- if (!is.null(newdata$Z)) newdata$Z else object$Z
+			validate_predict_newdata(object, W_new, X_new, Z_new)
+			eta <- eta_tab_symmetric(object$tab, W_new, X_new, Z_new, object$p, object$q)
+		} else {
+			if (type == "response") return(object$fitted.values)
+			eta <- eta_tab_symmetric(object$tab, object$W, object$X, object$Z,
+									 object$p, object$q)
+		}
+		out <- switch(object$family,
+			poisson = exp(eta), binomial = 1 / (1 + exp(-eta)), eta)
+		if (type != "response") out <- eta
+		# mirror to a full symmetric matrix with NA diagonal
+		return(.sir_prediction_mask(out, object))
 	}
 
 	fr <- isTRUE(object$fix_receiver)
@@ -818,27 +885,49 @@ predict.sir <- function(object, newdata = NULL,
 #' @param object A fitted \code{sir} object from \code{\link{sir}}.
 #' @param type Character string:
 #'   \itemize{
-#'     \item \code{"cluster"} (default) --- multiway cluster-robust covariance
-#'       on sender, receiver, and time margins for directed-network data when
-#'       the Hessian bread is stable.
-#'     \item \code{"classical"} --- inverse-Hessian covariance.
-#'     \item \code{"robust"} --- HC0 sandwich; corrects heteroskedasticity /
-#'       overdispersion only, \emph{not} dyadic dependence.
-#'     \item \code{"twoway"} --- alias for \code{"cluster"}.
-#'     \item \code{"dyad"} --- clusters the directed dyad across time.
+#'     \item \code{"cluster"} (default) --- actor-clustered cluster-robust
+#'       covariance: each cell's score is stacked onto both endpoint actors and
+#'       summed within actor, with an HC1 small-sample factor. This is a
+#'       conservative actor-margin sandwich (not textbook two-way CGM), used
+#'       identically for directed and symmetric fits. The returned matrix carries
+#'       a \code{"cluster_df"} attribute (number of actor clusters minus one) that
+#'       \code{confint}/\code{tidy} use for the \code{t(G - 1)} reference.
+#'     \item \code{"classical"} --- inverse-Hessian covariance; valid when dyads
+#'       are independent, and tighter, but it undercovers under dyadic dependence.
+#'     \item \code{"robust"} --- the HC0 sandwich for directed fits; for
+#'       symmetric fits (which have no separate HC0 path) it aliases to
+#'       \code{"cluster"}.
 #'   }
-#'   The cluster types require the classical covariance as their bread
-#'   (\code{calc_se = TRUE}, the default) and are unavailable for dynamic (4D)
+#'   The cluster type requires the classical covariance as its bread
+#'   (\code{calc_se = TRUE}, the default) and is unavailable for dynamic (4D)
 #'   \code{W} and for full-bilinear bipartite fits (use
-#'   \code{boot_sir(type = "dyad")} there).
+#'   \code{boot_sir(type = "dyad")} there). \code{confint} pairs it with a
+#'   \code{t(G - 1)} reference (G = number of actors).
 #' @param ... Additional arguments (unused).
 #' @return A square matrix with rows and columns named by parameter.
 #'   Returns NULL if standard errors were not computed (\code{calc_se = FALSE}).
 #' @seealso \code{\link{confint.sir}} for confidence intervals,
 #'   \code{\link{boot_sir}} for resampling-based inference.
 #' @export
-	vcov.sir <- function(object, type = c("cluster", "classical", "robust", "twoway", "dyad"), ...) {
+	vcov.sir <- function(object, type = c("cluster", "classical", "robust"), ...) {
+		default_type <- missing(type)
 		type <- match.arg(type)
+		# dynamic w has no cluster sandwich, so the default call falls back to
+		# classical wald rather than aborting (an explicit cluster request aborts)
+		if (default_type && type == "cluster" &&
+			!is.null(object$W) && length(dim(object$W)) == 4L) {
+			if (is.null(object$vcov)) {
+				cli::cli_abort(c(
+					"Cluster-robust SEs are unavailable for dynamic (4D) W, and classical SEs need {.code calc_se = TRUE}.",
+					"i" = "Refit with {.code calc_se = TRUE}, or use {.code boot_sir(type = \"dyad\")}."
+				))
+			}
+			cli::cli_inform(c(
+				"i" = "Cluster-robust SEs are unavailable for dynamic (4D) W; using classical Wald covariance.",
+				" " = "Use {.code boot_sir(type = \"dyad\")} for dyadic-dependence-robust inference."
+			))
+			type <- "classical"
+		}
 		if (!isTRUE(object$convergence)) {
 			cli::cli_abort(c(
 				"Model did not converge; Wald covariance estimates are not reliable.",
@@ -859,10 +948,14 @@ predict.sir <- function(object, newdata = NULL,
 			"i" = "Use {.code boot_sir()} or refit/simplify the model before reporting Wald inference."
 		))
 	}
-			if (type %in% c("cluster", "twoway", "dyad")) {
-		  # cluster-robust sandwich for dyadic dependence
-	  by <- if (type == "dyad") "dyad" else "twoway"
-	  return(.sir_vcov_cluster(object, by = by))
+			# symmetric fits have no separate HC0 path, so "robust" maps to the actor
+	# cluster-robust sandwich here
+	if (isTRUE(object$symmetric) && identical(object$operator, "symmetric") &&
+		type %in% c("robust", "cluster")) {
+		return(.sir_vcov_cluster(object))
+	}
+	if (type == "cluster") {
+	  return(.sir_vcov_cluster(object))
 	}
 	if (type == "robust") {
 	  V <- object$vcov_robust
@@ -900,13 +993,13 @@ predict.sir <- function(object, newdata = NULL,
 #'   When provided, percentile intervals from the bootstrap distribution are
 #'   used instead of Wald intervals.
 #' @param se.type Character. For Wald intervals, which standard errors to use:
-#'   \code{"cluster"} (default; multiway sender, receiver, and time clustering
-#'   for supported static fits), \code{"classical"} (inverse-Hessian),
-#'   \code{"robust"} (HC0 sandwich), \code{"twoway"} (alias for
-#'   \code{"cluster"}), or \code{"dyad"} (directed-dyad clustering). Cluster
-#'   intervals still rely on the Hessian bread being stable. Ignored
-#'   when \code{boot} is supplied. Non-classical types require \code{calc_se =
-#'   TRUE}; cluster types are unavailable for dynamic (4D) \code{W}.
+#'   \code{"cluster"} (default; actor-clustered cluster-robust, with a
+#'   \code{t(G - 1)} reference, the same estimator for directed and symmetric
+#'   fits), \code{"classical"} (inverse-Hessian, with a normal reference -- valid
+#'   and tighter when dyads are independent), or \code{"robust"} (HC0 for directed
+#'   fits; maps to cluster for symmetric fits). Cluster intervals rely on the
+#'   Hessian bread being stable. Ignored when \code{boot} is supplied; cluster is
+#'   unavailable for dynamic (4D) \code{W}.
 #' @param ... Additional arguments (unused).
 #' @return A matrix with one row per parameter and columns for the lower
 #'   and upper bounds, labeled by percentage (e.g., \code{"2.5 \%"} and
@@ -915,8 +1008,25 @@ predict.sir <- function(object, newdata = NULL,
 #'   \code{\link{vcov.sir}} for the variance-covariance matrix.
 #' @export
 	confint.sir <- function(object, parm = NULL, level = 0.95, boot = NULL,
-							se.type = c("cluster", "classical", "robust", "twoway", "dyad"), ...) {
+							se.type = c("cluster", "classical", "robust"), ...) {
+		default_se <- missing(se.type)
 		se.type <- match.arg(se.type)
+		# dynamic w has no cluster sandwich, so the default interval falls back to
+		# classical wald rather than aborting (an explicit cluster request aborts)
+		if (default_se && is.null(boot) && se.type == "cluster" &&
+			!is.null(object$W) && length(dim(object$W)) == 4L) {
+			if (is.null(object$vcov)) {
+				cli::cli_abort(c(
+					"Cluster-robust intervals are unavailable for dynamic (4D) W, and classical SEs need {.code calc_se = TRUE}.",
+					"i" = "Refit with {.code calc_se = TRUE}, or use {.code boot_sir(type = \"dyad\")} then {.code confint(fit, boot = ...)}."
+				))
+			}
+			cli::cli_inform(c(
+				"i" = "Cluster-robust intervals are unavailable for dynamic (4D) W; using classical Wald intervals.",
+				" " = "Use {.code boot_sir(type = \"dyad\")} then {.code confint(fit, boot = ...)} for dyadic-dependence-robust inference."
+			))
+			se.type <- "classical"
+		}
 		if (!is.numeric(level) || length(level) != 1L || !is.finite(level) ||
 			level <= 0 || level >= 1) {
 			cli::cli_abort("{.arg level} must be a single number between 0 and 1.")
@@ -967,7 +1077,15 @@ predict.sir <- function(object, newdata = NULL,
 		"i" = "Use {.code boot_sir()} or refit/simplify the model before reporting Wald inference."
 	  ))
 	}
-	if (se.type == "classical") {
+	# default reference is normal; cluster SEs use a t(G-1) reference (df carried
+	# on the vcov as the "cluster_df" attribute) for honest small-sample width.
+	crit_df <- Inf
+	if (isTRUE(object$symmetric) && identical(object$operator, "symmetric") &&
+		se.type != "classical") {
+	  # symmetric fits: any non-classical type is the actor cluster-robust sandwich
+	  Vc <- .sir_vcov_cluster(object)
+	  se <- sqrt(diag(Vc)); crit_df <- attr(Vc, "cluster_df")
+	} else if (se.type == "classical") {
 	  se <- object$summ$se
 	  if (is.null(se) || all(is.na(se))) {
 		cli::cli_abort("No classical standard errors available. Refit with {.code calc_se = TRUE} or provide bootstrap results via the {.arg boot} argument.")
@@ -981,10 +1099,10 @@ predict.sir <- function(object, newdata = NULL,
 		))
 	  }
 	} else {
-	  by <- if (se.type == "dyad") "dyad" else "twoway"
-	  se <- sqrt(diag(.sir_vcov_cluster(object, by = by)))
+	  Vc <- .sir_vcov_cluster(object)
+	  se <- sqrt(diag(Vc)); crit_df <- attr(Vc, "cluster_df")
 	}
-	z <- qnorm(1 - a)
+	z <- if (is.null(crit_df) || !is.finite(crit_df) || crit_df < 1) qnorm(1 - a) else qt(1 - a, crit_df)
 	ci <- cbind(cf - z * se, cf + z * se)
 	rownames(ci) <- pnames
 	colnames(ci) <- pct

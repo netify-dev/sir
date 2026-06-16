@@ -47,3 +47,7 @@ a <- matrix(rpois(100, 2), 10, 10); diag(a) <- NA
 p <- a + 0.5
 score_sir(a, p, "poisson")
 }
+\seealso{
+\code{\link{cv_sir}} for cross-validated scoring,
+  \code{\link{forecast.sir_fit}} for producing the predictions to score.
+}

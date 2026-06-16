@@ -16,7 +16,10 @@
 }
 \value{
 An array with the same dimensions as \code{Y} containing the
-  requested residuals. Contains NA where \code{Y} is missing.
+  requested residuals. Contains NA where \code{Y} is missing. For a symmetric
+  fit only the upper-triangle off-diagonal cells (the ones in the likelihood)
+  are populated; the lower triangle and diagonal are NA, whereas
+  \code{fitted()} returns the full symmetric matrix.
 }
 \description{
 Returns residuals of the specified type. Response residuals are raw

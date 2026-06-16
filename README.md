@@ -70,11 +70,11 @@ coef_table <- data.frame(
 )
 print(coef_table, row.names = FALSE)
 #>         term estimate cluster_low cluster_high
-#>       (Z) Z1    0.231       0.213        0.250
-#>       (Z) Z2   -0.369      -0.379       -0.358
-#>  (alphaW) W2    0.309       0.206        0.412
-#>   (betaW) W1   -0.162      -0.176       -0.148
-#>   (betaW) W2    0.115       0.110        0.121
+#>       (Z) Z1    0.231       0.205        0.258
+#>       (Z) Z2   -0.369      -0.386       -0.352
+#>  (alphaW) W2    0.309       0.141        0.477
+#>   (betaW) W1   -0.162      -0.188       -0.136
+#>   (betaW) W2    0.115       0.098        0.133
 
 mu0 <- predict(fit)             # fitted expected counts
 W_scen <- dat$W                 # preserve the observed W structure
@@ -118,9 +118,11 @@ plot(fit, which = 1:4)          # influence heatmaps + distributions
 ![SIR diagnostic plots](man/figures/readme-diagnostics.png)
 
 `vcov(fit)`, `confint(fit)`, and `tidy(fit, conf.int = TRUE)` use
-cluster-robust uncertainty by default for supported static directed fits. If a
-fit cannot support analytic cluster-robust inference, the accessor errors
-directly; use `boot_sir(fit, type = "dyad")` for full-bilinear bipartite fits.
+cluster-robust uncertainty by default for supported static fits, both directed
+and symmetric (undirected). For dynamic (4D) `W` the default accessors fall back
+to classical Wald inference (an explicit `type = "cluster"` still errors); use
+`boot_sir(fit, type = "dyad")` for dynamic `W` and for full-bilinear bipartite
+fits. Request classical intervals anytime with `se.type = "classical"`.
 
 The bundled `icews` dataset (50 countries x 95 months of inter-state conflict)
 provides a larger real-data example:

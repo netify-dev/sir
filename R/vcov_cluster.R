@@ -1,10 +1,10 @@
 # cluster-robust variance for sir fits.
 #
-# the sandwich V = B M B clusters the per-observation scores on sender, receiver,
-# and time margins to account for the dyadic dependence that the classical and
-# hc0 ses ignore. B is the inverse observed information (object$vcov), M is the
-# cluster-sum meat with a g/(g-1) small-cluster factor, and the result is
-# psd-repaired.
+# the sandwich V = B M B clusters the per-observation scores on the actor margin
+# (each cell's score is assigned to both endpoint actors) to account for the
+# dyadic dependence that the classical and hc0 ses ignore. B is the inverse
+# observed information (object$vcov), M is the actor-sum meat with an hc1
+# g/(g-1) factor (g = #actors), and the result is psd-repaired.
 
 # per-observation score matrix reproducing the c++ kernel's d_eta.
 .sir_obs_scores <- function(object) {
@@ -17,6 +17,12 @@
 			"Cluster-robust SEs are not implemented for dynamic (4D) W.",
 			"i" = "Use {.code boot_sir()} for inference with time-varying influence covariates."
 		))
+	}
+
+	# symmetric (A = B) fits use a dedicated score with d eta / d gamma_r =
+	# W_r X A' + A X W_r' over the upper-triangle off-diagonal cells
+	if (isTRUE(object$symmetric) && identical(object$operator, "symmetric")) {
+		return(.sir_obs_scores_symmetric(object))
 	}
 
 	n1 <- dim(X)[1]; n2 <- dim(X)[2]; T_len <- dim(X)[3]
@@ -55,7 +61,6 @@
 	score_chunks <- vector("list", T_len)
 	send_chunks  <- vector("list", T_len)
 	recv_chunks  <- vector("list", T_len)
-	time_chunks  <- vector("list", T_len)
 
 	for (t in seq_len(T_len)) {
 		Xt <- X[, , t]; Yt <- Y[, , t]
@@ -90,13 +95,11 @@
 		score_chunks[[t]] <- sc
 		send_chunks[[t]]  <- ij$i
 		recv_chunks[[t]]  <- ij$j
-		time_chunks[[t]]  <- rep.int(t, n1 * n2)
 	}
 
 	scores <- do.call(rbind, score_chunks)
 	sender <- unlist(send_chunks)
 	receiver <- unlist(recv_chunks)
-	time <- unlist(time_chunks)
 
 		# keep only modeled observations: off-diagonal for one-mode square fits and
 		# finite y. Square bipartite fits keep diagonal sender-receiver cells.
@@ -105,7 +108,57 @@
 		if (drop_diagonal) keep <- keep & (sender != receiver)
 
 	list(scores = scores[keep, , drop = FALSE],
-		 sender = sender[keep], receiver = receiver[keep], time = time[keep])
+		 sender = sender[keep], receiver = receiver[keep])
+}
+
+# per-observation scores for the symmetric (A = B) operator over the upper-
+# triangle off-diagonal cells. returns scores plus the actor
+# index for each endpoint (i, j) and the time index.
+.sir_obs_scores_symmetric <- function(object) {
+	Y <- object$Y; W <- object$W; X <- object$X; Z <- object$Z
+	family <- object$family; tab <- object$tab
+	n <- dim(X)[1]; T_len <- dim(X)[3]
+	p <- if (is.null(W)) 0L else dim(W)[3]
+	zdim <- if (!is.null(Z)) length(dim(Z)) else 0L
+	q  <- if (zdim == 4) dim(Z)[3] else if (zdim == 3) 1L else 0L
+	sig2 <- if (family == "normal" && !is.null(object$sigma2)) object$sigma2 else 1
+	theta <- if (q > 0) tab[seq_len(q)] else numeric(0)
+	gamma <- tab[q + seq_len(p)]
+	A <- matrix(matrix(W, n * n, p) %*% gamma, n, n)
+	zget <- function(k, t) if (zdim == 4) Z[, , k, t] else Z[, , t]
+	P <- q + p
+	um <- upper.tri(matrix(0, n, n))
+	ut <- which(um)
+	ij <- expand.grid(i = seq_len(n), j = seq_len(n))[ut, ]
+
+	chunks <- vector("list", T_len)
+	keepL <- vector("list", T_len)
+	for (t in seq_len(T_len)) {
+		Xt <- X[, , t]; Yt <- Y[, , t]
+		eta <- A %*% Xt %*% t(A)
+		if (q > 0) for (k in seq_len(q)) eta <- eta + theta[k] * zget(k, t)
+		mu <- switch(family,
+			poisson = exp(pmin(pmax(eta, -500), 500)),
+			binomial = pmin(pmax(1 / (1 + exp(-eta)), 1e-10), 1 - 1e-10),
+			normal = eta)
+		resid <- (Yt - mu) / sig2
+		deta <- vector("list", P); cc <- 1L
+		if (q > 0) for (k in seq_len(q)) { deta[[cc]] <- zget(k, t); cc <- cc + 1L }
+		AX <- A %*% Xt; XtA <- Xt %*% t(A)
+		for (r in seq_len(p)) {
+			Wr <- W[, , r]
+			deta[[cc]] <- Wr %*% XtA + AX %*% t(Wr); cc <- cc + 1L
+		}
+		sc <- matrix(0, length(ut), P)
+		rvec <- resid[ut]
+		for (cidx in seq_len(P)) sc[, cidx] <- rvec * deta[[cidx]][ut]
+		ok <- is.finite(Yt[ut]) & rowSums(!is.finite(sc)) == 0
+		chunks[[t]] <- sc[ok, , drop = FALSE]
+		keepL[[t]] <- cbind(i = ij$i[ok], j = ij$j[ok])
+	}
+	scores <- do.call(rbind, chunks)
+	idx <- do.call(rbind, keepL)
+	list(scores = scores, sender = idx[, "i"], receiver = idx[, "j"], symmetric = TRUE)
 }
 
 # meat for one clustering: crossprod of the per-group score sums.
@@ -122,12 +175,10 @@
 	ev$vectors %*% (lam * t(ev$vectors))
 }
 
-# the cluster-robust covariance. by = "twoway" keeps the legacy alias for the
-# sender, receiver, and time multiway estimator. by = "dyad" clusters the
-# directed dyad across time plus the time margin. returns a P x P covariance in
+# the cluster-robust covariance: assign each cell's score to both endpoint
+# actors, sandwich with the classical bread, and return a P x P covariance in
 # the same ordering as object$vcov.
-.sir_vcov_cluster <- function(object, by = c("twoway", "dyad")) {
-	by <- match.arg(by)
+.sir_vcov_cluster <- function(object) {
 	bread <- object$vcov
 	if (is.null(bread)) {
 		cli::cli_abort(c(
@@ -152,29 +203,26 @@
 		))
 	}
 
-	if (by == "twoway") {
-		Mi   <- .cluster_meat(scores, sc$sender)
-		Mj   <- .cluster_meat(scores, sc$receiver)
-		Mt   <- .cluster_meat(scores, sc$time)
-		Mij  <- .cluster_meat(scores, paste(sc$sender, sc$receiver, sep = "_"))
-		Mit  <- .cluster_meat(scores, paste(sc$sender, sc$time, sep = "_"))
-		Mjt  <- .cluster_meat(scores, paste(sc$receiver, sc$time, sep = "_"))
-		Mijt <- .cluster_meat(scores, paste(sc$sender, sc$receiver, sc$time, sep = "_"))
-		meat <- Mi + Mj + Mt - Mij - Mit - Mjt + Mijt
-		G <- min(length(unique(sc$sender)), length(unique(sc$receiver)))
-		if (G > 1) meat <- meat * (G / (G - 1))
-	} else {
-		Mdyad <- .cluster_meat(scores, paste(sc$sender, sc$receiver, sep = "_"))
-		Mt    <- .cluster_meat(scores, sc$time)
-		Mdt   <- .cluster_meat(scores, paste(sc$sender, sc$receiver, sc$time, sep = "_"))
-		meat <- Mdyad + Mt - Mdt
-		G <- length(unique(paste(sc$sender, sc$receiver)))
-		if (G > 1) meat <- meat * (G / (G - 1))
-	}
-
+	# actor-margin cluster-robust sandwich, used for both directed and symmetric
+	# fits: assign every cell's score to BOTH endpoint actors and sum within
+	# actor, meat = sum_a g_a g_a' with an HC1 G/(G-1) factor (G = #actors). the
+	# influence-coefficient score loads on the actor margin, so this is the
+	# covariance that matters.
+	sc2 <- rbind(scores, scores)
+	# in a bipartite fit senders and receivers are distinct populations, so tag
+	# the two margins apart (sender i and receiver i are different actors); in a
+	# one-mode/symmetric fit node i is the same actor on both sides
+	actor <- if (isTRUE(object$bipartite))
+		c(paste0("s", sc$sender), paste0("r", sc$receiver))
+	else c(sc$sender, sc$receiver)
+	meat <- .cluster_meat(sc2, actor)
+	G <- length(unique(actor))
+	if (G > 1) meat <- meat * (G / (G - 1))
 	V <- bread %*% meat %*% bread
 	V <- .psd_repair(V)
 	dn <- dimnames(bread)
 	if (!is.null(dn)) dimnames(V) <- dn
+	# carry the cluster count so confint can use a t(G-1) reference
+	attr(V, "cluster_df") <- G - 1L
 	V
 }
