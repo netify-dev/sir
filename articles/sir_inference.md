@@ -1,10 +1,13 @@
 # Inference and model comparison
 
 Inference for bilinear models takes more care than for an ordinary GLM.
-The bilinear influence term can produce an ill-conditioned Hessian,
-which makes naive Wald standard errors unreliable. This vignette covers
-the tools the package provides: classical and robust variance estimates,
-confidence intervals, bootstrap and jackknife checks, and
+Network data violate the independent-observations assumption behind
+naive Wald standard errors — ties that share an actor are correlated —
+so this vignette is mostly about getting *honest intervals* in the face
+of that dependence. (A separate risk, weak identification of the
+influence term, shows up as an ill-conditioned Hessian and is flagged by
+the `se_reliable` field, covered below.) It walks through classical and
+robust variance estimates, confidence intervals, bootstrap checks, and
 information-criterion model comparison. For basic fitting see
 [`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md).
 
@@ -12,9 +15,9 @@ information-criterion model comparison. For basic fitting see
 |:---|:---|:---|
 | Classical SE | Fast model-based Wald intervals | Assumes independent dyad-period scores and a stable Hessian |
 | HC0 robust SE | Heteroskedasticity or overdispersion | Does not address shared-actor network dependence |
-| Multiway cluster SE | Sender, receiver, and time dependence in the score | Still uses the Hessian as bread, so weak identification remains a problem |
-| Block bootstrap | Time-period resampling | Preserves within-period dependence but not actor dependence |
-| Dyad jackknife | Delete-one-actor sensitivity and actor dependence checks | Normal jackknife intervals, not bootstrap percentile intervals |
+| Cluster-robust SE (default) | Shared-actor dyadic dependence (each cell scored onto both actors) | Still uses the Hessian as bread, so weak identification remains a problem |
+| Parametric bootstrap | Resimulates from the fitted model; confirms the model-based SEs | Assumes the model is correct, so it does not capture shared-actor dependence |
+| Dyad jackknife | Fallback when analytic SEs are unavailable (bipartite, unstable Hessian) | A deliberately wide worst-case bound, not a precise interval |
 
 ## Setup
 
@@ -30,21 +33,92 @@ fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z,
            family = "poisson", calc_se = TRUE, seed = 1)
 ```
 
+The estimator recovers these known parameters
+([`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md)
+shows the recovery check); here we take the fit as given and focus on
+putting honest *intervals* around it. In the tables below, the
+coefficient labels tag each parameter’s role — `(Z)` a direct covariate
+effect, `(alphaW)` a sender-influence weight, `(betaW)` a
+receiver-influence weight — and the first sender weight is fixed at 1
+for identifiability, so there is no `(alphaW) W1` row.
+
 ## Classical (Hessian-based) standard errors
 
 `sir(calc_se = TRUE)` computes classical standard errors from the
-inverse observed-information matrix. These are what
-[`summary()`](https://rdrr.io/r/base/summary.html) prints for quick
-model inspection. For reporting, the default accessors now use
-cluster-robust uncertainty when the fit supports it; request classical
-intervals explicitly when you need a Hessian-only comparison:
+inverse observed-information matrix.
+[`summary()`](https://rdrr.io/r/base/summary.html) prints them for a
+quick look, along with a note that they are Hessian-based and can
+overstate significance under dyadic dependence:
 
 ``` r
 
-sqrt(diag(vcov(fit, type = "classical")))   # the SEs reported by summary()
+summary(fit)
+#> 
+#> ── Social Influence Regression Model ───────────────────────────────────────────
+#> Network: 14 nodes, 80 time periods (directed)
+#> Family: "poisson" | Method: "ALS"
+#> Observations: 14560
+#> ────────────────────────────────────────────────────────────────────────────────
+#> 
+#> ── Coefficients ──
+#> 
+#>              Estimate Std. Error z value Pr(>|z|)    
+#> (Z) Z1      -0.166973   0.007030  -23.75   <2e-16 ***
+#> (Z) Z2       0.473545   0.006552   72.27   <2e-16 ***
+#> (alphaW) W2  0.734622   0.026506   27.71   <2e-16 ***
+#> (betaW) W1  -0.350048   0.005033  -69.55   <2e-16 ***
+#> (betaW) W2  -0.202726   0.007608  -26.65   <2e-16 ***
+#> ---
+#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+#> Std. Error, z value, Pr(>|z|) and significance stars above are classical
+#> (Hessian-based) and may overstate significance under dyadic dependence. NOTE:
+#> `confint(fit)`/`tidy(fit)` default to cluster-robust inference
+#> (actor-clustered, t(G-1) reference) --- the same estimator for directed and
+#> symmetric fits; request classical intervals with `confint(se.type =
+#> "classical")` if dyads are independent.
+#> (Z) = direct covariate effect; (alphaW) = sender influence; (betaW) = receiver
+#> influence
+#> ────────────────────────────────────────────────────────────────────────────────
+#> 
+#> ── Model Fit ──
+#> 
+#> • Log-Likelihood: -19482.18
+#> • AIC: 38974.36
+#> • BIC: 39012.29
+#> • Residual deviance: 15933.43
+#> • Dispersion (Pearson chi-sq / resid df): 1.022
+#> ✔ Converged in 3 iterations
+#> ────────────────────────────────────────────────────────────────────────────────
+#> 
+#> ── Influence Matrices ──
+#> 
+#> A matrix (sender effects):
+#> • Mean: 0.0696
+#> • SD: 1.2133
+#> • Range: [-3.6025, 3.0012]
+#> B matrix (receiver effects):
+#> • Mean: -0.0278
+#> • SD: 0.3912
+#> • Range: [-1.0295, 1.1373]
+```
+
+The closing **Influence Matrices** block summarizes the fitted
+$`m \times m`$ sender and receiver matrices $`A`$ and $`B`$ (each a
+weighted sum of the `W` slices), so their entries live on a wider scale
+than the coefficient table above;
+[`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md)
+covers how to read them.
+
+For reporting, the default accessors use cluster-robust uncertainty when
+the fit supports it; request the classical SEs explicitly when you need
+a Hessian-only comparison:
+
+``` r
+
+round(sqrt(diag(vcov(fit, type = "classical"))), 4)   # the SEs reported by summary()
 #>      (Z) Z1      (Z) Z2 (alphaW) W2  (betaW) W1  (betaW) W2 
-#> 0.007030010 0.006552255 0.026505862 0.005033336 0.007607866
-confint(fit, se.type = "classical")         # Hessian-only Wald intervals
+#>      0.0070      0.0066      0.0265      0.0050      0.0076
+confint(fit, se.type = "classical")                   # Hessian-only Wald intervals
 #>                  2.5 %     97.5 %
 #> (Z) Z1      -0.1807515 -0.1531944
 #> (Z) Z2       0.4607029  0.4863873
@@ -56,9 +130,10 @@ confint(fit, se.type = "classical")         # Hessian-only Wald intervals
 ## Robust (sandwich) standard errors
 
 The HC0 sandwich estimator $`H^{-1} S H^{-1}`$ (with $`S`$ the empirical
-score covariance) is useful for heteroskedasticity or overdispersion
-when dyad-period score contributions are otherwise independent and the
-Hessian bread is stable. Compare it against the classical SEs:
+score covariance) corrects for heteroskedasticity or overdispersion. Our
+simulation is a correctly specified Poisson, so there is nothing to
+correct and the robust SEs match the classical ones almost exactly — a
+useful confirmation that the model is well specified:
 
 ``` r
 
@@ -78,30 +153,50 @@ data.frame(
 #> 3 (alphaW) W2    0.0265 0.0261  0.98
 #> 4  (betaW) W1    0.0050 0.0049  0.96
 #> 5  (betaW) W2    0.0076 0.0075  0.99
-
-confint(fit, se.type = "robust")
-#>                  2.5 %     97.5 %
-#> (Z) Z1      -0.1806005 -0.1533454
-#> (Z) Z2       0.4608553  0.4862350
-#> (alphaW) W2  0.6834737  0.7857704
-#> (betaW) W1  -0.3595586 -0.3405378
-#> (betaW) W2  -0.2174425 -0.1880104
 ```
 
-For well-specified data the HC0 robust SEs barely move (ratio near 1):
-HC0 corrects for overdispersion, not for the dyadic dependence that
-dominates relational data. That dependence is what the
-**cluster-robust** estimator addresses.
+To see HC0 do real work, refit on overdispersed counts — here redrawn
+from a negative binomial, whose variance far exceeds its mean. Now the
+robust SEs come out about three times the classical ones, correctly
+widening for the extra dispersion the Poisson likelihood would otherwise
+ignore:
 
-## Multiway cluster-robust standard errors
+``` r
 
-The $`(i, j)`$ and $`(j, i)`$ dyads share both actors, and every tie
-involving an actor is correlated.
-[`vcov()`](https://rdrr.io/r/stats/vcov.html) clusters the score
-contributions on the sender, receiver, and time margins (`"twoway"`
-remains an alias for this multiway estimator). For supported static
-directed-network fits, report this interval in place of classical
-Hessian SEs when the Hessian bread is stable:
+set.seed(99)
+Y_od <- dat$Y
+Y_od[] <- rnbinom(length(Y_od), mu = pmax(dat$Y, 0.1), size = 0.5)   # heavier-than-Poisson counts
+fit_od <- sir(Y_od, W = dat$W, X = dat$X, Z = dat$Z,
+              family = "poisson", calc_se = TRUE, seed = 1)
+
+data.frame(
+    term = names(coef(fit_od)),
+    robust_over_classical = round(sqrt(diag(vcov(fit_od, type = "robust"))) /
+                                  sqrt(diag(vcov(fit_od, type = "classical"))), 2),
+    row.names = NULL
+)
+#>          term robust_over_classical
+#> 1      (Z) Z1                  3.05
+#> 2      (Z) Z2                  3.18
+#> 3 (alphaW) W2                  3.06
+#> 4  (betaW) W1                  3.19
+#> 5  (betaW) W2                  3.11
+```
+
+HC0 handles dispersion and heteroskedasticity, but neither HC0 form
+models the shared-actor dependence that the **cluster-robust** estimator
+addresses next.
+
+## Cluster-robust standard errors
+
+Every tie involving an actor is correlated, so
+[`vcov()`](https://rdrr.io/r/stats/vcov.html) clusters on the
+**actors**: each dyad-period score is assigned to both of its endpoint
+actors and summed within actor. (Mechanically, an HC1 small-sample
+factor and a $`t(G - 1)`$ reference, with $`G`$ the number of actors,
+complete the sandwich.) This is the default reporting interval for
+supported static directed and symmetric fits when the Hessian bread is
+stable; report it in place of classical Hessian SEs:
 
 ``` r
 
@@ -115,70 +210,117 @@ data.frame(
     row.names = NULL
 )
 #>          term classical cluster ratio
-#> 1      (Z) Z1    0.0070  0.0062  0.88
-#> 2      (Z) Z2    0.0066  0.0082  1.26
-#> 3 (alphaW) W2    0.0265  0.0235  0.89
-#> 4  (betaW) W1    0.0050  0.0047  0.93
-#> 5  (betaW) W2    0.0076  0.0055  0.72
+#> 1      (Z) Z1    0.0070  0.0101  1.44
+#> 2      (Z) Z2    0.0066  0.0123  1.88
+#> 3 (alphaW) W2    0.0265  0.0277  1.04
+#> 4  (betaW) W1    0.0050  0.0072  1.42
+#> 5  (betaW) W2    0.0076  0.0091  1.19
 ```
 
-The cluster-robust SEs can move in either direction in this clean
-simulation. In dependent real data they are often more conservative
-because they stop assuming independent dyad-times. `confint(fit)`
-returns the matching Wald intervals:
+Here the cluster-robust SEs are 1.0–1.9 times the classical ones:
+because they stop assuming independent dyad-times, they are the more
+conservative — and the ones to report. `confint(fit)` returns the
+matching Wald intervals:
 
 ``` r
 
 confint(fit)
 #>                  2.5 %     97.5 %
-#> (Z) Z1      -0.1790843 -0.1548617
-#> (Z) Z2       0.4574220  0.4896683
-#> (alphaW) W2  0.6885972  0.7806470
-#> (betaW) W1  -0.3591747 -0.3409217
-#> (betaW) W2  -0.2135366 -0.1919164
+#> (Z) Z1      -0.1887952 -0.1451508
+#> (Z) Z2       0.4469773  0.5001130
+#> (alphaW) W2  0.6748119  0.7944323
+#> (betaW) W1  -0.3655139 -0.3345825
+#> (betaW) W2  -0.2223161 -0.1831368
 ```
+
+On this simulation the gap is modest because the periods are nearly
+independent. On real relational data it is not. Refitting on the bundled
+`icews` inter-state conflict network, the cluster SEs come out many
+times the classical ones:
+
+``` r
+
+data(icews)
+ic <- 1:10; ip <- 1:24
+ifit <- sir(icews$Y[ic, ic, ip, drop = FALSE], W = icews$W[ic, ic, , drop = FALSE],
+            X = icews$X[ic, ic, ip, drop = FALSE], Z = icews$Z[ic, ic, , ip, drop = FALSE],
+            family = "poisson", seed = 1, max_iter = 20)
+
+data.frame(
+    term = names(coef(ifit)),
+    cluster_over_classical = round(sqrt(diag(vcov(ifit, type = "cluster"))) /
+                                   sqrt(diag(vcov(ifit, type = "classical"))), 1),
+    row.names = NULL
+)
+#>                   term cluster_over_classical
+#> 1            (Z) mConf                   18.3
+#> 2         (Z) mConf_ji                   21.8
+#> 3       (Z) minDistLog                   43.3
+#> 4             (Z) ally                   23.2
+#> 5         (Z) verbCoop                   80.7
+#> 6        (alphaW) ally                   34.1
+#> 7    (alphaW) verbCoop                   21.0
+#> 8  (alphaW) minDistLog                   27.0
+#> 9          (betaW) int                   49.1
+#> 10        (betaW) ally                   24.5
+#> 11    (betaW) verbCoop                   66.5
+#> 12  (betaW) minDistLog                   12.4
+```
+
+Real conflict data carry exactly the shared-actor dependence the
+classical SEs assume away, so the classical intervals would badly
+overstate significance — the cluster SEs are an order of magnitude
+larger. This is why the cluster interval is the default and the reported
+one.
 
 ## Bootstrap inference
 
 [`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
-refits the model on resampled or reduced data. The **block** bootstrap
-resamples whole time periods (preserving within-period dependence); the
-**dyad jackknife** deletes each actor in turn; the **parametric**
-bootstrap simulates new outcome arrays from the fitted model.
+refits the model on resampled data and forms distribution-free intervals
+that do not assume the Wald normal shape. Two are worth running: the
+**parametric** bootstrap resimulates outcomes from the fitted model (a
+model-based cross-check), and the **dyad jackknife** deletes each actor
+in turn (a conservative robustness check, and the fallback when analytic
+SEs are unavailable).
 
 ``` r
 
-br <- boot_sir(fit, R = 20, type = "block", seed = 123, trace = FALSE)
+br_par  <- boot_sir(fit, R = 200, type = "parametric", seed = 123, trace = FALSE)
 br_dyad <- boot_sir(fit, type = "dyad", seed = 123, trace = FALSE)
 
 data.frame(
-    method = c("Block Bootstrap", "Dyad Jackknife"),
-    valid_refits = c(br$n_valid, br_dyad$n_valid),
-    total_refits = c(br$n_total, br_dyad$n_total),
-    interval_type = c(br$interval, br_dyad$interval)
+    method = c("Parametric bootstrap", "Dyad jackknife"),
+    valid_refits = c(br_par$n_valid, br_dyad$n_valid),
+    total_refits = c(br_par$n_total, br_dyad$n_total),
+    interval_type = c(br_par$interval, br_dyad$interval)
 )
-#>            method valid_refits total_refits    interval_type
-#> 1 Block Bootstrap           20           20       percentile
-#> 2  Dyad Jackknife           14           14 normal-jackknife
+#>                 method valid_refits total_refits    interval_type
+#> 1 Parametric bootstrap          200          200       percentile
+#> 2       Dyad jackknife           14           14 normal-jackknife
 ```
 
-Percentile intervals from block or parametric bootstrap replicates are
-often more reliable than Wald intervals for the bilinear parameters:
+Each replicate refits the full model and non-converged ones are dropped,
+so check the valid-replicate count. The **parametric** bootstrap
+intervals track the classical ones and every one excludes zero — a
+distribution-free confirmation that the estimates are well separated
+from zero:
 
 ``` r
 
-confint(fit, boot = br)
+confint(fit, boot = br_par)
 #>                  2.5 %     97.5 %
-#> (Z) Z1      -0.1822541 -0.1559235
-#> (Z) Z2       0.4551020  0.4867091
-#> (alphaW) W2  0.6766893  0.7749009
-#> (betaW) W1  -0.3612847 -0.3429720
-#> (betaW) W2  -0.2216027 -0.1933744
+#> (Z) Z1      -0.1816208 -0.1551895
+#> (Z) Z2       0.4604181  0.4852921
+#> (alphaW) W2  0.6869696  0.7892897
+#> (betaW) W1  -0.3593313 -0.3395785
+#> (betaW) W2  -0.2177358 -0.1838933
 ```
 
-The dyad jackknife uses normal intervals from the jackknife standard
-error, because the delete-one fits are not a bootstrap sampling
-distribution:
+The **dyad jackknife** is deliberately conservative: deleting a whole
+actor is a large perturbation (especially with only `m = 14` actors), so
+its intervals run several times wider, most of all for the bilinear
+influence weights. Read it as a worst-case bound, not a competing
+precise estimate:
 
 ``` r
 
@@ -191,139 +333,82 @@ confint(fit, boot = br_dyad)
 #> (betaW) W2  -0.3759329 -0.0295200
 ```
 
-For reporting, synthesize the uncertainty checks in one table instead of
-presenting four disconnected printouts. The rendered version below is a
-mechanics check: the block bootstrap used only `R = 20` to keep the
-vignette fast. Re-run the same table with `R = 500`–`1000` before
-treating the block intervals as evidence.
+For reporting, place the intervals side by side — the classical (which
+ignores dyadic dependence), the cluster-robust default, and the
+conservative dyad jackknife:
 
 ``` r
 
-ci_classical <- confint(fit, se.type = "classical")
-ci_cluster <- confint(fit)
-ci_block <- confint(fit, boot = br)
-ci_dyad <- confint(fit, boot = br_dyad)
-
-sign_stable <- function(ci) sign(ci[, 1]) == sign(ci[, 2])
-interval_pattern <- ifelse(
-    sign_stable(ci_cluster) & sign_stable(ci_dyad),
-    "same sign in cluster and dyad intervals",
-    ifelse(sign_stable(ci_cluster), "same sign in cluster interval only",
-           "interval crosses zero")
-)
+fmt <- function(ci) sprintf("[%.3f, %.3f]", ci[, 1], ci[, 2])
 
 data.frame(
-    term = names(coef(fit)),
-    estimate = round(unname(coef(fit)), 3),
-    classical = paste0("[", round(ci_classical[, 1], 3), ", ", round(ci_classical[, 2], 3), "]"),
-    cluster = paste0("[", round(ci_cluster[, 1], 3), ", ", round(ci_cluster[, 2], 3), "]"),
-    block = paste0("[", round(ci_block[, 1], 3), ", ", round(ci_block[, 2], 3), "]"),
-    dyad = paste0("[", round(ci_dyad[, 1], 3), ", ", round(ci_dyad[, 2], 3), "]"),
-    cluster_over_classical = round(unname(se_cluster / se_classical), 2),
-    interval_pattern = interval_pattern,
-    block_note = "R = 20; mechanics only",
+    term           = names(coef(fit)),
+    estimate       = round(unname(coef(fit)), 3),
+    classical      = fmt(confint(fit, se.type = "classical")),
+    cluster        = fmt(confint(fit)),
+    dyad_jackknife = fmt(confint(fit, boot = br_dyad)),
     row.names = NULL
 )
-#>          term estimate        classical          cluster            block
-#> 1      (Z) Z1   -0.167 [-0.181, -0.153] [-0.179, -0.155] [-0.182, -0.156]
-#> 2      (Z) Z2    0.474   [0.461, 0.486]    [0.457, 0.49]   [0.455, 0.487]
-#> 3 (alphaW) W2    0.735   [0.683, 0.787]   [0.689, 0.781]   [0.677, 0.775]
-#> 4  (betaW) W1   -0.350   [-0.36, -0.34] [-0.359, -0.341] [-0.361, -0.343]
-#> 5  (betaW) W2   -0.203 [-0.218, -0.188] [-0.214, -0.192] [-0.222, -0.193]
-#>               dyad cluster_over_classical
-#> 1   [-0.2, -0.134]                   0.88
-#> 2    [0.427, 0.52]                   1.26
-#> 3   [0.172, 1.298]                   0.89
-#> 4 [-0.671, -0.029]                   0.93
-#> 5  [-0.376, -0.03]                   0.72
-#>                          interval_pattern             block_note
-#> 1 same sign in cluster and dyad intervals R = 20; mechanics only
-#> 2 same sign in cluster and dyad intervals R = 20; mechanics only
-#> 3 same sign in cluster and dyad intervals R = 20; mechanics only
-#> 4 same sign in cluster and dyad intervals R = 20; mechanics only
-#> 5 same sign in cluster and dyad intervals R = 20; mechanics only
+#>          term estimate        classical          cluster   dyad_jackknife
+#> 1      (Z) Z1   -0.167 [-0.181, -0.153] [-0.189, -0.145] [-0.200, -0.134]
+#> 2      (Z) Z2    0.474   [0.461, 0.486]   [0.447, 0.500]   [0.427, 0.520]
+#> 3 (alphaW) W2    0.735   [0.683, 0.787]   [0.675, 0.794]   [0.172, 1.298]
+#> 4  (betaW) W1   -0.350 [-0.360, -0.340] [-0.366, -0.335] [-0.671, -0.029]
+#> 5  (betaW) W2   -0.203 [-0.218, -0.188] [-0.222, -0.183] [-0.376, -0.030]
 ```
 
-Each bootstrap replicate refits the full model; non-converged replicates
-are dropped and reported, so check the valid-replicate count. Use
-`R = 500`–`1000` for publication-quality block or parametric bootstrap
-intervals. The dyad jackknife ignores `R` and instead uses one refit per
-deleted actor (or sender and receiver actor for rectangular fits).
+The estimate is shared across the columns (one fit); what changes is the
+interval. Classical is the narrowest (it assumes independent dyads), the
+cluster default widens it for shared-actor dependence, and the jackknife
+is the conservative outer bound. Report the cluster interval and use the
+jackknife as a robustness check. Use `R = 500`–`1000` for
+publication-quality bootstrap intervals.
 
-## Important caveats on dependence
+## Choosing an approach
 
-The classical and HC0-robust SE types assume **independence across
-dyads**. Relational data violate this: the $`(i, j)`$ and $`(j, i)`$
-directed dyads share members, and degree heterogeneity correlates every
-tie involving the same actor. The HC0-robust SEs only correct for
-heteroskedasticity/overdispersion (note how little they moved above).
-The period/block bootstrap resamples whole time periods as independent
-blocks: it preserves within-period network dependence, but not serial
-dependence across adjacent periods.
+The choice reduces to three rules:
 
-The package ships two dyad-aware tools that *do* address it, both shown
-earlier in this vignette:
-
-- [`vcov()`](https://rdrr.io/r/stats/vcov.html) /
-  [`confint()`](https://rdrr.io/r/stats/confint.html) — a multiway
-  cluster-robust sandwich (sender + receiver + time), the default
-  reporting interval for supported static directed-network fits with a
-  stable Hessian.
-- `boot_sir(type = "dyad")` — a delete-one-actor jackknife (also the
-  only inference path for full-bilinear bipartite fits).
-
-In practice:
-
-- Report **cluster-robust** SEs
-  ([`vcov()`](https://rdrr.io/r/stats/vcov.html)) for supported static
-  fits with reliable analytic covariance, and use the
-  bootstrap/jackknife as a cross-check.
-- For dynamic `W`, unstable Hessians, or full-bilinear bipartite fits,
-  prefer the dyad jackknife and response-scale sensitivity checks over
-  cluster SEs.
-- Do not use dyad-independent $`p`$-values as the primary reporting
-  target for influence coefficients; report cluster or dyad-jackknife
-  intervals and the response-scale scenario table.
+- **Report cluster-robust intervals**
+  ([`vcov()`](https://rdrr.io/r/stats/vcov.html) /
+  [`confint()`](https://rdrr.io/r/stats/confint.html), the default) for
+  supported static directed and symmetric fits with a stable Hessian
+  (`se_reliable = TRUE`).
+- **Fall back to the dyad jackknife** (`boot_sir(type = "dyad")`) when
+  analytic SEs are unavailable — full-bilinear bipartite fits, dynamic
+  `W`, or an unstable Hessian (`se_reliable = FALSE`) — and as a
+  worst-case cross-check otherwise.
+- **Do not** report dyad-independent classical $`p`$-values as the
+  headline result for influence coefficients; pair the cluster interval
+  with a response-scale scenario (below).
 
 ## Fixed-receiver model and model comparison
 
 Setting `fix_receiver = TRUE` constrains $`B = I`$ and estimates only
-sender-side influence. This removes the alpha/beta scaling ambiguity by
-dropping the receiver-side channel, but the remaining coefficients still
-need adequate design rank and signal. It is faster and
-better-conditioned, and is a useful descriptive baseline to compare
-against the full bilinear model on the same response and mask.
+sender-side influence. It is faster and better-conditioned, and serves
+as a constrained baseline. Because our simulation has a genuine
+receiver-side channel that this constraint drops, we expect the full
+model to fit better — so the useful question is not what the constrained
+model’s influence coefficients are, but whether dropping the receiver
+side costs fit. We answer that with information criteria rather than by
+reading the constrained coefficients:
 
 ``` r
 
 fit_fr <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z,
               family = "poisson", fix_receiver = TRUE, calc_se = TRUE, seed = 1)
-fr_ci <- confint(fit_fr, se.type = "cluster")
-data.frame(
-    term = names(coef(fit_fr)),
-    estimate = round(unname(coef(fit_fr)), 3),
-    cluster_low = round(fr_ci[, 1], 3),
-    cluster_high = round(fr_ci[, 2], 3),
-    row.names = NULL
-)
-#>          term estimate cluster_low cluster_high
-#> 1      (Z) Z1   -0.202      -0.239       -0.164
-#> 2      (Z) Z2    0.554       0.491        0.617
-#> 3 (alphaW) W1   -0.192      -1.221        0.838
-#> 4 (alphaW) W2   -0.260      -0.782        0.262
 ```
 
-Compare specifications with fit criteria, convergence diagnostics, and a
-common response-scale scenario. Here the scenario shifts the first
-direct covariate by one standard deviation under each fitted model:
+Compare specifications with fit criteria and a common response-scale
+scenario. Because the two models differ in how the *lagged network*
+propagates, we shift the lagged signal `X` up by one standard deviation
+and read how each model’s predicted mean responds:
 
 ``` r
 
 scenario_change <- function(model) {
-    Zcf <- dat$Z
-    Zcf[, , 1, ] <- Zcf[, , 1, ] + stats::sd(Zcf[, , 1, ], na.rm = TRUE)
+    Xcf <- dat$X + stats::sd(dat$X, na.rm = TRUE)
     mu0 <- predict(model)
-    mu1 <- predict(model, newdata = list(W = dat$W, X = dat$X, Z = Zcf))
+    mu1 <- predict(model, newdata = list(W = dat$W, X = Xcf, Z = dat$Z))
     mean(mu1 - mu0, na.rm = TRUE)
 }
 
@@ -332,20 +417,29 @@ data.frame(
     logLik = round(c(as.numeric(logLik(fit)), as.numeric(logLik(fit_fr))), 2),
     AIC   = round(c(AIC(fit), AIC(fit_fr)), 2),
     BIC   = round(c(BIC(fit), BIC(fit_fr)), 2),
-    converged = c(fit$convergence, fit_fr$convergence),
     se_reliable = c(fit$se_reliable, fit_fr$se_reliable),
-    mean_scenario_change = round(c(scenario_change(fit), scenario_change(fit_fr)), 3)
+    mean_response_to_X = round(c(scenario_change(fit), scenario_change(fit_fr)), 3)
 )
-#>           model    logLik      AIC      BIC converged se_reliable
-#> 1 full bilinear -19482.18 38974.36 39012.29      TRUE        TRUE
-#> 2  fix_receiver -22712.67 45433.34 45463.68      TRUE        TRUE
-#>   mean_scenario_change
-#> 1               -0.209
-#> 2               -0.219
+#>           model    logLik      AIC      BIC se_reliable mean_response_to_X
+#> 1 full bilinear -19482.18 38974.36 39012.29        TRUE              0.650
+#> 2  fix_receiver -22712.67 45433.34 45463.68        TRUE              0.001
 ```
 
-Lower AIC/BIC is better, but model choice should also ask whether the
-simpler model changes the substantive response-scale conclusion.
+The `se_reliable` column flags whether the Hessian was well-conditioned
+enough to trust the analytic SEs (both fits here are reliable). Lower
+AIC/BIC is better, and the full bilinear model wins decisively —
+confirming the receiver-side channel carries real signal. The scenario
+makes the difference concrete: shifting the lagged network moves the
+full model’s predicted mean noticeably, but barely moves the
+fixed-receiver model’s. Forcing $`B = I`$ leaves a sender map (the `A`
+matrix) that is both weaker in spread and nearly self-cancelling, so a
+uniform shift in the lagged network produces almost no net change in its
+predicted mean, whereas the full model’s stronger, coherent influence
+structure responds. The much larger drop in log-likelihood for the
+constrained model confirms the receiver side carries signal it cannot
+recover.
+[`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md)
+covers `predict(newdata = )` scenarios in full.
 
 ## Out-of-sample evaluation
 
@@ -373,8 +467,7 @@ fit_train <- sir(dat$Y[, , 1:T_hold, drop = FALSE],
                  W = dat$W,
                  X = dat$X[, , 1:T_hold, drop = FALSE],
                  Z = dat$Z[, , , 1:T_hold, drop = FALSE],
-                 family = "poisson", fix_receiver = TRUE,
-                 calc_se = FALSE, seed = 1)
+                 family = "poisson", calc_se = FALSE, seed = 1)
 Z_hold <- dat$Z[, , , T_hold + 1, drop = FALSE]
 fc <- forecast(fit_train, h = 1, Z_future = Z_hold)
 model_score <- score_sir(dat$Y[, , T_hold + 1, drop = FALSE], fc, "poisson")
@@ -391,12 +484,13 @@ data.frame(
     row.names = NULL
 )
 #>     metric model  naive improvement
-#> 1     rmse 1.399  2.008       0.609
-#> 2      mae 0.976  1.385       0.409
-#> 3 deviance 1.379 32.591      31.213
+#> 1     rmse 1.130  2.008       0.878
+#> 2      mae 0.846  1.385       0.539
+#> 3 deviance 1.077 32.591      31.515
 
-# rolling-origin conditional cross-validation: refit on 1..o, score period o + 1
-cv <- cv_sir(fit_fr, initial = 60, origins = c(60, 70, 79))
+# rolling-origin conditional cross-validation: initial is the minimum training
+# length and origins are the cut-points o (each refits on 1..o and scores o + 1)
+cv <- cv_sir(fit, initial = 60, origins = c(60, 70, 79))
 data.frame(
     metric = c("rmse", "mae", "deviance"),
     model = round(unname(cv$aggregate[c("rmse", "mae", "deviance")]), 3),
@@ -407,15 +501,18 @@ data.frame(
     row.names = NULL
 )
 #>     metric model  naive improvement effective_origins
-#> 1     rmse 1.565  2.073       0.508                 3
-#> 2      mae 1.023  1.374       0.351                 3
-#> 3 deviance 1.511 31.466      29.955                 3
+#> 1     rmse 1.146  2.073       0.927                 3
+#> 2      mae 0.867  1.374       0.506                 3
+#> 3 deviance 1.139 31.466      30.327                 3
 ```
 
-Lower RMSE/MAE/deviance scores are better. This example uses only three
-origins, so it demonstrates the workflow rather than providing a final
-validation study; with real applications, use more origins or a
-substantively chosen rolling schedule.
+Lower RMSE/MAE/deviance scores are better. The model improves all three
+over the naive last-value baseline; the deviance gap is the largest
+because Poisson deviance penalizes the naive predictor heavily when its
+carried-forward counts miss, while RMSE and MAE are gentler. This
+example uses only three origins, so it demonstrates the workflow rather
+than providing a final validation study; with real applications, use
+more origins or a substantively chosen rolling schedule.
 
 [`score_sir()`](https://netify-dev.github.io/sir/reference/score_sir.md)
 exposes the same family-appropriate scores (RMSE / MAE plus the Poisson

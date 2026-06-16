@@ -120,15 +120,29 @@ sir(
 
 - symmetric:
 
-  Logical. If TRUE, treats the network as undirected (symmetric). The
-  function uses only upper-triangle observations for fitting and sets
-  `fix_receiver = TRUE`, giving an upper-triangle, sender-side
-  representation of undirected data rather than a fully order-invariant
-  undirected bilinear model. Continuous asymmetric outcomes are averaged
-  across upper and lower triangles; Poisson and Binomial outcomes must
-  already be symmetric so averaging does not create invalid non-integer
-  or non-binary observations. Influence covariates W must also be
-  symmetric. Default is FALSE.
+  Logical. If TRUE, fits the genuine **undirected** model with a single
+  shared influence operator \\A = B = \sum_k \gamma_k W_k\\, so the
+  bilinear term is the quadratic form \\A X A'\\, symmetric in \\(i,j)\\
+  by construction. All \\\gamma_k\\ are estimated (the quadratic form's
+  scale is identified by the data); \\A\\ is identified only up to its
+  overall sign (\\A X A' = (-A) X (-A)'\\), fixed so the
+  largest-magnitude \\\gamma_k\\ is positive. Requires a square network
+  and symmetric, zero-diagonal influence covariates `W` (non-zero W
+  diagonals are zeroed, since the quadratic form must be
+  self-feedback-free); static (3D) or dynamic (4D, time-varying) `W` are
+  both supported, the dynamic case giving a per-period operator \\A_t
+  X_t A_t'\\. Continuous asymmetric `Y` is averaged across triangles;
+  Poisson/Binomial `Y` must already be symmetric. Estimation is BFGS
+  with an analytic gradient over the upper-triangle off-diagonal cells;
+  [`confint()`](https://rdrr.io/r/stats/confint.html)/[`vcov()`](https://rdrr.io/r/stats/vcov.html)/
+  [`tidy()`](https://generics.r-lib.org/reference/tidy.html) default to
+  the actor-clustered cluster-robust SE (the same estimator used for
+  directed fits, with a \\t(G-1)\\ reference), while
+  [`summary()`](https://rdrr.io/r/base/summary.html) prints the
+  classical SE. Request classical intervals with `se.type = "classical"`
+  (see
+  [`confint.sir`](https://netify-dev.github.io/sir/reference/confint.sir.md)).
+  Cannot be combined with `fix_receiver`. Default is FALSE.
 
 - bipartite:
 
@@ -193,7 +207,11 @@ An object of class `"sir"` with the following components:
   Data frame of parameter estimates with columns `coef`, `se` (classical
   SE), `rse` (robust/sandwich SE), `t_se` (z-statistic using classical
   SE), `t_rse` (z-statistic using robust SE). Row names identify each
-  parameter.
+  parameter. The `rse`/`t_rse` columns are `NA` for fits with no
+  separate HC0 path (notably symmetric/undirected fits; all SE columns
+  are `NA` for full-bilinear bipartite fits). The default cluster-robust
+  SEs/intervals come from `sqrt(diag(vcov(fit)))` and `confint(fit)`,
+  not from `summ`.
 
 - A:
 
@@ -215,8 +233,11 @@ An object of class `"sir"` with the following components:
   Numeric vector of all estimated parameters in order: \[theta_1, ...,
   theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p\]. When
   `fix_receiver = TRUE`: \[theta_1, ..., theta_q, alpha_1, ...,
-  alpha_p\]. For a full-bilinear bipartite fit: \[theta_1, ..., theta_q,
-  alpha_2, ..., alpha_p, beta_1, ..., beta_p2\].
+  alpha_p\]. For a symmetric fit: \[theta_1, ..., theta_q, gamma_1, ...,
+  gamma_p\] (all gamma estimated; A is identified up to global sign,
+  fixed so the largest-magnitude gamma is positive). For a full-bilinear
+  bipartite fit: \[theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1,
+  ..., beta_p2\].
 
 - theta:
 
@@ -359,6 +380,26 @@ An object of class `"sir"` with the following components:
 - sigma2:
 
   Estimated error variance (only for `family = "normal"`).
+
+- se_reliable:
+
+  Logical, FALSE if the Hessian was ill-conditioned so the classical SEs
+  should be treated with caution.
+
+- dynamic_W:
+
+  Logical, TRUE if W was time-varying (4D).
+
+- symmetric/gamma/operator/rho_A/gain/stationary:
+
+  Present for symmetric (A = B) fits: `symmetric = TRUE`,
+  `operator = "symmetric"`; `gamma` is the full shared-influence vector
+  (length p, all estimated, identified up to global sign,
+  largest-magnitude gamma fixed positive); `rho_A` is the spectral
+  radius of A (the max over periods for dynamic W),
+  `gain = rho_A^2 / (n - 1)` is the stationarity gain, and `stationary`
+  is `FALSE` when `gain >= 1` (the operator is explosive and estimates
+  may be degenerate).
 
 ## Details
 

@@ -85,6 +85,13 @@ with a warning and the aggregate averages over those that succeeded. For
 a full-bilinear (`W_recv`) fit the refits draw random restarts; the
 fit's `seed` is threaded through so the result is reproducible.
 
+## See also
+
+[`forecast.sir_fit`](https://netify-dev.github.io/sir/reference/forecast.sir_fit.md)
+for the one-off forecasts CV scores,
+[`score_sir`](https://netify-dev.github.io/sir/reference/score_sir.md)
+for the scoring rules used.
+
 ## Examples
 
 ``` r

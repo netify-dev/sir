@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -97,11 +97,7 @@ influence matrices</strong>,
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
 and
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>η</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>=</mo><mi>g</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo><mspace width="0.278em"></mspace><mo>=</mo><mspace width="0.278em"></mspace><msup><mi>𝛉</mi><mi>⊤</mi></msup><msub><mi>𝐳</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mspace width="0.278em"></mspace><mo>+</mo><mspace width="0.278em"></mspace><munder><mo>∑</mo><mrow><mi>k</mi><mo>,</mo><mi>ℓ</mi></mrow></munder><msub><mi>x</mi><mrow><mi>k</mi><mo>,</mo><mi>ℓ</mi><mo>,</mo><mi>t</mi></mrow></msub><mspace width="0.167em"></mspace><msub><mi>a</mi><mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow></msub><mspace width="0.167em"></mspace><msub><mi>b</mi><mrow><mi>j</mi><mo>,</mo><mi>ℓ</mi></mrow></msub><mspace width="0.278em"></mspace><mo>=</mo><mspace width="0.278em"></mspace><msup><mi>𝛉</mi><mi>⊤</mi></msup><msub><mi>𝐳</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>+</mo><mo stretchy="false" form="prefix">(</mo><mi>A</mi><mspace width="0.167em"></mspace><msub><mi>X</mi><mi>t</mi></msub><mspace width="0.167em"></mspace><msup><mi>B</mi><mi>⊤</mi></msup><msub><mo stretchy="false" form="postfix">)</mo><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
-  \eta_{i,j,t} = g(\mu_{i,j,t}) \;=\; \boldsymbol{\theta}^{\top} \mathbf{z}_{i,j,t}
-  \;+\; \sum_{k,\ell} x_{k,\ell,t}\, a_{i,k}\, b_{j,\ell}
-  \;=\; \boldsymbol{\theta}^{\top}\mathbf{z}_{i,j,t} + (A\,X_t\,B^{\top})_{i,j}.
-</annotation></semantics></math></p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>η</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>=</mo><mi>g</mi><mo stretchy="false" form="prefix">(</mo><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo><mspace width="0.278em"></mspace><mo>=</mo><mspace width="0.278em"></mspace><msup><mi>𝛉</mi><mi>⊤</mi></msup><msub><mi>𝐳</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mspace width="0.278em"></mspace><mo>+</mo><mspace width="0.278em"></mspace><munder><mo>∑</mo><mrow><mi>k</mi><mo>,</mo><mi>ℓ</mi></mrow></munder><msub><mi>x</mi><mrow><mi>k</mi><mo>,</mo><mi>ℓ</mi><mo>,</mo><mi>t</mi></mrow></msub><mspace width="0.167em"></mspace><msub><mi>a</mi><mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow></msub><mspace width="0.167em"></mspace><msub><mi>b</mi><mrow><mi>j</mi><mo>,</mo><mi>ℓ</mi></mrow></msub><mspace width="0.278em"></mspace><mo>=</mo><mspace width="0.278em"></mspace><msup><mi>𝛉</mi><mi>⊤</mi></msup><msub><mi>𝐳</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>+</mo><mo stretchy="false" form="prefix">(</mo><mi>A</mi><mspace width="0.167em"></mspace><msub><mi>X</mi><mi>t</mi></msub><mspace width="0.167em"></mspace><msup><mi>B</mi><mi>⊤</mi></msup><msub><mo stretchy="false" form="postfix">)</mo><mrow><mi>i</mi><mo>,</mo><mi>j</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex"> \eta_{i,j,t} = g(\mu_{i,j,t}) \;=\; \boldsymbol{\theta}^{\top} \mathbf{z}_{i,j,t} \;+\; \sum_{k,\ell} x_{k,\ell,t}\, a_{i,k}\, b_{j,\ell} \;=\; \boldsymbol{\theta}^{\top}\mathbf{z}_{i,j,t} + (A\,X_t\,B^{\top})_{i,j}. </annotation></semantics></math></p>
 <p>The mean is then
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>μ</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo>=</mo><msup><mi>g</mi><mrow><mi>−</mi><mn>1</mn></mrow></msup><mo stretchy="false" form="prefix">(</mo><msub><mi>η</mi><mrow><mi>i</mi><mo>,</mo><mi>j</mi><mo>,</mo><mi>t</mi></mrow></msub><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\mu_{i,j,t} = g^{-1}(\eta_{i,j,t})</annotation></semantics></math>:
 expected counts for Poisson, expected continuous values for Normal, and
@@ -138,9 +134,7 @@ and
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
 are <strong>explained by covariates</strong>
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>W</mi><annotation encoding="application/x-tex">W</annotation></semantics></math>:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>α</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mo>,</mo><mspace width="2.0em"></mspace><mi>B</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>β</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
-  A = \sum_{r=1}^{p}\alpha_r W_r, \qquad B = \sum_{r=1}^{p}\beta_r W_r .
-</annotation></semantics></math></p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>α</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mo>,</mo><mspace width="2.0em"></mspace><mi>B</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>β</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mi>.</mi></mrow><annotation encoding="application/x-tex"> A = \sum_{r=1}^{p}\alpha_r W_r, \qquad B = \sum_{r=1}^{p}\beta_r W_r . </annotation></semantics></math></p>
 <p>So instead of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>2</mn><msup><mi>m</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">2m^2</annotation></semantics></math>
 free influence weights you estimate two short coefficient vectors
@@ -162,8 +156,7 @@ associations.</p>
 <div class="section level3">
 <h3 id="the-three-covariate-roles-w-vs--x-vs--z">The three covariate roles (W vs. X vs. Z)<a class="anchor" aria-label="anchor" href="#the-three-covariate-roles-w-vs--x-vs--z"></a>
 </h3>
-<p>The single most important thing to get straight before fitting is
-what each input does:</p>
+<p>What each input does:</p>
 <table class="table">
 <colgroup>
 <col width="29%">
@@ -212,9 +205,10 @@ direct effects
 </tr>
 </tbody>
 </table>
-<p>In one line: <strong>W describes which dyads can carry lagged
-influence; X is the signal that travels; Z are direct effects that
-bypass the influence machinery.</strong></p>
+<p><strong>W</strong> describes which dyads can carry lagged influence;
+<strong>X</strong> is the lagged signal that flows through it;
+<strong>Z</strong> are direct effects that bypass the influence
+term.</p>
 </div>
 </div>
 <div class="section level2">
@@ -222,24 +216,31 @@ bypass the influence machinery.</strong></p>
 </h2>
 <p><code><a href="../reference/sim_sir.html">sim_sir()</a></code> generates data from a known SIR process, so
 you can confirm the estimator recovers the truth before trusting it on
-real data. (It bakes in a
+real data. We pass <code>gain = 0.9</code> so the lagged influence
+network is a strong (but still stationary) driver of future ties — that
+makes the influence mechanism, the whole point of SIR, clearly visible
+in the examples below. (<code><a href="../reference/sim_sir.html">sim_sir()</a></code> also bakes in a
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi>/</mi><mo stretchy="false" form="prefix">(</mo><mi>m</mi><mo>−</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">1/(m-1)</annotation></semantics></math>
 scaling of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>X</mi><annotation encoding="application/x-tex">X</annotation></semantics></math>
-so the bilinear predictor stays on a sane scale even as the network
-grows; see “Building X” below.)</p>
+so the bilinear predictor stays on a sane scale as the network grows;
+see “Building X” below.)</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">42</span><span class="op">)</span></span>
-<span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_sir.html">sim_sir</a></span><span class="op">(</span>m <span class="op">=</span> <span class="fl">14</span>, T_len <span class="op">=</span> <span class="fl">80</span>, p <span class="op">=</span> <span class="fl">2</span>, q <span class="op">=</span> <span class="fl">2</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
+<span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_sir.html">sim_sir</a></span><span class="op">(</span>m <span class="op">=</span> <span class="fl">20</span>, T_len <span class="op">=</span> <span class="fl">120</span>, p <span class="op">=</span> <span class="fl">2</span>, q <span class="op">=</span> <span class="fl">2</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, gain <span class="op">=</span> <span class="fl">0.9</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sir.html">sir</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span>, W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>, X <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span>, Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="va">fit</span></span>
 <span><span class="co">#&gt;             Estimate Std. Err</span></span>
-<span><span class="co">#&gt; (Z) Z1        0.2314   0.0075</span></span>
-<span><span class="co">#&gt; (Z) Z2       -0.3687   0.0073</span></span>
-<span><span class="co">#&gt; (alphaW) W2   0.3092   0.0589</span></span>
-<span><span class="co">#&gt; (betaW) W1   -0.1623   0.0085</span></span>
-<span><span class="co">#&gt; (betaW) W2    0.1154   0.0093</span></span></code></pre></div>
+<span><span class="co">#&gt; (Z) Z1        0.2374   0.0037</span></span>
+<span><span class="co">#&gt; (Z) Z2       -0.3618   0.0036</span></span>
+<span><span class="co">#&gt; (alphaW) W2   0.4097   0.0044</span></span>
+<span><span class="co">#&gt; (betaW) W1   -0.6540   0.0032</span></span>
+<span><span class="co">#&gt; (betaW) W2    0.4167   0.0040</span></span></code></pre></div>
+<p>The printout carries a <code>Std. Err</code> column: that is the
+classical Hessian SE, which can understate uncertainty for dependent
+network data. Treat it as a quick look only — for reporting we use the
+cluster-robust intervals from <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code> shown below.</p>
 <p>How well did we recover the truth? <code><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef()</a></code> reports one
 normalized parameterization with
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>α</mi><mn>1</mn></msub><annotation encoding="application/x-tex">\alpha_1</annotation></semantics></math>
@@ -259,11 +260,11 @@ because that is what users see from <code><a href="https://rdrr.io/r/stats/coef.
 <span>    abs_error <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">truth</span> <span class="op">-</span> <span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">estimated</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;          term  truth estimate abs_error</span></span>
-<span><span class="co">#&gt; 1      (Z) Z1  0.237    0.231     0.005</span></span>
-<span><span class="co">#&gt; 2      (Z) Z2 -0.365   -0.369     0.003</span></span>
-<span><span class="co">#&gt; 3 (alphaW) W2  0.411    0.309     0.102</span></span>
-<span><span class="co">#&gt; 4  (betaW) W1 -0.169   -0.162     0.007</span></span>
-<span><span class="co">#&gt; 5  (betaW) W2  0.109    0.115     0.006</span></span></code></pre></div>
+<span><span class="co">#&gt; 1      (Z) Z1  0.237    0.237     0.001</span></span>
+<span><span class="co">#&gt; 2      (Z) Z2 -0.365   -0.362     0.004</span></span>
+<span><span class="co">#&gt; 3 (alphaW) W2  0.411    0.410     0.002</span></span>
+<span><span class="co">#&gt; 4  (betaW) W1 -0.651   -0.654     0.003</span></span>
+<span><span class="co">#&gt; 5  (betaW) W2  0.418    0.417     0.002</span></span></code></pre></div>
 <p>The rank-at-most-one influence coefficient matrix is also close:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">C_truth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/outer.html" class="external-link">outer</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">alpha</span>, <span class="va">dat</span><span class="op">$</span><span class="va">beta</span><span class="op">)</span></span>
@@ -277,20 +278,19 @@ because that is what users see from <code><a href="https://rdrr.io/r/stats/coef.
 <span>    <span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;                     quantity value</span></span>
-<span><span class="co">#&gt; 1   maximum absolute C error 0.020</span></span>
-<span><span class="co">#&gt; 2 relative Frobenius C error 0.108</span></span></code></pre></div>
-<p>The <strong>point estimates</strong> land close to the truth: direct
-effects recover tightly and the influence coefficients are close
-(noisier per replicate at this network size, shrinking as you add time
-periods or nodes). We deliberately show recovery by <em>error
-magnitude</em> rather than by a Wald “is the truth inside the 95%
-interval” check, because the default standard errors are
-<strong>anti-conservative for network data</strong> – they assume
-independent dyad-times and so understate the true uncertainty. Treat
-point recovery as the evidence here, and see
-<code><a href="../articles/sir_inference.html">vignette("sir_inference")</a></code> for more defensible uncertainty
-estimates (cluster-robust SEs and bootstrap/jackknife checks) before
-reporting significance.</p>
+<span><span class="co">#&gt; 1   maximum absolute C error 0.003</span></span>
+<span><span class="co">#&gt; 2 relative Frobenius C error 0.005</span></span></code></pre></div>
+<p>Both the direct effects and the influence coefficients land close to
+the truth, and the rank-one influence matrix
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mo>=</mo><mi>α</mi><msup><mi>β</mi><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">C = \alpha\beta^\top</annotation></semantics></math>
+— the quantity SIR actually identifies — recovers tightly. For
+uncertainty, <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code> reports cluster-robust intervals by
+default, which account for the dyadic dependence in network data; the
+classical errors that <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> prints assume independent
+dyad-times. Here the two are close because the simulated dependence is
+mild, but the gap can be large — the ICEWS example in
+<code><a href="../articles/sir_inference.html">vignette("sir_inference")</a></code> shows the cluster SEs running an
+order of magnitude wider. See that vignette for the full treatment.</p>
 <blockquote>
 <p><strong>Aside — why
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>α</mi><mn>1</mn></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\alpha_1 = 1</annotation></semantics></math>?</strong>
@@ -343,14 +343,14 @@ its role:</p>
 <span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;          term estimate cluster_low cluster_high</span></span>
-<span><span class="co">#&gt; 1      (Z) Z1    0.231       0.213        0.250</span></span>
-<span><span class="co">#&gt; 2      (Z) Z2   -0.369      -0.379       -0.358</span></span>
-<span><span class="co">#&gt; 3 (alphaW) W2    0.309       0.206        0.412</span></span>
-<span><span class="co">#&gt; 4  (betaW) W1   -0.162      -0.176       -0.148</span></span>
-<span><span class="co">#&gt; 5  (betaW) W2    0.115       0.110        0.121</span></span></code></pre></div>
+<span><span class="co">#&gt; 1      (Z) Z1    0.237       0.231        0.243</span></span>
+<span><span class="co">#&gt; 2      (Z) Z2   -0.362      -0.372       -0.352</span></span>
+<span><span class="co">#&gt; 3 (alphaW) W2    0.410       0.401        0.419</span></span>
+<span><span class="co">#&gt; 4  (betaW) W1   -0.654      -0.660       -0.648</span></span>
+<span><span class="co">#&gt; 5  (betaW) W2    0.417       0.408        0.426</span></span></code></pre></div>
 <p>For applied reporting, use <code>confint(fit)</code> or
 <code>tidy(fit, conf.int = TRUE)</code>; both use cluster-robust
-uncertainty by default for supported static directed fits.
+uncertainty by default for supported static directed and symmetric fits.
 <code>summary(fit)</code> remains a compact Hessian-based printout for
 quick model inspection.</p>
 </div>
@@ -368,80 +368,70 @@ influence on node
 outgoing ties. We blank the diagonal below because self-ties are
 excluded from the model’s likelihood, so the diagonal of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
-is not interpreted.</p>
+is not interpreted. (<code><a href="https://rdrr.io/r/base/order.html" class="external-link">order()</a></code> returns positions into the
+flattened matrix; <code><a href="https://rdrr.io/r/base/which.html" class="external-link">arrayInd()</a></code> turns each one back into its
+<code>[row, column]</code> pair, where the column is the source actor
+and the row is the influenced actor.)</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">A</span> <span class="op">&lt;-</span> <span class="va">fit</span><span class="op">$</span><span class="va">A</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NA</span>                                      <span class="co"># self-influence is not modeled</span></span>
+<span><span class="va">typical</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>              <span class="co"># average |weight|, for scale</span></span>
 <span><span class="va">ord</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span>, na.last <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
+<span><span class="va">cells</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">arrayInd</a></span><span class="op">(</span><span class="va">ord</span>, <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">)</span>                     <span class="co"># col 1 = influenced (row), col 2 = source (column)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    source_node     <span class="op">=</span> <span class="op">(</span><span class="op">(</span><span class="va">ord</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span>,   <span class="co"># column k (the influencer)</span></span>
-<span>    influenced_node <span class="op">=</span> <span class="op">(</span><span class="op">(</span><span class="va">ord</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span>  <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span>,   <span class="co"># row i (the influenced)</span></span>
-<span>    influence       <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">A</span><span class="op">[</span><span class="va">ord</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
+<span>    source_node     <span class="op">=</span> <span class="va">cells</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span>,                    <span class="co"># column k (the influencer)</span></span>
+<span>    influenced_node <span class="op">=</span> <span class="va">cells</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>,                    <span class="co"># row i (the influenced)</span></span>
+<span>    influence       <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">A</span><span class="op">[</span><span class="va">ord</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>,</span>
+<span>    vs_typical      <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">A</span><span class="op">[</span><span class="va">ord</span><span class="op">]</span><span class="op">)</span> <span class="op">/</span> <span class="va">typical</span>, <span class="fl">1</span><span class="op">)</span> <span class="co"># multiple of the average |weight|</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;   source_node influenced_node influence</span></span>
-<span><span class="co">#&gt; 1           1              14    -2.682</span></span>
-<span><span class="co">#&gt; 2           4              13    -2.592</span></span>
-<span><span class="co">#&gt; 3           9               2     2.507</span></span>
-<span><span class="co">#&gt; 4           3               7    -2.497</span></span>
-<span><span class="co">#&gt; 5           2               1    -2.287</span></span></code></pre></div>
-<p>The receiver-side matrix has the same row/column convention, but for
-incoming ties: <code>B[j, l]</code> says how past activity directed at
-receiver
+<span><span class="co">#&gt;   source_node influenced_node influence vs_typical</span></span>
+<span><span class="co">#&gt; 1          14               5    -3.319        4.0</span></span>
+<span><span class="co">#&gt; 2           2              15    -2.898        3.5</span></span>
+<span><span class="co">#&gt; 3           1              15    -2.699        3.3</span></span>
+<span><span class="co">#&gt; 4           1               5     2.624        3.2</span></span>
+<span><span class="co">#&gt; 5           1              14    -2.569        3.1</span></span></code></pre></div>
+<p>The receiver-side matrix <code>fit$B</code> is read with the same
+convention for incoming ties — <code>B[j, l]</code> is how past activity
+directed at receiver
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>l</mi><annotation encoding="application/x-tex">l</annotation></semantics></math>
 shapes future activity directed at receiver
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">B</span> <span class="op">&lt;-</span> <span class="va">fit</span><span class="op">$</span><span class="va">B</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span>
-<span><span class="va">ord_b</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span>, na.last <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    source_receiver     <span class="op">=</span> <span class="op">(</span><span class="op">(</span><span class="va">ord_b</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span>,</span>
-<span>    influenced_receiver <span class="op">=</span> <span class="op">(</span><span class="op">(</span><span class="va">ord_b</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span>  <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span>,</span>
-<span>    influence           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">B</span><span class="op">[</span><span class="va">ord_b</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co">#&gt;   source_receiver influenced_receiver influence</span></span>
-<span><span class="co">#&gt; 1               4                  13     0.635</span></span>
-<span><span class="co">#&gt; 2               9                   2    -0.511</span></span>
-<span><span class="co">#&gt; 3               1                   8    -0.493</span></span>
-<span><span class="co">#&gt; 4               7                  10     0.492</span></span>
-<span><span class="co">#&gt; 5               8                   2    -0.488</span></span></code></pre></div>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>
+— so we defer a worked <code>B</code> reading to the labelled real-data
+example below rather than repeat the idiom on anonymous nodes here.</p>
 <p><strong>Reading magnitudes.</strong> The entries of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
 and
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
-are <em>unitless relative influence weights</em>: their sign and
-relative size carry the meaning — a larger
+are relative influence weights: a larger
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">|</mo><msub><mi>a</mi><mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow></msub><mo stretchy="false" form="prefix">|</mo></mrow><annotation encoding="application/x-tex">|a_{i,k}|</annotation></semantics></math>
 means
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
 shapes
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>
-more strongly. The sign of one cell is conditional on the other bilinear
-side and on <code>X</code>: the contribution is
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo stretchy="false" form="prefix">[</mo><mi>i</mi><mo>,</mo><mi>k</mi><mo stretchy="false" form="postfix">]</mo><mi>X</mi><mo stretchy="false" form="prefix">[</mo><mi>k</mi><mo>,</mo><mi>l</mi><mo>,</mo><mi>t</mi><mo stretchy="false" form="postfix">]</mo><mi>B</mi><mo stretchy="false" form="prefix">[</mo><mi>j</mi><mo>,</mo><mi>l</mi><mo stretchy="false" form="postfix">]</mo></mrow><annotation encoding="application/x-tex">A[i,k] X[k,l,t] B[j,l]</annotation></semantics></math>.
-Because influence enters the linear predictor <em>bilinearly</em>
-through
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>A</mi><msub><mi>X</mi><mi>t</mi></msub><msup><mi>B</mi><mi>⊤</mi></msup><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(A X_t B^{\top})</annotation></semantics></math>
-with
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>X</mi><annotation encoding="application/x-tex">X</annotation></semantics></math>
-scaled by
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>1</mn><mi>/</mi><mo stretchy="false" form="prefix">(</mo><mi>m</mi><mo>−</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">1/(m-1)</annotation></semantics></math>,
-a single
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>a</mi><mrow><mi>i</mi><mo>,</mo><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">a_{i,k}</annotation></semantics></math>
-is <strong>not</strong> a standalone count multiplier. For Poisson
-direct effects,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mi mathvariant="normal">exp</mi><mo>⁡</mo></mrow><mo stretchy="false" form="prefix">(</mo><mi>θ</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">\exp(\theta)</annotation></semantics></math>
-is a rate ratio and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>100</mn><mo stretchy="false" form="prefix">(</mo><mrow><mi mathvariant="normal">exp</mi><mo>⁡</mo></mrow><mo stretchy="false" form="prefix">(</mo><mi>θ</mi><mo stretchy="false" form="postfix">)</mo><mo>−</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">100(\exp(\theta)-1)</annotation></semantics></math>
-is the percent change; for Binomial direct effects it is an odds ratio.
-For the substantive size of an influence channel, use a
-<code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> scenario (below) rather than exponentiating a
-cell. Most off-diagonal weights are small, and many are negative
-(damping):</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+more strongly, and the sign gives the direction. They are not standalone
+multipliers — influence enters bilinearly through
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><msub><mi>X</mi><mi>t</mi></msub><msup><mi>B</mi><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">A X_t B^{\top}</annotation></semantics></math>
+— so to size a channel substantively, run a <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code>
+scenario (below) rather than reading a single cell. The
+<code>vs_typical</code> column makes the scale concrete: the channels
+shown are several times the average
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mo stretchy="false" form="prefix">|</mo><annotation encoding="application/x-tex">|</annotation></semantics></math>weight<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mo stretchy="false" form="prefix">|</mo><annotation encoding="application/x-tex">|</annotation></semantics></math>,
+the outliers of a wide, roughly symmetric spread. Most weights are far
+smaller — centered near zero (median about
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>0.07</mn></mrow><annotation encoding="application/x-tex">-0.07</annotation></semantics></math>),
+with the middle half from about
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>0.7</mn></mrow><annotation encoding="application/x-tex">-0.7</annotation></semantics></math>
+to
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>+</mi><mn>0.6</mn></mrow><annotation encoding="application/x-tex">+0.6</annotation></semantics></math>
+and the central 90% from about
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>1.7</mn></mrow><annotation encoding="application/x-tex">-1.7</annotation></semantics></math>
+to
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>+</mi><mn>1.7</mn></mrow><annotation encoding="application/x-tex">+1.7</annotation></semantics></math>
+(the 5th and 95th percentiles below):</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/quantile.html" class="external-link">quantile</a></span><span class="op">(</span><span class="va">A</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">]</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0.05</span>, <span class="fl">0.25</span>, <span class="fl">0.5</span>, <span class="fl">0.75</span>, <span class="fl">0.95</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     5%    25%    50%    75%    95% </span></span>
-<span><span class="co">#&gt; -1.682 -0.764 -0.080  0.630  1.670</span></span></code></pre></div>
+<span><span class="co">#&gt; -1.742 -0.726 -0.070  0.641  1.680</span></span></code></pre></div>
 <div class="section level3">
 <h3 id="visual-diagnostics">Visual diagnostics<a class="anchor" aria-label="anchor" href="#visual-diagnostics"></a>
 </h3>
@@ -463,7 +453,7 @@ means
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>
 strongly shapes
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>.</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/graphics/plot.default.html" class="external-link">plot</a></span><span class="op">(</span><span class="va">fit</span>, which <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">4</span><span class="op">)</span></span></code></pre></div>
 <div class="figure" style="text-align: center">
 <img src="sir_overview_files/figure-html/plots-1.png" class="r-plt" alt="Four diagnostic panels showing the A and B influence matrix heatmaps and the distributions of their off-diagonal entries." width="768"><p class="caption">
@@ -475,17 +465,18 @@ heatmaps, followed by off-diagonal influence-weight distributions.
 optional <code>igraph</code> and <code>ggraph</code> packages are
 installed; otherwise it prints the same strongest-channel information as
 a table.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"ggraph"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span> <span class="op">&amp;&amp;</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"igraph"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="fu"><a href="../reference/plot_sir_network.html">plot_sir_network</a></span><span class="op">(</span><span class="va">fit</span>, matrix <span class="op">=</span> <span class="st">"A"</span>, threshold <span class="op">=</span> <span class="fl">0.15</span><span class="op">)</span></span>
+<span>    <span class="fu"><a href="../reference/plot_sir_network.html">plot_sir_network</a></span><span class="op">(</span><span class="va">fit</span>, matrix <span class="op">=</span> <span class="st">"A"</span>, threshold <span class="op">=</span> <span class="fl">1.5</span><span class="op">)</span></span>
 <span><span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
 <span>    <span class="va">A_network</span> <span class="op">&lt;-</span> <span class="va">fit</span><span class="op">$</span><span class="va">A</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">A_network</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span>
 <span>    <span class="va">edge_order</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">A_network</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span>, na.last <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
+<span>    <span class="va">cells_net</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">arrayInd</a></span><span class="op">(</span><span class="va">edge_order</span>, <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">A_network</span><span class="op">)</span><span class="op">)</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>        source_node <span class="op">=</span> <span class="op">(</span><span class="op">(</span><span class="va">edge_order</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">A_network</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span>,</span>
-<span>        influenced_node <span class="op">=</span> <span class="op">(</span><span class="op">(</span><span class="va">edge_order</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">A_network</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span>,</span>
+<span>        source_node <span class="op">=</span> <span class="va">cells_net</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span>,</span>
+<span>        influenced_node <span class="op">=</span> <span class="va">cells_net</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>,</span>
 <span>        influence <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">A_network</span><span class="op">[</span><span class="va">edge_order</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span>    <span class="op">)</span></span>
 <span><span class="op">}</span></span></code></pre></div>
@@ -509,10 +500,10 @@ scenarios</strong> — change one input and hold the rest fixed. Only
 counterfactual requires the assumptions in the causal interpretation box
 above, plus a coherent way to update the network history and covariates
 under the intervention.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mu_hat</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>                             <span class="co"># in-sample expected counts</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">mu_hat</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 14 14 80</span></span>
+<span><span class="co">#&gt; [1]  20  20 120</span></span>
 <span></span>
 <span><span class="va">Zcf</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span></span>
 <span><span class="va">Zcf</span><span class="op">[</span>, , <span class="fl">1</span>, <span class="op">]</span> <span class="op">&lt;-</span> <span class="va">Zcf</span><span class="op">[</span>, , <span class="fl">1</span>, <span class="op">]</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd</a></span><span class="op">(</span><span class="va">Zcf</span><span class="op">[</span>, , <span class="fl">1</span>, <span class="op">]</span><span class="op">)</span>    <span class="co"># shift first Z covariate up 1 sd</span></span>
@@ -521,58 +512,50 @@ under the intervention.</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>    scenario <span class="op">=</span> <span class="st">"Increase Z1 by 1 SD"</span>,</span>
-<span>    baseline_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_hat</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    scenario_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_cf</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    mean_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">delta_z</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    median_change <span class="op">=</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/median.html" class="external-link">median</a></span><span class="op">(</span><span class="va">delta_z</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    q05_change <span class="op">=</span> <span class="fu">qval</span><span class="op">(</span><span class="va">delta_z</span>, <span class="fl">0.05</span><span class="op">)</span>,</span>
-<span>    q95_change <span class="op">=</span> <span class="fu">qval</span><span class="op">(</span><span class="va">delta_z</span>, <span class="fl">0.95</span><span class="op">)</span>,</span>
+<span>    baseline_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_hat</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
+<span>    mean_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">delta_z</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
+<span>    median_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/median.html" class="external-link">median</a></span><span class="op">(</span><span class="va">delta_z</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
+<span>    q95_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu">qval</span><span class="op">(</span><span class="va">delta_z</span>, <span class="fl">0.95</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
 <span>    check.names <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;              scenario baseline_mean scenario_mean mean_change median_change</span></span>
-<span><span class="co">#&gt; 1 Increase Z1 by 1 SD      1.129467        1.4287   0.2992334     0.2677779</span></span>
-<span><span class="co">#&gt;   q05_change q95_change</span></span>
-<span><span class="co">#&gt; 1  0.1240459  0.5802815</span></span></code></pre></div>
-<p>For influence covariates, the strongest applied workflow is to copy
-the observed <code>W</code> array and modify a theoretically defined
-part of it. The helper <code><a href="../reference/get_scen_array.html">get_scen_array()</a></code> builds artificial
-design grids, which are useful for diagnostics, but those grids erase
-the observed network structure. Here we keep that structure and shift
-the first continuous <code>W</code> slice up or down by one off-diagonal
-standard deviation:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">W_base</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span></span>
-<span><span class="va">off</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/row.html" class="external-link">row</a></span><span class="op">(</span><span class="va">W_base</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">!=</span> <span class="fu"><a href="https://rdrr.io/r/base/col.html" class="external-link">col</a></span><span class="op">(</span><span class="va">W_base</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="va">w_step</span> <span class="op">&lt;-</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd</a></span><span class="op">(</span><span class="va">W_base</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">]</span><span class="op">[</span><span class="va">off</span><span class="op">]</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="co">#&gt;              scenario baseline_mean mean_change median_change q95_change</span></span>
+<span><span class="co">#&gt; 1 Increase Z1 by 1 SD         1.554       0.418         0.266      1.137</span></span></code></pre></div>
+<p>Because <code>Z1</code> enters with a positive direct effect,
+shifting it up one standard deviation lifts expected counts across the
+board: the average dyad-time gains about 0.42 events (roughly a quarter
+above the 1.55 baseline), and the most responsive dyads (the 95th
+percentile) gain over 1. This is the simplest kind of scenario — move
+one exogenous covariate, hold everything else fixed.</p>
+<p>How much of the predicted activity actually comes from the lagged
+influence network, as opposed to the direct covariates? Switch the
+influence term off — set the lagged state <code>X</code> to zero,
+leaving only the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>𝛉</mi><mi>⊤</mi></msup><mi>𝐳</mi></mrow><annotation encoding="application/x-tex">\boldsymbol{\theta}^\top \mathbf{z}</annotation></semantics></math>
+part — and compare the fitted means:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">mu_no_influence</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>    W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>,</span>
+<span>    X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/array.html" class="external-link">array</a></span><span class="op">(</span><span class="fl">0</span>, dim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">X</span><span class="op">)</span><span class="op">)</span>,   <span class="co"># lagged network switched off</span></span>
+<span>    Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span></span>
+<span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">w_scenarios</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"-1 SD"</span>, <span class="st">"baseline"</span>, <span class="st">"+1 SD"</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">label</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">W_tmp</span> <span class="op">&lt;-</span> <span class="va">W_base</span></span>
-<span>    <span class="va">W1</span> <span class="op">&lt;-</span> <span class="va">W_tmp</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">]</span></span>
-<span>    <span class="va">shift</span> <span class="op">&lt;-</span> <span class="kw"><a href="https://rdrr.io/r/base/switch.html" class="external-link">switch</a></span><span class="op">(</span><span class="va">label</span>, <span class="st">"-1 SD"</span> <span class="op">=</span> <span class="op">-</span><span class="va">w_step</span>, <span class="st">"baseline"</span> <span class="op">=</span> <span class="fl">0</span>, <span class="st">"+1 SD"</span> <span class="op">=</span> <span class="va">w_step</span><span class="op">)</span></span>
-<span>    <span class="va">W1</span><span class="op">[</span><span class="va">off</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">W1</span><span class="op">[</span><span class="va">off</span><span class="op">]</span> <span class="op">+</span> <span class="va">shift</span></span>
-<span>    <span class="va">W_tmp</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">W1</span></span>
-<span>    <span class="va">mu_tmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span>, newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>W <span class="op">=</span> <span class="va">W_tmp</span>, X <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span>, Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span><span class="op">)</span><span class="op">)</span></span>
-<span>    <span class="va">delta</span> <span class="op">&lt;-</span> <span class="va">mu_tmp</span> <span class="op">-</span> <span class="va">mu_hat</span></span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>        scenario <span class="op">=</span> <span class="va">label</span>,</span>
-<span>        scenario_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_tmp</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>        mean_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">delta</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>        median_change <span class="op">=</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/median.html" class="external-link">median</a></span><span class="op">(</span><span class="va">delta</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>        p90_abs_change <span class="op">=</span> <span class="fu">qval</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">delta</span><span class="op">)</span>, <span class="fl">0.9</span><span class="op">)</span>,</span>
-<span>        check.names <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>        row.names <span class="op">=</span> <span class="cn">NULL</span></span>
-<span>    <span class="op">)</span></span>
-<span><span class="op">}</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="va">w_scenarios</span><span class="op">)</span></span>
-<span><span class="co">#&gt;   scenario scenario_mean mean_change median_change p90_abs_change</span></span>
-<span><span class="co">#&gt; 1    -1 SD     0.3866448  -0.7428217    -0.6923806       1.298637</span></span>
-<span><span class="co">#&gt; 2 baseline     1.1294665   0.0000000     0.0000000       0.000000</span></span>
-<span><span class="co">#&gt; 3    +1 SD     0.4290909  -0.7003756    -0.6081084       1.278216</span></span></code></pre></div>
-<p>The table reports expected-count differences on the response scale. A
-higher <code>W</code> value can move the mean down if the fitted
-coefficient signs and the bilinear product imply damping conditional on
-the observed <code>X</code>.</p>
+<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    prediction     <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"full model"</span>, <span class="st">"influence switched off"</span><span class="op">)</span>,</span>
+<span>    mean_predicted <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_hat</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
+<span>                             <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_no_influence</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
+<span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt;               prediction mean_predicted</span></span>
+<span><span class="co">#&gt; 1             full model           1.55</span></span>
+<span><span class="co">#&gt; 2 influence switched off           1.10</span></span></code></pre></div>
+<p>Switching the lagged network off drops predicted activity by roughly
+a third. That gap is exactly what the bilinear influence mechanism adds
+over an ordinary direct-covariate regression: because we simulated with
+<code>gain = 0.9</code>, the lagged network is a strong, persistent
+driver of future ties, not a marginal add-on. (For fully artificial
+design grids useful for diagnostics, see <code><a href="../reference/get_scen_array.html">get_scen_array()</a></code>
+in <code><a href="../articles/sir_extensions.html">vignette("sir_extensions")</a></code>.)</p>
 <p><code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> returns fitted or scenario-implied expected
 outcomes. For one-step-ahead or multi-step forecasting, use
 <code><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast()</a></code> so the lagged <code>X</code> updates are handled
@@ -589,7 +572,7 @@ data object, <code>X</code> is the raw lagged count transform
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>m</mi><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">m-1</annotation></semantics></math>.
 To keep the vignette fast while still showing real output, we fit the
 first 10 countries and first 24 months:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">icews</span><span class="op">)</span></span>
 <span><span class="va">icews_nodes</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span></span>
 <span><span class="va">icews_periods</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">24</span></span>
@@ -625,18 +608,21 @@ first 10 countries and first 24 months:</p>
 <span><span class="op">)</span></span></code></pre></div>
 <p>Real data is rarely as clean as the simulation. Always check whether
 the fit is trustworthy before reading any standard error:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    Diagnostic <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ALS converged"</span>, <span class="st">"Classical SEs reliable"</span><span class="op">)</span>,</span>
+<span>    Diagnostic <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ALS converged"</span>, <span class="st">"Hessian well-conditioned"</span><span class="op">)</span>,</span>
 <span>    Value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">ifit</span><span class="op">$</span><span class="va">convergence</span>, <span class="va">ifit</span><span class="op">$</span><span class="va">se_reliable</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;               Diagnostic Value</span></span>
-<span><span class="co">#&gt; 1          ALS converged  TRUE</span></span>
-<span><span class="co">#&gt; 2 Classical SEs reliable  TRUE</span></span></code></pre></div>
-<p>For this small subset the Hessian-based SEs are numerically
-available, but the cluster/classical gaps below are large enough that
-classical SEs should not be read substantively on their own:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<span><span class="co">#&gt;                 Diagnostic Value</span></span>
+<span><span class="co">#&gt; 1            ALS converged  TRUE</span></span>
+<span><span class="co">#&gt; 2 Hessian well-conditioned  TRUE</span></span></code></pre></div>
+<p>We report the cluster-robust standard errors, which are the default
+and the trustworthy choice for dependent relational data. (The classical
+Hessian SEs that <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> prints are far smaller here
+because they assume independent dyad-times;
+<code><a href="../articles/sir_inference.html">vignette("sir_inference")</a></code> works through that
+comparison.)</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">term_labels</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>    <span class="st">"(Z) mConf"</span> <span class="op">=</span> <span class="st">"Direct: Lagged Material Conflict"</span>,</span>
 <span>    <span class="st">"(Z) mConf_ji"</span> <span class="op">=</span> <span class="st">"Direct: Reciprocal Lagged Material Conflict"</span>,</span>
@@ -652,65 +638,63 @@ classical SEs should not be read substantively on their own:</p>
 <span>    <span class="st">"(betaW) minDistLog"</span> <span class="op">=</span> <span class="st">"Receiver Channel: Minimum Logged Distance"</span></span>
 <span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">se_classical_icews</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">ifit</span>, type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">se_cluster_icews</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">ifit</span>, type <span class="op">=</span> <span class="st">"cluster"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>    <span class="st">"Term"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">term_labels</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">ifit</span><span class="op">)</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>,</span>
-<span>    <span class="st">"Estimate"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">ifit</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    <span class="st">"Classical SE"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">signif</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">se_classical_icews</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>,</span>
-<span>    <span class="st">"Cluster SE"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">signif</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">se_cluster_icews</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>,</span>
-<span>    <span class="st">"Cluster/Classical"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">se_cluster_icews</span> <span class="op">/</span> <span class="va">se_classical_icews</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
+<span>    <span class="st">"Estimate"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">ifit</span><span class="op">)</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>,</span>
+<span>    <span class="st">"Cluster SE"</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">se_cluster_icews</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>,</span>
 <span>    check.names <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;                                           Term Estimate Classical SE Cluster SE</span></span>
-<span><span class="co">#&gt; 1             Direct: Lagged Material Conflict    0.000    7.287e-06  0.0001817</span></span>
-<span><span class="co">#&gt; 2  Direct: Reciprocal Lagged Material Conflict    0.001    8.257e-06  0.0001088</span></span>
-<span><span class="co">#&gt; 3              Direct: Minimum Logged Distance    0.104    2.387e-03  0.0540300</span></span>
-<span><span class="co">#&gt; 4                             Direct: Alliance   -1.128    3.880e-02  0.6008000</span></span>
-<span><span class="co">#&gt; 5                   Direct: Verbal Cooperation    0.221    4.041e-03  0.2136000</span></span>
-<span><span class="co">#&gt; 6                     Sender Channel: Alliance    0.609    6.169e-03  0.1189000</span></span>
-<span><span class="co">#&gt; 7           Sender Channel: Verbal Cooperation    0.042    1.019e-03  0.0197200</span></span>
-<span><span class="co">#&gt; 8      Sender Channel: Minimum Logged Distance   -0.171    5.572e-04  0.0125400</span></span>
-<span><span class="co">#&gt; 9                   Receiver Channel: Baseline   -0.567    7.585e-03  0.2280000</span></span>
-<span><span class="co">#&gt; 10                  Receiver Channel: Alliance   -0.384    6.796e-03  0.1041000</span></span>
-<span><span class="co">#&gt; 11        Receiver Channel: Verbal Cooperation    0.123    1.328e-03  0.0580400</span></span>
-<span><span class="co">#&gt; 12   Receiver Channel: Minimum Logged Distance    0.003    5.139e-04  0.0088680</span></span>
-<span><span class="co">#&gt;    Cluster/Classical</span></span>
-<span><span class="co">#&gt; 1              24.94</span></span>
-<span><span class="co">#&gt; 2              13.17</span></span>
-<span><span class="co">#&gt; 3              22.63</span></span>
-<span><span class="co">#&gt; 4              15.48</span></span>
-<span><span class="co">#&gt; 5              52.84</span></span>
-<span><span class="co">#&gt; 6              19.27</span></span>
-<span><span class="co">#&gt; 7              19.35</span></span>
-<span><span class="co">#&gt; 8              22.50</span></span>
-<span><span class="co">#&gt; 9              30.06</span></span>
-<span><span class="co">#&gt; 10             15.31</span></span>
-<span><span class="co">#&gt; 11             43.70</span></span>
-<span><span class="co">#&gt; 12             17.26</span></span></code></pre></div>
+<span><span class="co">#&gt;                                           Term Estimate Cluster SE</span></span>
+<span><span class="co">#&gt; 1             Direct: Lagged Material Conflict   0.0001     0.0001</span></span>
+<span><span class="co">#&gt; 2  Direct: Reciprocal Lagged Material Conflict   0.0006     0.0002</span></span>
+<span><span class="co">#&gt; 3              Direct: Minimum Logged Distance   0.1036     0.1034</span></span>
+<span><span class="co">#&gt; 4                             Direct: Alliance  -1.1284     0.8986</span></span>
+<span><span class="co">#&gt; 5                   Direct: Verbal Cooperation   0.2213     0.3261</span></span>
+<span><span class="co">#&gt; 6                     Sender Channel: Alliance   0.6094     0.2101</span></span>
+<span><span class="co">#&gt; 7           Sender Channel: Verbal Cooperation   0.0423     0.0214</span></span>
+<span><span class="co">#&gt; 8      Sender Channel: Minimum Logged Distance  -0.1709     0.0150</span></span>
+<span><span class="co">#&gt; 9                   Receiver Channel: Baseline  -0.5673     0.3727</span></span>
+<span><span class="co">#&gt; 10                  Receiver Channel: Alliance  -0.3841     0.1666</span></span>
+<span><span class="co">#&gt; 11        Receiver Channel: Verbal Cooperation   0.1226     0.0883</span></span>
+<span><span class="co">#&gt; 12   Receiver Channel: Minimum Logged Distance   0.0034     0.0064</span></span></code></pre></div>
 <p>The direct <code>Z</code> rows describe immediate dyadic
-associations. The <code>(alphaW)</code> and <code>(betaW)</code> rows
-describe which dyadic features are associated with lagged conflict
-channels under the fitted SIR model. They are not standalone count-rate
+associations. The first two, <code>mConf</code> and
+<code>mConf_ji</code>, enter on a raw event-count scale, so their
+per-unit coefficients round to about zero — their effect sizes show up
+in scenarios, not in the point estimate. The more readable rows here are
+the influence channels: <code>(alphaW) ally</code> (about 0.61) and
+<code>(alphaW) minDistLog</code> (about
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>0.17</mn></mrow><annotation encoding="application/x-tex">-0.17</annotation></semantics></math>,
+with a tight cluster SE) say which dyadic features carry lagged conflict
+under the fitted model. None of these are standalone count-rate
 multipliers; use fitted means or scenario predictions for effect sizes.
 The first influence covariate, <code>int</code>, is an intercept-like
-baseline channel, so it plays the role of the fixed
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>α</mi><mn>1</mn></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\alpha_1 = 1</annotation></semantics></math>.</p>
+baseline channel that plays its two sides differently. On the
+<em>sender</em> side it carries the identifying constraint
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>α</mi><mn>1</mn></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\alpha_1 = 1</annotation></semantics></math>,
+which is why there is no <code>(alphaW) int</code> row (only
+<code>ally</code>, <code>verbCoop</code>, and <code>minDistLog</code>
+appear). On the <em>receiver</em> side it is freely estimated — the
+visible <code>Receiver Channel: Baseline</code> row
+(<code>(betaW) int</code>, about
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>−</mi><mn>0.57</mn></mrow><annotation encoding="application/x-tex">-0.57</annotation></semantics></math>)
+is the estimated receiver intercept that absorbs the overall
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math>
+scale.</p>
 <p>Country names ride along on <code>icews$countries</code>, so you can
-label the strongest estimated influence channels. These are exploratory
-summaries of the fitted subset, not causal claims:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+label the strongest estimated influence channels:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">A</span> <span class="op">&lt;-</span> <span class="va">ifit</span><span class="op">$</span><span class="va">A</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span>, <span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span>
 <span><span class="va">top_edges</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span>, na.last <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
-<span><span class="va">source_index</span> <span class="op">&lt;-</span> <span class="op">(</span><span class="op">(</span><span class="va">top_edges</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span></span>
-<span><span class="va">influenced_index</span> <span class="op">&lt;-</span> <span class="op">(</span><span class="op">(</span><span class="va">top_edges</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span></span>
+<span><span class="va">cells_a</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">arrayInd</a></span><span class="op">(</span><span class="va">top_edges</span>, <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    Source <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">[</span><span class="va">source_index</span><span class="op">]</span>,</span>
-<span>    Influenced <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">[</span><span class="va">influenced_index</span><span class="op">]</span>,</span>
+<span>    Source <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">[</span><span class="va">cells_a</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span><span class="op">]</span>,</span>
+<span>    Influenced <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">[</span><span class="va">cells_a</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span><span class="op">]</span>,</span>
 <span>    Weight <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">A</span><span class="op">[</span><span class="va">top_edges</span><span class="op">]</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;        Source                Influenced Weight</span></span>
@@ -722,17 +706,16 @@ summaries of the fitted subset, not causal claims:</p>
 <p>The receiver-side channels are read analogously: past activity
 directed at the source receiver helps predict future activity directed
 at the influenced receiver.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">B</span> <span class="op">&lt;-</span> <span class="va">ifit</span><span class="op">$</span><span class="va">B</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span>, <span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="cn">NA</span></span>
 <span><span class="va">top_b</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span>, na.last <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
-<span><span class="va">b_source_index</span> <span class="op">&lt;-</span> <span class="op">(</span><span class="op">(</span><span class="va">top_b</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%/%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span></span>
-<span><span class="va">b_influenced_index</span> <span class="op">&lt;-</span> <span class="op">(</span><span class="op">(</span><span class="va">top_b</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span> <span class="op"><a href="https://rdrr.io/r/base/Arithmetic.html" class="external-link">%%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1</span></span>
+<span><span class="va">cells_b</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">arrayInd</a></span><span class="op">(</span><span class="va">top_b</span>, <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    Source_receiver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">[</span><span class="va">b_source_index</span><span class="op">]</span>,</span>
-<span>    Influenced_receiver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">[</span><span class="va">b_influenced_index</span><span class="op">]</span>,</span>
+<span>    Source_receiver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">[</span><span class="va">cells_b</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span><span class="op">]</span>,</span>
+<span>    Influenced_receiver <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">B</span><span class="op">)</span><span class="op">[</span><span class="va">cells_b</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span><span class="op">]</span>,</span>
 <span>    Weight <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">B</span><span class="op">[</span><span class="va">top_b</span><span class="op">]</span>, <span class="fl">2</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;   Source_receiver Influenced_receiver Weight</span></span>
@@ -741,64 +724,48 @@ at the influenced receiver.</p>
 <span><span class="co">#&gt; 3     AFGHANISTAN             LEBANON  -0.51</span></span>
 <span><span class="co">#&gt; 4     AFGHANISTAN              ISRAEL  -0.51</span></span>
 <span><span class="co">#&gt; 5         LEBANON         AFGHANISTAN  -0.50</span></span></code></pre></div>
-<p>For an effect-size summary, change the lagged signal <code>X</code>
-and compare fitted means. The next scenario is a post-fit sensitivity
-check among high-leverage channels: it nudges the lagged conflict signal
-sent by the strongest source country above by one quarter of a standard
-deviation, holding <code>W</code> and <code>Z</code> fixed. It is not a
-causal intervention or a forecast.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<p>Both <code>A</code> and <code>B</code> show near-symmetric pairs —
+India–Pakistan and Afghanistan–Pakistan on the sender side, Iraq–Lebanon
+on the receiver side — each direction carrying a similar weight. SIR
+estimates the two directions separately, so this symmetry is an
+empirical finding about these mutually reactive dyads, not an assumption
+baked into the model.</p>
+<p>For an effect-size summary, pose a substantive <em>what-if</em> on a
+specific dyad. India and Pakistan are the strongest mutually reactive
+pair above; what would the model predict for their conflict if they were
+allies? We set the <code>ally</code> indicator to 1 for that dyad — in
+both the direct covariates <code>Z</code> and the influence covariates
+<code>W</code>, so the change is coherent — and re-predict:</p>
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">mu_icews</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">ifit</span><span class="op">)</span></span>
-<span><span class="va">X_scen</span> <span class="op">&lt;-</span> <span class="va">X_icews</span></span>
-<span><span class="va">src</span> <span class="op">&lt;-</span> <span class="va">source_index</span><span class="op">[</span><span class="fl">1</span><span class="op">]</span></span>
-<span><span class="va">x_shift</span> <span class="op">&lt;-</span> <span class="fl">0.25</span> <span class="op">*</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd</a></span><span class="op">(</span><span class="va">X_icews</span><span class="op">[</span><span class="va">src</span>, , <span class="op">]</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="va">X_scen</span><span class="op">[</span><span class="va">src</span>, , <span class="op">]</span> <span class="op">&lt;-</span> <span class="va">X_scen</span><span class="op">[</span><span class="va">src</span>, , <span class="op">]</span> <span class="op">+</span> <span class="va">x_shift</span></span>
-<span><span class="va">mu_scen</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">ifit</span>, newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>W <span class="op">=</span> <span class="va">W_icews</span>, X <span class="op">=</span> <span class="va">X_scen</span>, Z <span class="op">=</span> <span class="va">Z_icews</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="va">delta</span> <span class="op">&lt;-</span> <span class="va">mu_scen</span> <span class="op">-</span> <span class="va">mu_icews</span></span>
+<span><span class="va">ally_W</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="va">icews</span><span class="op">$</span><span class="va">W</span><span class="op">)</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="st">"ally"</span><span class="op">)</span></span>
+<span><span class="va">ally_Z</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/dimnames.html" class="external-link">dimnames</a></span><span class="op">(</span><span class="va">icews</span><span class="op">$</span><span class="va">Z</span><span class="op">)</span><span class="op">[[</span><span class="fl">3</span><span class="op">]</span><span class="op">]</span> <span class="op">==</span> <span class="st">"ally"</span><span class="op">)</span></span>
+<span><span class="va">ind</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span> <span class="op">==</span> <span class="st">"INDIA"</span><span class="op">)</span></span>
+<span><span class="va">pak</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span> <span class="op">==</span> <span class="st">"PAKISTAN"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">W_ally</span> <span class="op">&lt;-</span> <span class="va">W_icews</span></span>
+<span><span class="va">Z_ally</span> <span class="op">&lt;-</span> <span class="va">Z_icews</span></span>
+<span><span class="va">W_ally</span><span class="op">[</span><span class="va">ind</span>, <span class="va">pak</span>, <span class="va">ally_W</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">1</span>; <span class="va">W_ally</span><span class="op">[</span><span class="va">pak</span>, <span class="va">ind</span>, <span class="va">ally_W</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">1</span>   <span class="co"># turn the ally channel on</span></span>
+<span><span class="va">Z_ally</span><span class="op">[</span><span class="va">ind</span>, <span class="va">pak</span>, <span class="va">ally_Z</span>, <span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">1</span>; <span class="va">Z_ally</span><span class="op">[</span><span class="va">pak</span>, <span class="va">ind</span>, <span class="va">ally_Z</span>, <span class="op">]</span> <span class="op">&lt;-</span> <span class="fl">1</span></span>
+<span><span class="va">mu_ally</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">ifit</span>, newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>W <span class="op">=</span> <span class="va">W_ally</span>, X <span class="op">=</span> <span class="va">X_icews</span>, Z <span class="op">=</span> <span class="va">Z_ally</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    scenario <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="st">"Increase lagged signal sent by"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">A</span><span class="op">)</span><span class="op">[</span><span class="va">src</span><span class="op">]</span>, <span class="st">"by 0.25 SD"</span><span class="op">)</span>,</span>
-<span>    baseline_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_icews</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    scenario_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_scen</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    mean_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">delta</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    median_change <span class="op">=</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/median.html" class="external-link">median</a></span><span class="op">(</span><span class="va">delta</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    q05_change <span class="op">=</span> <span class="fu">qval</span><span class="op">(</span><span class="va">delta</span>, <span class="fl">0.05</span><span class="op">)</span>,</span>
-<span>    q95_change <span class="op">=</span> <span class="fu">qval</span><span class="op">(</span><span class="va">delta</span>, <span class="fl">0.95</span><span class="op">)</span>,</span>
-<span>    p90_abs_change <span class="op">=</span> <span class="fu">qval</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">delta</span><span class="op">)</span>, <span class="fl">0.9</span><span class="op">)</span>,</span>
-<span>    max_abs_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">delta</span><span class="op">)</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>,</span>
-<span>    check.names <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>    dyad              <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"India -&gt; Pakistan"</span>, <span class="st">"Pakistan -&gt; India"</span><span class="op">)</span>,</span>
+<span>    baseline_conflict <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_icews</span><span class="op">[</span><span class="va">ind</span>, <span class="va">pak</span>, <span class="op">]</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_icews</span><span class="op">[</span><span class="va">pak</span>, <span class="va">ind</span>, <span class="op">]</span><span class="op">)</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>,</span>
+<span>    allied_conflict   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_ally</span><span class="op">[</span><span class="va">ind</span>, <span class="va">pak</span>, <span class="op">]</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu_ally</span><span class="op">[</span><span class="va">pak</span>, <span class="va">ind</span>, <span class="op">]</span><span class="op">)</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>,</span>
 <span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;                                             scenario baseline_mean</span></span>
-<span><span class="co">#&gt; 1 Increase lagged signal sent by PAKISTAN by 0.25 SD      13.09405</span></span>
-<span><span class="co">#&gt;   scenario_mean mean_change median_change q05_change q95_change p90_abs_change</span></span>
-<span><span class="co">#&gt; 1      13.63516   0.5411172             0  -5.204853   2.264367       3.873522</span></span>
-<span><span class="co">#&gt;   max_abs_change</span></span>
-<span><span class="co">#&gt; 1       529.1686</span></span></code></pre></div>
-<p>The change columns are expected-count differences on the Poisson
-response scale. The median is the main guide to the typical dyad-month;
-<code>max_abs_change</code> tells you how reactive the fitted model can
-be in the tail. Because this is a post-fit sensitivity check on a
-high-leverage source, inspect the dyad-months that move most before
-attaching a substantive interpretation:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">top_delta</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="va">delta</span><span class="op">)</span>, decreasing <span class="op">=</span> <span class="cn">TRUE</span>, na.last <span class="op">=</span> <span class="cn">NA</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
-<span><span class="va">top_idx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">arrayInd</a></span><span class="op">(</span><span class="va">top_delta</span>, <span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">delta</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    Source <span class="op">=</span> <span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span><span class="op">[</span><span class="va">top_idx</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>    Receiver <span class="op">=</span> <span class="va">icews</span><span class="op">$</span><span class="va">countries</span><span class="op">[</span><span class="va">icews_nodes</span><span class="op">]</span><span class="op">[</span><span class="va">top_idx</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>    Month <span class="op">=</span> <span class="va">icews_periods</span><span class="op">[</span><span class="va">top_idx</span><span class="op">[</span>, <span class="fl">3</span><span class="op">]</span><span class="op">]</span>,</span>
-<span>    baseline_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">mu_icews</span><span class="op">[</span><span class="va">top_delta</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    scenario_mean <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">mu_scen</span><span class="op">[</span><span class="va">top_delta</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    delta <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">delta</span><span class="op">[</span><span class="va">top_delta</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co">#&gt;    Source Receiver Month baseline_mean scenario_mean   delta</span></span>
-<span><span class="co">#&gt; 1  ISRAEL  LEBANON    19      2318.822      2847.991 529.169</span></span>
-<span><span class="co">#&gt; 2  ISRAEL  LEBANON    20      2005.888      2463.644 457.755</span></span>
-<span><span class="co">#&gt; 3 LEBANON   ISRAEL    19      1301.964      1521.086 219.123</span></span>
-<span><span class="co">#&gt; 4 LEBANON   ISRAEL    20       985.938      1151.873 165.935</span></span>
-<span><span class="co">#&gt; 5  ISRAEL  LEBANON     9       520.745       639.582 118.837</span></span></code></pre></div>
+<span><span class="co">#&gt;                dyad baseline_conflict allied_conflict</span></span>
+<span><span class="co">#&gt; 1 India -&gt; Pakistan              38.4             3.4</span></span>
+<span><span class="co">#&gt; 2 Pakistan -&gt; India              27.3             0.4</span></span></code></pre></div>
+<p>Under the fitted model, an India–Pakistan alliance cuts predicted
+bilateral conflict sharply — from about 38 expected events per month
+down to 3 on India’s side, and from about 27 to under 1 on Pakistan’s.
+Because the <code>ally</code> indicator enters both the direct effect
+and the influence channel, flipping it on for one dyad answers a
+coherent, interpretable counterfactual. As with any scenario, read it as
+a model-implied association under the assumptions in the causal box
+above, not a guaranteed consequence of a real alliance.</p>
 </div>
 <div class="section level2">
 <h2 id="building-x-a-note-that-saves-silent-errors">Building X (a note that saves silent errors)<a class="anchor" aria-label="anchor" href="#building-x-a-note-that-saves-silent-errors"></a>

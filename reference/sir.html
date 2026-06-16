@@ -29,7 +29,7 @@ Receiver influence (B matrix): B[j,l] measures how node l's
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -171,15 +171,25 @@ Default is FALSE.</p></dd>
 
 
 <dt id="arg-symmetric">symmetric<a class="anchor" aria-label="anchor" href="#arg-symmetric"></a></dt>
-<dd><p>Logical. If TRUE, treats the network as undirected
-(symmetric). The function uses only upper-triangle observations for
-fitting and sets <code>fix_receiver = TRUE</code>, giving an upper-triangle,
-sender-side representation of undirected data rather than a fully
-order-invariant undirected bilinear model. Continuous asymmetric outcomes
-are averaged across upper and lower triangles; Poisson and Binomial
-outcomes must already be symmetric so averaging does not create invalid
-non-integer or non-binary observations. Influence covariates W must also be
-symmetric. Default is FALSE.</p></dd>
+<dd><p>Logical. If TRUE, fits the genuine <strong>undirected</strong>
+model with a single shared influence operator \(A = B = \sum_k \gamma_k
+W_k\), so the bilinear term is the quadratic form \(A X A'\), symmetric in
+\((i,j)\) by construction. All \(\gamma_k\) are estimated (the quadratic
+form's scale is identified by the data); \(A\) is identified only up to its
+overall sign (\(A X A' = (-A) X (-A)'\)), fixed so the largest-magnitude
+\(\gamma_k\) is positive. Requires a square network and symmetric,
+zero-diagonal influence covariates <code>W</code> (non-zero W diagonals are
+zeroed, since the quadratic form must be self-feedback-free); static (3D) or
+dynamic (4D, time-varying) <code>W</code> are both supported, the dynamic case
+giving a per-period operator \(A_t X_t A_t'\). Continuous
+asymmetric <code>Y</code> is averaged across triangles; Poisson/Binomial <code>Y</code>
+must already be symmetric. Estimation is BFGS with an analytic gradient over
+the upper-triangle off-diagonal cells; <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>/<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>/
+<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> default to the actor-clustered cluster-robust SE (the same
+estimator used for directed fits, with a \(t(G-1)\) reference), while
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> prints the classical SE. Request classical intervals with
+<code>se.type = "classical"</code> (see <code><a href="confint.sir.html">confint.sir</a></code>). Cannot be
+combined with <code>fix_receiver</code>. Default is FALSE.</p></dd>
 
 
 <dt id="arg-bipartite">bipartite<a class="anchor" aria-label="anchor" href="#arg-bipartite"></a></dt>
@@ -238,7 +248,11 @@ values). The global RNG state is restored on exit. Default NULL.</p></dd>
       <code>se</code> (classical SE), <code>rse</code> (robust/sandwich SE),
       <code>t_se</code> (z-statistic using classical SE),
       <code>t_rse</code> (z-statistic using robust SE). Row names identify each
-      parameter.</p></dd>
+      parameter. The <code>rse</code>/<code>t_rse</code> columns are <code>NA</code> for fits
+      with no separate HC0 path (notably symmetric/undirected fits; all SE
+      columns are <code>NA</code> for full-bilinear bipartite fits). The default
+      cluster-robust SEs/intervals come from <code>sqrt(diag(vcov(fit)))</code> and
+      <code>confint(fit)</code>, not from <code>summ</code>.</p></dd>
 
     <dt>A</dt>
 <dd><p>Sender influence matrix. For static W: n1 x n1 matrix.
@@ -258,6 +272,9 @@ values). The global RNG state is restored on exit. Default NULL.</p></dd>
 <dd><p>Numeric vector of all estimated parameters in order:
       [theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p].
       When <code>fix_receiver = TRUE</code>: [theta_1, ..., theta_q, alpha_1, ..., alpha_p].
+      For a symmetric fit: [theta_1, ..., theta_q, gamma_1, ..., gamma_p]
+      (all gamma estimated; A is identified up to global sign, fixed so the
+      largest-magnitude gamma is positive).
       For a full-bilinear bipartite fit:
       [theta_1, ..., theta_q, alpha_2, ..., alpha_p, beta_1, ..., beta_p2].</p></dd>
 
@@ -371,6 +388,24 @@ values). The global RNG state is restored on exit. Default NULL.</p></dd>
 
     <dt>sigma2</dt>
 <dd><p>Estimated error variance (only for <code>family = "normal"</code>).</p></dd>
+
+    <dt>se_reliable</dt>
+<dd><p>Logical, FALSE if the Hessian was ill-conditioned so
+      the classical SEs should be treated with caution.</p></dd>
+
+    <dt>dynamic_W</dt>
+<dd><p>Logical, TRUE if W was time-varying (4D).</p></dd>
+
+    <dt>symmetric/gamma/operator/rho_A/gain/stationary</dt>
+<dd><p>Present for symmetric
+      (A = B) fits: <code>symmetric = TRUE</code>, <code>operator = "symmetric"</code>;
+      <code>gamma</code> is the full shared-influence vector (length p, all estimated,
+      identified up to global sign, largest-magnitude gamma fixed positive);
+      <code>rho_A</code> is the
+      spectral radius of A (the max over periods for dynamic W),
+      <code>gain = rho_A^2 / (n - 1)</code> is the stationarity gain, and
+      <code>stationary</code> is <code>FALSE</code> when <code>gain &gt;= 1</code> (the operator is
+      explosive and estimates may be degenerate).</p></dd>
 
 
 </dl></div>

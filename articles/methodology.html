@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,7 +76,9 @@
 <h2 id="the-social-influence-regression-model">The Social Influence Regression model<a class="anchor" aria-label="anchor" href="#the-social-influence-regression-model"></a>
 </h2>
 <p>This vignette is the mathematical companion to
-<code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code>. Substantive readers can use the
+<code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code>. It is a reference document with
+no runnable code; for examples you can run and adapt, see the overview,
+inference, and extensions vignettes. Substantive readers can use the
 overview first, then return here for the model scale, identification,
 and inference assumptions. The recurring symbols are:</p>
 <table class="table">
@@ -120,10 +122,18 @@ and inference assumptions. The recurring symbols are:</p>
 <code>W</code> in <code>B</code>, and <code>Z</code>
 </td>
 </tr>
+<tr class="odd">
+<td align="left"><math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mover><mi>S</mi><mo accent="true">̃</mo></mover><annotation encoding="application/x-tex">\tilde S</annotation></semantics></math></td>
+<td align="left">reduced
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>p</mi><mo>×</mo><mi>p</mi></mrow><annotation encoding="application/x-tex">p \times p</annotation></semantics></math>
+sender-channel by receiver-channel lagged-signal table</td>
+</tr>
 </tbody>
 </table>
-<p>Social Influence Regression (SIR) models directed relational data
-observed over time. For a network of
+<p>Social Influence Regression (SIR) models relational data observed
+over time, presented here in directed form; the undirected
+(<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>=</mo><mi>B</mi></mrow><annotation encoding="application/x-tex">A = B</annotation></semantics></math>)
+and bipartite cases are special forms covered later. For a network of
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>
 actors observed at
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math>
@@ -142,10 +152,7 @@ for a link
 (log for Poisson, identity for Normal, logit for Binomial).</p>
 <p>The linear predictor combines exogenous direct effects with a
 bilinear influence term:</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>η</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>=</mo><msup><mi>θ</mi><mi>⊤</mi></msup><msub><mi>z</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>+</mo><mo stretchy="false" form="prefix">(</mo><mi>A</mi><msub><mi>X</mi><mi>t</mi></msub><msup><mi>B</mi><mi>⊤</mi></msup><msub><mo stretchy="false" form="postfix">)</mo><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><msup><mi>θ</mi><mi>⊤</mi></msup><msub><mi>z</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>+</mo><munder><mo>∑</mo><mrow><mi>k</mi><mo>,</mo><mi>l</mi></mrow></munder><msub><mi>A</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><msub><mi>X</mi><mrow><mi>k</mi><mi>l</mi><mi>t</mi></mrow></msub><msub><mi>B</mi><mrow><mi>j</mi><mi>l</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
-\eta_{ijt} = \theta^\top z_{ijt} + (A X_t B^\top)_{ij}
-    = \theta^\top z_{ijt} + \sum_{k,l} A_{ik} X_{klt} B_{jl}.
-</annotation></semantics></math></p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>η</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>=</mo><msup><mi>θ</mi><mi>⊤</mi></msup><msub><mi>z</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>+</mo><mo stretchy="false" form="prefix">(</mo><mi>A</mi><msub><mi>X</mi><mi>t</mi></msub><msup><mi>B</mi><mi>⊤</mi></msup><msub><mo stretchy="false" form="postfix">)</mo><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><msup><mi>θ</mi><mi>⊤</mi></msup><msub><mi>z</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>+</mo><munder><mo>∑</mo><mrow><mi>k</mi><mo>,</mo><mi>l</mi></mrow></munder><msub><mi>A</mi><mrow><mi>i</mi><mi>k</mi></mrow></msub><msub><mi>X</mi><mrow><mi>k</mi><mi>l</mi><mi>t</mi></mrow></msub><msub><mi>B</mi><mrow><mi>j</mi><mi>l</mi></mrow></msub><mi>.</mi></mrow><annotation encoding="application/x-tex"> \eta_{ijt} = \theta^\top z_{ijt} + (A X_t B^\top)_{ij} = \theta^\top z_{ijt} + \sum_{k,l} A_{ik} X_{klt} B_{jl}. </annotation></semantics></math></p>
 <p>where</p>
 <ul>
 <li>
@@ -168,23 +175,22 @@ for counts);</li>
 matrices by covariates</strong>
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>W</mi><mi>r</mi></msub><annotation encoding="application/x-tex">W_r</annotation></semantics></math>
 (the slices of <code>W</code>):</p>
-<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>α</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mo>,</mo><mspace width="2.0em"></mspace><mi>B</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>β</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mi>.</mi></mrow><annotation encoding="application/x-tex">
-A = \sum_{r=1}^{p} \alpha_r W_r,
-\qquad
-B = \sum_{r=1}^{p} \beta_r W_r.
-</annotation></semantics></math></p>
+<p><math display="block" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>α</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mo>,</mo><mspace width="2.0em"></mspace><mi>B</mi><mo>=</mo><munderover><mo>∑</mo><mrow><mi>r</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover><msub><mi>β</mi><mi>r</mi></msub><msub><mi>W</mi><mi>r</mi></msub><mi>.</mi></mrow><annotation encoding="application/x-tex"> A = \sum_{r=1}^{p} \alpha_r W_r, \qquad B = \sum_{r=1}^{p} \beta_r W_r. </annotation></semantics></math></p>
 <p>Substituting gives the compact form
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>η</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>=</mo><msup><mi>θ</mi><mi>⊤</mi></msup><msub><mi>z</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>+</mo><msup><mi>α</mi><mi>⊤</mi></msup><msub><mover><mi>X</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mi>β</mi></mrow><annotation encoding="application/x-tex">\eta_{ijt} = \theta^\top z_{ijt} + \alpha^\top \tilde X_{ijt} \beta</annotation></semantics></math>,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>η</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>=</mo><msup><mi>θ</mi><mi>⊤</mi></msup><msub><mi>z</mi><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mo>+</mo><msup><mi>α</mi><mi>⊤</mi></msup><msub><mover><mi>S</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><mi>β</mi></mrow><annotation encoding="application/x-tex">\eta_{ijt} = \theta^\top z_{ijt} + \alpha^\top \tilde S_{ijt} \beta</annotation></semantics></math>,
 where the reduced
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>p</mi><mo>×</mo><mi>p</mi></mrow><annotation encoding="application/x-tex">p \times p</annotation></semantics></math>
 matrix
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mover><mi>X</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\tilde X_{ijt}</annotation></semantics></math>
-(distinct from the
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mover><mi>S</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\tilde S_{ijt}</annotation></semantics></math>
+— the table of sender-channel by receiver-channel lagged signals for
+dyad
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(i,j)</annotation></semantics></math>,
+distinct from the
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>m</mi><mo>×</mo><mi>m</mi></mrow><annotation encoding="application/x-tex">m \times m</annotation></semantics></math>
 lagged state
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>X</mi><mi>t</mi></msub><annotation encoding="application/x-tex">X_t</annotation></semantics></math>)
-has entries
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><msub><mover><mi>X</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><msub><mo stretchy="false" form="postfix">)</mo><mrow><mi>r</mi><mi>s</mi></mrow></msub><mo>=</mo><msub><mo>∑</mo><mrow><mi>k</mi><mo>,</mo><mi>l</mi></mrow></msub><msub><mi>W</mi><mrow><mi>r</mi><mo>,</mo><mi>i</mi><mi>k</mi></mrow></msub><msub><mi>X</mi><mrow><mi>k</mi><mi>l</mi><mi>t</mi></mrow></msub><msub><mi>W</mi><mrow><mi>s</mi><mo>,</mo><mi>j</mi><mi>l</mi></mrow></msub></mrow><annotation encoding="application/x-tex">(\tilde X_{ijt})_{rs} = \sum_{k,l} W_{r,ik} X_{klt} W_{s,jl}</annotation></semantics></math>.
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>X</mi><mi>t</mi></msub><annotation encoding="application/x-tex">X_t</annotation></semantics></math>
+— has entries
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><msub><mover><mi>S</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><msub><mo stretchy="false" form="postfix">)</mo><mrow><mi>r</mi><mi>s</mi></mrow></msub><mo>=</mo><msub><mo>∑</mo><mrow><mi>k</mi><mo>,</mo><mi>l</mi></mrow></msub><msub><mi>W</mi><mrow><mi>r</mi><mo>,</mo><mi>i</mi><mi>k</mi></mrow></msub><msub><mi>X</mi><mrow><mi>k</mi><mi>l</mi><mi>t</mi></mrow></msub><msub><mi>W</mi><mrow><mi>s</mi><mo>,</mo><mi>j</mi><mi>l</mi></mrow></msub></mrow><annotation encoding="application/x-tex">(\tilde S_{ijt})_{rs} = \sum_{k,l} W_{r,ik} X_{klt} W_{s,jl}</annotation></semantics></math>.
 The two forms are identical; the explicit double-sum above is the one
 used throughout the other vignettes.</p>
 <p>Equivalently this is a <strong>rank-at-most-one matrix
@@ -193,19 +199,20 @@ regression</strong>: the otherwise arbitrary
 coefficient matrix
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math>
 multiplying
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mover><mi>X</mi><mo accent="true">̃</mo></mover><annotation encoding="application/x-tex">\tilde X</annotation></semantics></math>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mover><mi>S</mi><mo accent="true">̃</mo></mover><annotation encoding="application/x-tex">\tilde S</annotation></semantics></math>
 is restricted to
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mo>=</mo><mi>α</mi><msup><mi>β</mi><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">C = \alpha\beta^\top</annotation></semantics></math>.</p>
-<p>In regression terms,
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mover><mi>X</mi><mo accent="true">̃</mo></mover><mrow><mi>i</mi><mi>j</mi><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">\tilde X_{ijt}</annotation></semantics></math>
-is the table of all sender-channel by receiver-channel lagged signals
-for dyad
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(i,j)</annotation></semantics></math>
-at time
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>.
-SIR does not estimate an unrestricted coefficient for every entry in
-that table; it restricts those interaction coefficients to products of
-sender-side weights and receiver-side weights.</p>
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>C</mi><mo>=</mo><mi>α</mi><msup><mi>β</mi><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">C = \alpha\beta^\top</annotation></semantics></math>.
+SIR does not estimate a free coefficient for every channel pair — it
+forces them to be products of sender-side and receiver-side weights.
+Read the weights substantively: a positive
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>α</mi><mi>r</mi></msub><annotation encoding="application/x-tex">\alpha_r</annotation></semantics></math>
+means senders strong on covariate
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>W</mi><mi>r</mi></msub><annotation encoding="application/x-tex">W_r</annotation></semantics></math>
+propagate more <em>outgoing</em> influence (e.g. a positive weight on an
+alliance covariate means allied senders pass on more of their past
+activity), and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>β</mi><mi>r</mi></msub><annotation encoding="application/x-tex">\beta_r</annotation></semantics></math>
+says the same for the <em>receiver</em> side.</p>
 </div>
 <div class="section level2">
 <h2 id="identifiability">Identifiability<a class="anchor" aria-label="anchor" href="#identifiability"></a>
@@ -233,9 +240,12 @@ assessing recovery, compare
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math>
 rather than
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>α</mi><mo>,</mo><mi>β</mi></mrow><annotation encoding="application/x-tex">\alpha,\beta</annotation></semantics></math>
-separately. In applied work, put a theoretically central, nonzero
-baseline channel first in <code>W</code>; all reported
-<code>alpha</code> coefficients are relative to that first slice.</p>
+separately — form
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mover><mi>C</mi><mo accent="true">̂</mo></mover><mo>=</mo><mover><mi>α</mi><mo accent="true">̂</mo></mover><msup><mover><mi>β</mi><mo accent="true">̂</mo></mover><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">\hat C = \hat\alpha\hat\beta^\top</annotation></semantics></math>
+(in code, <code>tcrossprod(fit$alpha, fit$beta)</code>) and compare it
+to the truth; <code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code> works a full
+example. In applied work, put a theoretically central, nonzero baseline
+channel first in <code>W</code>.</p>
 </div>
 <div class="section level2">
 <h2 id="estimation">Estimation<a class="anchor" aria-label="anchor" href="#estimation"></a>
@@ -244,23 +254,25 @@ baseline channel first in <code>W</code>; all reported
 <ul>
 <li>
 <strong>Alternating GLM/IRLS</strong> (<code>method = "ALS"</code>,
-the default): alternates between updating
+the default): holding one influence vector fixed makes the model linear
+in the other, so the engine alternates two GLM/IRLS subproblems — update
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>θ</mi><mo>,</mo><mi>α</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\theta, \alpha)</annotation></semantics></math>
 with
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math>
-fixed and
+fixed, then
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>θ</mi><mo>,</mo><mi>β</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(\theta, \beta)</annotation></semantics></math>
 with
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>
-fixed. Holding one influence vector fixed makes the model linear in the
-other, so each update is a GLM/IRLS subproblem. The <code>"ALS"</code>
-method name is retained for API compatibility.</li>
+fixed. (The argument value <code>"ALS"</code> is a historical label; the
+engine is the GLM/IRLS scheme just described, not least squares.)</li>
 <li>
 <strong>optim</strong>: maximizes the full log-likelihood jointly
 using BFGS with analytic gradients.</li>
 </ul>
 <p>The alternating GLM/IRLS engine is generally more stable and is the
-default.</p>
+default; reach for <code>method = "optim"</code> (BFGS, full-likelihood)
+mainly to double-check a solution or when the alternating scheme
+stalls.</p>
 </div>
 <div class="section level2">
 <h2 id="standard-errors">Standard errors<a class="anchor" aria-label="anchor" href="#standard-errors"></a>
@@ -268,43 +280,55 @@ default.</p>
 <p>Several uncertainty summaries are available:</p>
 <ul>
 <li>
-<strong>Classical</strong>: the inverse Hessian, valid when the
-model is correctly specified, the Hessian is well conditioned, and
-dyad-period scores are independent.</li>
+<strong>Cluster</strong> (<code>vcov(fit)</code>, the default for
+<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>/<code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>/<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code>): an
+actor-clustered sandwich that assigns each cell’s score to both of its
+endpoint actors — the right starting point for directed and undirected
+network data when the Hessian bread is stable.</li>
 <li>
-<strong>Robust (HC0)</strong>: a sandwich estimator for
+<strong>Classical</strong>
+(<code>vcov(fit, type = "classical")</code>, also what
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> prints): the inverse Hessian, valid when the
+model is correctly specified, the Hessian is well conditioned, and
+dyad-period scores are independent. Note the asymmetry —
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> prints these classical SEs and significance stars
+for a quick look, while
+<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>/<code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>/<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> default
+to the cluster-robust estimator for reporting.</li>
+<li>
+<strong>Robust / HC0</strong>
+(<code>vcov(fit, type = "robust")</code>): a sandwich estimator for
 heteroskedasticity or overdispersion; it does not model shared-actor
 dyadic dependence.</li>
-<li>
-<strong>Cluster</strong>: a multiway cluster-robust sandwich on
-sender, receiver, and time margins; this is the usual starting point for
-directed network data when the Hessian bread is stable.</li>
 <li>
 <strong>Bootstrap/jackknife</strong>:
 <code>boot_sir(type = "block")</code> resamples whole periods as
 independent blocks, preserving within-period network dependence but not
-serial dependence, while <code>boot_sir(type = "dyad")</code> is a
-delete-one-actor jackknife.</li>
+serial dependence; <code>boot_sir(type = "parametric")</code> simulates
+new outcome arrays from the fitted model; and
+<code>boot_sir(type = "dyad")</code> is a delete-one-actor
+jackknife.</li>
 </ul>
-<p>If the Hessian is numerically singular the package falls back to a
-generalized inverse and warns. A <em>near</em>-singular (but invertible)
-Hessian will not trigger a warning, so also watch for a large gap
-between the classical and robust SEs as a practical signal of weak
-identification. Cluster SEs address dependence in the score, not weak
-identification in the Hessian; when <code>se_reliable</code> is
-<code>FALSE</code>, prefer refitting, simplifying the model, or using
-the dyad jackknife as a sensitivity check. See
-<code><a href="../articles/sir_inference.html">vignette("sir_inference")</a></code> for worked examples.</p>
+<p>Two checks tell you whether to trust the analytic SEs. First, read
+<code>fit$se_reliable</code>: if it is <code>FALSE</code>, the Hessian
+was singular or ill-conditioned (the package falls back to a generalized
+inverse and warns), so refit, simplify the model, or switch to the dyad
+jackknife. Second, remember that the cluster default corrects for
+dependence in the <em>score</em>, not for weak identification in the
+Hessian — so even when <code>se_reliable</code> is <code>TRUE</code>, a
+model whose influence term is barely identified will have wide intervals
+that no sandwich can tighten. See <code><a href="../articles/sir_inference.html">vignette("sir_inference")</a></code>
+for worked examples.</p>
 </div>
 <div class="section level2">
 <h2 id="when-to-use-sir">When to use SIR<a class="anchor" aria-label="anchor" href="#when-to-use-sir"></a>
 </h2>
-<p>SIR is appropriate when you have a directed network observed over
-time and want to explain lagged, model-implied <em>temporal
-influence</em> – how the prior network predicts future ties through
-observed channels – using <strong>observed</strong> actor/dyad
-covariates. It is complementary to the main latent relational
-models:</p>
+<p>SIR is appropriate when you have a network observed over time —
+directed, undirected, or bipartite — and want to explain lagged,
+model-implied <em>temporal influence</em> — how the prior network
+predicts future ties through observed channels — using
+<strong>observed</strong> actor/dyad covariates. It is complementary to
+the main latent relational models:</p>
 <ul>
 <li>
 <strong>SIR</strong>: influence is a function of measured covariates
@@ -316,14 +340,23 @@ interpretable coefficients for them.</li>
 unobserved geometric space; good for visualizing positions/clustering
 when you cannot specify the drivers.</li>
 <li>
-<strong>AMEN / latent factor models</strong>: capture additive
-sender/receiver effects and multiplicative (stochastic-equivalence)
-structure with latent factors; good for flexible dependence when
-covariate explanation is secondary.</li>
+<strong>Additive and Multiplicative Effects (AMEN) / latent factor
+models</strong>: capture additive sender/receiver effects and
+multiplicative (stochastic-equivalence) structure with latent factors;
+good for flexible dependence when covariate explanation is
+secondary.</li>
 <li>
-<strong>ERGM</strong>: models the network via local configuration
-statistics (reciprocity, triangles); a cross-sectional generative model,
-less geared to temporal covariate-driven influence.</li>
+<strong>ERGM and its temporal extensions (TERGM, STERGM)</strong>:
+model the network via local configuration statistics (reciprocity,
+triangles); ERGM is cross-sectional, while TERGM and STERGM add temporal
+terms. Generative models of structure rather than of covariate-driven
+influence through the lagged state.</li>
+<li>
+<strong>SAOM / RSiena (Snijders)</strong>: actor-oriented
+continuous-time models of how actors change ties over discrete waves —
+the closest longitudinal competitor. SIR differs by modelling influence
+as a low-rank bilinear operator on the lagged network with interpretable
+covariate weights, rather than actor decision rates.</li>
 </ul>
 <p>A key limitation to weigh: <strong>SIR has no contemporaneous
 latent-dependence term.</strong> Influence enters only through the
@@ -331,17 +364,14 @@ latent-dependence term.</strong> Influence enters only through the
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>X</mi><mi>t</mi></msub><annotation encoding="application/x-tex">X_t</annotation></semantics></math>,
 and the model carries no latent sender/receiver effects or
 multiplicative factors for the <em>residual</em> dyadic structure within
-a time period. Consequently SIR’s inference assumes dyadic independence
-given the covariates — any leftover within-period dependence
-(reciprocity, degree heterogeneity, stochastic equivalence) is unmodeled
-and can bias the reported standard errors. AMEN and latent-space models
-are preferable when that residual relational dependence is itself of
-interest, or when it is strong enough that ignoring it would distort
-uncertainty estimates; in applied work multiway cluster SEs and
-<code>boot_sir(type = "dyad")</code> are the package’s dyad-aware
-sensitivity checks. HC0 robust SEs only address
-heteroskedasticity/overdispersion under dyad-period score
-independence.</p>
+a time period. So any within-period dependence (reciprocity, degree
+heterogeneity, stochastic equivalence) is left in the residuals. The
+cluster-robust default keeps that from distorting the standard errors
+(see “Standard errors” above), but if the residual structure is itself
+of interest — or strong enough to shift the mean — AMEN or latent-space
+models are preferable. The practical rule: use SIR when residual
+dependence is a nuisance to guard against, and a latent-variable model
+when it is part of the question.</p>
 <p>For causal language, SIR needs the same discipline as any
 longitudinal observational design: temporal ordering, exogeneity of the
 included covariates, plausible control for time-varying confounding, and
@@ -354,14 +384,22 @@ cluster-robust intervals (with dyad jackknife or bootstrap checks for
 key coefficients), and present named model-implied scenarios as
 sensitivity comparisons on the response scale rather than as
 interventions.</p>
-<p>SIR also handles <strong>undirected</strong> networks (set
-<code>symmetric = TRUE</code>, which fixes
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mo>=</mo><mi>I</mi></mrow><annotation encoding="application/x-tex">B = I</annotation></semantics></math>)
-and <strong>bipartite / rectangular</strong> outcomes where senders and
-receivers are distinct populations. The default bipartite fit estimates
-sender-side influence only; supplying <code>W_recv</code> estimates a
-full bilinear sender-and-receiver model, with dyad jackknife inference
-recommended; see <code><a href="../articles/sir_extensions.html">vignette("sir_extensions")</a></code>.</p>
+<p>SIR also handles <strong>undirected</strong> networks
+(<code>symmetric = TRUE</code> ties the sender and receiver operators,
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mo>=</mo><mi>B</mi><mo>=</mo><msub><mo>∑</mo><mi>k</mi></msub><msub><mi>γ</mi><mi>k</mi></msub><msub><mi>W</mi><mi>k</mi></msub></mrow><annotation encoding="application/x-tex">A = B = \sum_k \gamma_k W_k</annotation></semantics></math>,
+so the bilinear term is the quadratic form
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>A</mi><mi>X</mi><msup><mi>A</mi><mo>′</mo></msup></mrow><annotation encoding="application/x-tex">A X A'</annotation></semantics></math>
+— symmetric by construction; all
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>γ</mi><mi>k</mi></msub><annotation encoding="application/x-tex">\gamma_k</annotation></semantics></math>
+are estimated and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+is identified up to global sign, fixed so the largest
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">|</mo><msub><mi>γ</mi><mi>k</mi></msub><mo stretchy="false" form="prefix">|</mo></mrow><annotation encoding="application/x-tex">|\gamma_k|</annotation></semantics></math>
+is positive) and <strong>bipartite / rectangular</strong> outcomes where
+senders and receivers are distinct populations. The default bipartite
+fit estimates sender-side influence only; supplying <code>W_recv</code>
+estimates a full bilinear sender-and-receiver model, with dyad jackknife
+inference recommended; see <code><a href="../articles/sir_extensions.html">vignette("sir_extensions")</a></code>.</p>
 <p>Reach for SIR when the question is “<em>which observable features
 make actors influential over time, and on whom?</em>”</p>
 </div>

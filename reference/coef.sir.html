@@ -11,7 +11,7 @@ include exogenous covariate effects (theta), sender influence weights
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -72,12 +72,12 @@ include exogenous covariate effects (theta), sender influence weights
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>Named numeric vector of estimated coefficients. Names use the
-  <code>(Z)</code> / <code>(alphaW)</code> / <code>(betaW)</code> tagging from
+    <p>Named numeric vector of estimated coefficients, tagged as in
   <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>: <code>(Z)</code> = exogenous direct effects (theta);
-  <code>(alphaW)</code> = sender-influence weights (alpha_2..alpha_p, since
-  alpha_1 = 1 is fixed for identifiability); <code>(betaW)</code> = receiver-
-  influence weights (beta).</p>
+  <code>(alphaW)</code> = sender-influence weights (alpha_2..alpha_p for a directed
+  fit, since alpha_1 = 1 is fixed); <code>(betaW)</code> = receiver-influence weights
+  (beta); <code>(gammaW)</code> = shared undirected weights for a symmetric fit (all
+  gamma_1..gamma_p estimated, identified up to sign).</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

@@ -17,7 +17,7 @@ be more reliable when the Hessian is ill-conditioned."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,7 +69,7 @@ be more reliable when the Hessian is ill-conditioned.</p>
 <span>  parm <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  level <span class="op">=</span> <span class="fl">0.95</span>,</span>
 <span>  boot <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  se.type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cluster"</span>, <span class="st">"classical"</span>, <span class="st">"robust"</span>, <span class="st">"twoway"</span>, <span class="st">"dyad"</span><span class="op">)</span>,</span>
+<span>  se.type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"cluster"</span>, <span class="st">"classical"</span>, <span class="st">"robust"</span><span class="op">)</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -99,13 +99,13 @@ used instead of Wald intervals.</p></dd>
 
 <dt id="arg-se-type">se.type<a class="anchor" aria-label="anchor" href="#arg-se-type"></a></dt>
 <dd><p>Character. For Wald intervals, which standard errors to use:
-<code>"cluster"</code> (default; multiway sender, receiver, and time clustering
-for supported static fits), <code>"classical"</code> (inverse-Hessian),
-<code>"robust"</code> (HC0 sandwich), <code>"twoway"</code> (alias for
-<code>"cluster"</code>), or <code>"dyad"</code> (directed-dyad clustering). Cluster
-intervals still rely on the Hessian bread being stable. Ignored
-when <code>boot</code> is supplied. Non-classical types require <code>calc_se =
-TRUE</code>; cluster types are unavailable for dynamic (4D) <code>W</code>.</p></dd>
+<code>"cluster"</code> (default; actor-clustered cluster-robust, with a
+<code>t(G - 1)</code> reference, the same estimator for directed and symmetric
+fits), <code>"classical"</code> (inverse-Hessian, with a normal reference – valid
+and tighter when dyads are independent), or <code>"robust"</code> (HC0 for directed
+fits; maps to cluster for symmetric fits). Cluster intervals rely on the
+Hessian bread being stable. Ignored when <code>boot</code> is supplied; cluster is
+unavailable for dynamic (4D) <code>W</code>.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

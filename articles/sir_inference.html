@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -75,12 +75,15 @@
     
     
 <p>Inference for bilinear models takes more care than for an ordinary
-GLM. The bilinear influence term can produce an ill-conditioned Hessian,
-which makes naive Wald standard errors unreliable. This vignette covers
-the tools the package provides: classical and robust variance estimates,
-confidence intervals, bootstrap and jackknife checks, and
-information-criterion model comparison. For basic fitting see
-<code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code>.</p>
+GLM. Network data violate the independent-observations assumption behind
+naive Wald standard errors — ties that share an actor are correlated —
+so this vignette is mostly about getting <em>honest intervals</em> in
+the face of that dependence. (A separate risk, weak identification of
+the influence term, shows up as an ill-conditioned Hessian and is
+flagged by the <code>se_reliable</code> field, covered below.) It walks
+through classical and robust variance estimates, confidence intervals,
+bootstrap checks, and information-criterion model comparison. For basic
+fitting see <code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code>.</p>
 <table class="table">
 <colgroup>
 <col width="13%">
@@ -105,23 +108,25 @@ Hessian</td>
 <td align="left">Does not address shared-actor network dependence</td>
 </tr>
 <tr class="odd">
-<td align="left">Multiway cluster SE</td>
-<td align="left">Sender, receiver, and time dependence in the score</td>
+<td align="left">Cluster-robust SE (default)</td>
+<td align="left">Shared-actor dyadic dependence (each cell scored onto
+both actors)</td>
 <td align="left">Still uses the Hessian as bread, so weak identification
 remains a problem</td>
 </tr>
 <tr class="even">
-<td align="left">Block bootstrap</td>
-<td align="left">Time-period resampling</td>
-<td align="left">Preserves within-period dependence but not actor
-dependence</td>
+<td align="left">Parametric bootstrap</td>
+<td align="left">Resimulates from the fitted model; confirms the
+model-based SEs</td>
+<td align="left">Assumes the model is correct, so it does not capture
+shared-actor dependence</td>
 </tr>
 <tr class="odd">
 <td align="left">Dyad jackknife</td>
-<td align="left">Delete-one-actor sensitivity and actor dependence
-checks</td>
-<td align="left">Normal jackknife intervals, not bootstrap percentile
-intervals</td>
+<td align="left">Fallback when analytic SEs are unavailable (bipartite,
+unstable Hessian)</td>
+<td align="left">A deliberately wide worst-case bound, not a precise
+interval</td>
 </tr>
 </tbody>
 </table>
@@ -136,21 +141,90 @@ can focus on the mechanics.</p>
 <span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_sir.html">sim_sir</a></span><span class="op">(</span>m <span class="op">=</span> <span class="fl">14</span>, T_len <span class="op">=</span> <span class="fl">80</span>, p <span class="op">=</span> <span class="fl">2</span>, q <span class="op">=</span> <span class="fl">2</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, seed <span class="op">=</span> <span class="fl">7</span><span class="op">)</span></span>
 <span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sir.html">sir</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span>, W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>, X <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span>, Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span>,</span>
 <span>           family <span class="op">=</span> <span class="st">"poisson"</span>, calc_se <span class="op">=</span> <span class="cn">TRUE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<p>The estimator recovers these known parameters
+(<code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code> shows the recovery check); here
+we take the fit as given and focus on putting honest <em>intervals</em>
+around it. In the tables below, the coefficient labels tag each
+parameter’s role — <code>(Z)</code> a direct covariate effect,
+<code>(alphaW)</code> a sender-influence weight, <code>(betaW)</code> a
+receiver-influence weight — and the first sender weight is fixed at 1
+for identifiability, so there is no <code>(alphaW) W1</code> row.</p>
 </div>
 <div class="section level2">
 <h2 id="classical-hessian-based-standard-errors">Classical (Hessian-based) standard errors<a class="anchor" aria-label="anchor" href="#classical-hessian-based-standard-errors"></a>
 </h2>
 <p><code>sir(calc_se = TRUE)</code> computes classical standard errors
-from the inverse observed-information matrix. These are what
-<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> prints for quick model inspection. For reporting,
-the default accessors now use cluster-robust uncertainty when the fit
-supports it; request classical intervals explicitly when you need a
-Hessian-only comparison:</p>
+from the inverse observed-information matrix. <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>
+prints them for a quick look, along with a note that they are
+Hessian-based and can overstate significance under dyadic
+dependence:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>   <span class="co"># the SEs reported by summary()</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">──</span> <span style="font-weight: bold;">Social Influence Regression Model</span> <span style="color: #00BBBB;">───────────────────────────────────────────</span></span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">Network:</span> <span style="color: #0000BB;">14</span> nodes, <span style="color: #0000BB;">80</span> time periods (directed)</span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">Family:</span> <span style="color: #0000BB;">"poisson"</span> | <span style="font-weight: bold;">Method:</span> <span style="color: #0000BB;">"ALS"</span></span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">Observations:</span> <span style="color: #0000BB;">14560</span></span></span>
+<span><span class="co">#&gt; ────────────────────────────────────────────────────────────────────────────────</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Coefficients</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt;              Estimate Std. Error z value Pr(&gt;|z|)    </span></span>
+<span><span class="co">#&gt; (Z) Z1      -0.166973   0.007030  -23.75   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; (Z) Z2       0.473545   0.006552   72.27   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; (alphaW) W2  0.734622   0.026506   27.71   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; (betaW) W1  -0.350048   0.005033  -69.55   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; (betaW) W2  -0.202726   0.007608  -26.65   &lt;2e-16 ***</span></span>
+<span><span class="co">#&gt; ---</span></span>
+<span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">Std. Error, z value, Pr(&gt;|z|) and significance stars above are classical</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">(Hessian-based) and may overstate significance under dyadic dependence. NOTE:</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">`confint(fit)`/`tidy(fit)` default to cluster-robust inference</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">(actor-clustered, t(G-1) reference) --- the same estimator for directed and</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">symmetric fits; request classical intervals with `confint(se.type =</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">"classical")` if dyads are independent.</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">(Z) = direct covariate effect; (alphaW) = sender influence; (betaW) = receiver</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">influence</span></span></span>
+<span><span class="co">#&gt; ────────────────────────────────────────────────────────────────────────────────</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Model Fit</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; • Log-Likelihood: -19482.18</span></span>
+<span><span class="co">#&gt; • AIC: 38974.36</span></span>
+<span><span class="co">#&gt; • BIC: 39012.29</span></span>
+<span><span class="co">#&gt; • Residual deviance: 15933.43</span></span>
+<span><span class="co">#&gt; • Dispersion (Pearson chi-sq / resid df): 1.022</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Converged in <span style="color: #0000BB;">3</span> iterations</span></span>
+<span><span class="co">#&gt; ────────────────────────────────────────────────────────────────────────────────</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; ── <span style="font-weight: bold;">Influence Matrices</span> ──</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">A matrix (sender effects):</span></span></span>
+<span><span class="co">#&gt; • Mean: 0.0696</span></span>
+<span><span class="co">#&gt; • SD: 1.2133</span></span>
+<span><span class="co">#&gt; • Range: [-3.6025, 3.0012]</span></span>
+<span><span class="co">#&gt; <span style="font-weight: bold;">B matrix (receiver effects):</span></span></span>
+<span><span class="co">#&gt; • Mean: -0.0278</span></span>
+<span><span class="co">#&gt; • SD: 0.3912</span></span>
+<span><span class="co">#&gt; • Range: [-1.0295, 1.1373]</span></span></code></pre></div>
+<p>The closing <strong>Influence Matrices</strong> block summarizes the
+fitted
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>m</mi><mo>×</mo><mi>m</mi></mrow><annotation encoding="application/x-tex">m \times m</annotation></semantics></math>
+sender and receiver matrices
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>A</mi><annotation encoding="application/x-tex">A</annotation></semantics></math>
+and
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math>
+(each a weighted sum of the <code>W</code> slices), so their entries
+live on a wider scale than the coefficient table above;
+<code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code> covers how to read them.</p>
+<p>For reporting, the default accessors use cluster-robust uncertainty
+when the fit supports it; request the classical SEs explicitly when you
+need a Hessian-only comparison:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, <span class="fl">4</span><span class="op">)</span>   <span class="co"># the SEs reported by summary()</span></span>
 <span><span class="co">#&gt;      (Z) Z1      (Z) Z2 (alphaW) W2  (betaW) W1  (betaW) W2 </span></span>
-<span><span class="co">#&gt; 0.007030010 0.006552255 0.026505862 0.005033336 0.007607866</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, se.type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span>         <span class="co"># Hessian-only Wald intervals</span></span>
+<span><span class="co">#&gt;      0.0070      0.0066      0.0265      0.0050      0.0076</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, se.type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span>                   <span class="co"># Hessian-only Wald intervals</span></span>
 <span><span class="co">#&gt;                  2.5 %     97.5 %</span></span>
 <span><span class="co">#&gt; (Z) Z1      -0.1807515 -0.1531944</span></span>
 <span><span class="co">#&gt; (Z) Z2       0.4607029  0.4863873</span></span>
@@ -165,11 +239,12 @@ Hessian-only comparison:</p>
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msup><mi>H</mi><mrow><mi>−</mi><mn>1</mn></mrow></msup><mi>S</mi><msup><mi>H</mi><mrow><mi>−</mi><mn>1</mn></mrow></msup></mrow><annotation encoding="application/x-tex">H^{-1} S H^{-1}</annotation></semantics></math>
 (with
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math>
-the empirical score covariance) is useful for heteroskedasticity or
-overdispersion when dyad-period score contributions are otherwise
-independent and the Hessian bread is stable. Compare it against the
-classical SEs:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+the empirical score covariance) corrects for heteroskedasticity or
+overdispersion. Our simulation is a correctly specified Poisson, so
+there is nothing to correct and the robust SEs match the classical ones
+almost exactly — a useful confirmation that the model is well
+specified:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">se_classical</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">se_robust</span>    <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"robust"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
@@ -185,34 +260,50 @@ classical SEs:</p>
 <span><span class="co">#&gt; 2      (Z) Z2    0.0066 0.0065  0.99</span></span>
 <span><span class="co">#&gt; 3 (alphaW) W2    0.0265 0.0261  0.98</span></span>
 <span><span class="co">#&gt; 4  (betaW) W1    0.0050 0.0049  0.96</span></span>
-<span><span class="co">#&gt; 5  (betaW) W2    0.0076 0.0075  0.99</span></span>
+<span><span class="co">#&gt; 5  (betaW) W2    0.0076 0.0075  0.99</span></span></code></pre></div>
+<p>To see HC0 do real work, refit on overdispersed counts — here redrawn
+from a negative binomial, whose variance far exceeds its mean. Now the
+robust SEs come out about three times the classical ones, correctly
+widening for the extra dispersion the Poisson likelihood would otherwise
+ignore:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">99</span><span class="op">)</span></span>
+<span><span class="va">Y_od</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">Y</span></span>
+<span><span class="va">Y_od</span><span class="op">[</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/NegBinomial.html" class="external-link">rnbinom</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">Y_od</span><span class="op">)</span>, mu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmax</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span>, <span class="fl">0.1</span><span class="op">)</span>, size <span class="op">=</span> <span class="fl">0.5</span><span class="op">)</span>   <span class="co"># heavier-than-Poisson counts</span></span>
+<span><span class="va">fit_od</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sir.html">sir</a></span><span class="op">(</span><span class="va">Y_od</span>, W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>, X <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span>, Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span>,</span>
+<span>              family <span class="op">=</span> <span class="st">"poisson"</span>, calc_se <span class="op">=</span> <span class="cn">TRUE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, se.type <span class="op">=</span> <span class="st">"robust"</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                  2.5 %     97.5 %</span></span>
-<span><span class="co">#&gt; (Z) Z1      -0.1806005 -0.1533454</span></span>
-<span><span class="co">#&gt; (Z) Z2       0.4608553  0.4862350</span></span>
-<span><span class="co">#&gt; (alphaW) W2  0.6834737  0.7857704</span></span>
-<span><span class="co">#&gt; (betaW) W1  -0.3595586 -0.3405378</span></span>
-<span><span class="co">#&gt; (betaW) W2  -0.2174425 -0.1880104</span></span></code></pre></div>
-<p>For well-specified data the HC0 robust SEs barely move (ratio near
-1): HC0 corrects for overdispersion, not for the dyadic dependence that
-dominates relational data. That dependence is what the
-<strong>cluster-robust</strong> estimator addresses.</p>
+<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    term <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit_od</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    robust_over_classical <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit_od</span>, type <span class="op">=</span> <span class="st">"robust"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span></span>
+<span>                                  <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit_od</span>, type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
+<span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt;          term robust_over_classical</span></span>
+<span><span class="co">#&gt; 1      (Z) Z1                  3.05</span></span>
+<span><span class="co">#&gt; 2      (Z) Z2                  3.18</span></span>
+<span><span class="co">#&gt; 3 (alphaW) W2                  3.06</span></span>
+<span><span class="co">#&gt; 4  (betaW) W1                  3.19</span></span>
+<span><span class="co">#&gt; 5  (betaW) W2                  3.11</span></span></code></pre></div>
+<p>HC0 handles dispersion and heteroskedasticity, but neither HC0 form
+models the shared-actor dependence that the
+<strong>cluster-robust</strong> estimator addresses next.</p>
 </div>
 <div class="section level2">
-<h2 id="multiway-cluster-robust-standard-errors">Multiway cluster-robust standard errors<a class="anchor" aria-label="anchor" href="#multiway-cluster-robust-standard-errors"></a>
+<h2 id="cluster-robust-standard-errors">Cluster-robust standard errors<a class="anchor" aria-label="anchor" href="#cluster-robust-standard-errors"></a>
 </h2>
-<p>The
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(i, j)</annotation></semantics></math>
-and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>j</mi><mo>,</mo><mi>i</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(j, i)</annotation></semantics></math>
-dyads share both actors, and every tie involving an actor is correlated.
-<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code> clusters the score contributions on the sender,
-receiver, and time margins (<code>"twoway"</code> remains an alias for
-this multiway estimator). For supported static directed-network fits,
-report this interval in place of classical Hessian SEs when the Hessian
-bread is stable:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<p>Every tie involving an actor is correlated, so <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>
+clusters on the <strong>actors</strong>: each dyad-period score is
+assigned to both of its endpoint actors and summed within actor.
+(Mechanically, an HC1 small-sample factor and a
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo stretchy="false" form="prefix">(</mo><mi>G</mi><mo>−</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">t(G - 1)</annotation></semantics></math>
+reference, with
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>G</mi><annotation encoding="application/x-tex">G</annotation></semantics></math>
+the number of actors, complete the sandwich.) This is the default
+reporting interval for supported static directed and symmetric fits when
+the Hessian bread is stable; report it in place of classical Hessian
+SEs:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">se_cluster</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
@@ -223,61 +314,101 @@ bread is stable:</p>
 <span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;          term classical cluster ratio</span></span>
-<span><span class="co">#&gt; 1      (Z) Z1    0.0070  0.0062  0.88</span></span>
-<span><span class="co">#&gt; 2      (Z) Z2    0.0066  0.0082  1.26</span></span>
-<span><span class="co">#&gt; 3 (alphaW) W2    0.0265  0.0235  0.89</span></span>
-<span><span class="co">#&gt; 4  (betaW) W1    0.0050  0.0047  0.93</span></span>
-<span><span class="co">#&gt; 5  (betaW) W2    0.0076  0.0055  0.72</span></span></code></pre></div>
-<p>The cluster-robust SEs can move in either direction in this clean
-simulation. In dependent real data they are often more conservative
-because they stop assuming independent dyad-times.
-<code>confint(fit)</code> returns the matching Wald intervals:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<span><span class="co">#&gt; 1      (Z) Z1    0.0070  0.0101  1.44</span></span>
+<span><span class="co">#&gt; 2      (Z) Z2    0.0066  0.0123  1.88</span></span>
+<span><span class="co">#&gt; 3 (alphaW) W2    0.0265  0.0277  1.04</span></span>
+<span><span class="co">#&gt; 4  (betaW) W1    0.0050  0.0072  1.42</span></span>
+<span><span class="co">#&gt; 5  (betaW) W2    0.0076  0.0091  1.19</span></span></code></pre></div>
+<p>Here the cluster-robust SEs are 1.0–1.9 times the classical ones:
+because they stop assuming independent dyad-times, they are the more
+conservative — and the ones to report. <code>confint(fit)</code> returns
+the matching Wald intervals:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                  2.5 %     97.5 %</span></span>
-<span><span class="co">#&gt; (Z) Z1      -0.1790843 -0.1548617</span></span>
-<span><span class="co">#&gt; (Z) Z2       0.4574220  0.4896683</span></span>
-<span><span class="co">#&gt; (alphaW) W2  0.6885972  0.7806470</span></span>
-<span><span class="co">#&gt; (betaW) W1  -0.3591747 -0.3409217</span></span>
-<span><span class="co">#&gt; (betaW) W2  -0.2135366 -0.1919164</span></span></code></pre></div>
+<span><span class="co">#&gt; (Z) Z1      -0.1887952 -0.1451508</span></span>
+<span><span class="co">#&gt; (Z) Z2       0.4469773  0.5001130</span></span>
+<span><span class="co">#&gt; (alphaW) W2  0.6748119  0.7944323</span></span>
+<span><span class="co">#&gt; (betaW) W1  -0.3655139 -0.3345825</span></span>
+<span><span class="co">#&gt; (betaW) W2  -0.2223161 -0.1831368</span></span></code></pre></div>
+<p>On this simulation the gap is modest because the periods are nearly
+independent. On real relational data it is not. Refitting on the bundled
+<code>icews</code> inter-state conflict network, the cluster SEs come
+out many times the classical ones:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">icews</span><span class="op">)</span></span>
+<span><span class="va">ic</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">10</span>; <span class="va">ip</span> <span class="op">&lt;-</span> <span class="fl">1</span><span class="op">:</span><span class="fl">24</span></span>
+<span><span class="va">ifit</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sir.html">sir</a></span><span class="op">(</span><span class="va">icews</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span><span class="va">ic</span>, <span class="va">ic</span>, <span class="va">ip</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>, W <span class="op">=</span> <span class="va">icews</span><span class="op">$</span><span class="va">W</span><span class="op">[</span><span class="va">ic</span>, <span class="va">ic</span>, , drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>,</span>
+<span>            X <span class="op">=</span> <span class="va">icews</span><span class="op">$</span><span class="va">X</span><span class="op">[</span><span class="va">ic</span>, <span class="va">ic</span>, <span class="va">ip</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>, Z <span class="op">=</span> <span class="va">icews</span><span class="op">$</span><span class="va">Z</span><span class="op">[</span><span class="va">ic</span>, <span class="va">ic</span>, , <span class="va">ip</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>,</span>
+<span>            family <span class="op">=</span> <span class="st">"poisson"</span>, seed <span class="op">=</span> <span class="fl">1</span>, max_iter <span class="op">=</span> <span class="fl">20</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    term <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">ifit</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    cluster_over_classical <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">ifit</span>, type <span class="op">=</span> <span class="st">"cluster"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span> <span class="op">/</span></span>
+<span>                                   <span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">sqrt</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></span><span class="op">(</span><span class="va">ifit</span>, type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span>,</span>
+<span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt;                   term cluster_over_classical</span></span>
+<span><span class="co">#&gt; 1            (Z) mConf                   18.3</span></span>
+<span><span class="co">#&gt; 2         (Z) mConf_ji                   21.8</span></span>
+<span><span class="co">#&gt; 3       (Z) minDistLog                   43.3</span></span>
+<span><span class="co">#&gt; 4             (Z) ally                   23.2</span></span>
+<span><span class="co">#&gt; 5         (Z) verbCoop                   80.7</span></span>
+<span><span class="co">#&gt; 6        (alphaW) ally                   34.1</span></span>
+<span><span class="co">#&gt; 7    (alphaW) verbCoop                   21.0</span></span>
+<span><span class="co">#&gt; 8  (alphaW) minDistLog                   27.0</span></span>
+<span><span class="co">#&gt; 9          (betaW) int                   49.1</span></span>
+<span><span class="co">#&gt; 10        (betaW) ally                   24.5</span></span>
+<span><span class="co">#&gt; 11    (betaW) verbCoop                   66.5</span></span>
+<span><span class="co">#&gt; 12  (betaW) minDistLog                   12.4</span></span></code></pre></div>
+<p>Real conflict data carry exactly the shared-actor dependence the
+classical SEs assume away, so the classical intervals would badly
+overstate significance — the cluster SEs are an order of magnitude
+larger. This is why the cluster interval is the default and the reported
+one.</p>
 </div>
 <div class="section level2">
 <h2 id="bootstrap-inference">Bootstrap inference<a class="anchor" aria-label="anchor" href="#bootstrap-inference"></a>
 </h2>
-<p><code><a href="../reference/boot_sir.html">boot_sir()</a></code> refits the model on resampled or reduced
-data. The <strong>block</strong> bootstrap resamples whole time periods
-(preserving within-period dependence); the <strong>dyad
-jackknife</strong> deletes each actor in turn; the
-<strong>parametric</strong> bootstrap simulates new outcome arrays from
-the fitted model.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">br</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/boot_sir.html">boot_sir</a></span><span class="op">(</span><span class="va">fit</span>, R <span class="op">=</span> <span class="fl">20</span>, type <span class="op">=</span> <span class="st">"block"</span>, seed <span class="op">=</span> <span class="fl">123</span>, trace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<p><code><a href="../reference/boot_sir.html">boot_sir()</a></code> refits the model on resampled data and forms
+distribution-free intervals that do not assume the Wald normal shape.
+Two are worth running: the <strong>parametric</strong> bootstrap
+resimulates outcomes from the fitted model (a model-based cross-check),
+and the <strong>dyad jackknife</strong> deletes each actor in turn (a
+conservative robustness check, and the fallback when analytic SEs are
+unavailable).</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">br_par</span>  <span class="op">&lt;-</span> <span class="fu"><a href="../reference/boot_sir.html">boot_sir</a></span><span class="op">(</span><span class="va">fit</span>, R <span class="op">=</span> <span class="fl">200</span>, type <span class="op">=</span> <span class="st">"parametric"</span>, seed <span class="op">=</span> <span class="fl">123</span>, trace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">br_dyad</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/boot_sir.html">boot_sir</a></span><span class="op">(</span><span class="va">fit</span>, type <span class="op">=</span> <span class="st">"dyad"</span>, seed <span class="op">=</span> <span class="fl">123</span>, trace <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Block Bootstrap"</span>, <span class="st">"Dyad Jackknife"</span><span class="op">)</span>,</span>
-<span>    valid_refits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">br</span><span class="op">$</span><span class="va">n_valid</span>, <span class="va">br_dyad</span><span class="op">$</span><span class="va">n_valid</span><span class="op">)</span>,</span>
-<span>    total_refits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">br</span><span class="op">$</span><span class="va">n_total</span>, <span class="va">br_dyad</span><span class="op">$</span><span class="va">n_total</span><span class="op">)</span>,</span>
-<span>    interval_type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">br</span><span class="op">$</span><span class="va">interval</span>, <span class="va">br_dyad</span><span class="op">$</span><span class="va">interval</span><span class="op">)</span></span>
+<span>    method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Parametric bootstrap"</span>, <span class="st">"Dyad jackknife"</span><span class="op">)</span>,</span>
+<span>    valid_refits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">br_par</span><span class="op">$</span><span class="va">n_valid</span>, <span class="va">br_dyad</span><span class="op">$</span><span class="va">n_valid</span><span class="op">)</span>,</span>
+<span>    total_refits <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">br_par</span><span class="op">$</span><span class="va">n_total</span>, <span class="va">br_dyad</span><span class="op">$</span><span class="va">n_total</span><span class="op">)</span>,</span>
+<span>    interval_type <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">br_par</span><span class="op">$</span><span class="va">interval</span>, <span class="va">br_dyad</span><span class="op">$</span><span class="va">interval</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;            method valid_refits total_refits    interval_type</span></span>
-<span><span class="co">#&gt; 1 Block Bootstrap           20           20       percentile</span></span>
-<span><span class="co">#&gt; 2  Dyad Jackknife           14           14 normal-jackknife</span></span></code></pre></div>
-<p>Percentile intervals from block or parametric bootstrap replicates
-are often more reliable than Wald intervals for the bilinear
-parameters:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, boot <span class="op">=</span> <span class="va">br</span><span class="op">)</span></span>
+<span><span class="co">#&gt;                 method valid_refits total_refits    interval_type</span></span>
+<span><span class="co">#&gt; 1 Parametric bootstrap          200          200       percentile</span></span>
+<span><span class="co">#&gt; 2       Dyad jackknife           14           14 normal-jackknife</span></span></code></pre></div>
+<p>Each replicate refits the full model and non-converged ones are
+dropped, so check the valid-replicate count. The
+<strong>parametric</strong> bootstrap intervals track the classical ones
+and every one excludes zero — a distribution-free confirmation that the
+estimates are well separated from zero:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, boot <span class="op">=</span> <span class="va">br_par</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                  2.5 %     97.5 %</span></span>
-<span><span class="co">#&gt; (Z) Z1      -0.1822541 -0.1559235</span></span>
-<span><span class="co">#&gt; (Z) Z2       0.4551020  0.4867091</span></span>
-<span><span class="co">#&gt; (alphaW) W2  0.6766893  0.7749009</span></span>
-<span><span class="co">#&gt; (betaW) W1  -0.3612847 -0.3429720</span></span>
-<span><span class="co">#&gt; (betaW) W2  -0.2216027 -0.1933744</span></span></code></pre></div>
-<p>The dyad jackknife uses normal intervals from the jackknife standard
-error, because the delete-one fits are not a bootstrap sampling
-distribution:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<span><span class="co">#&gt; (Z) Z1      -0.1816208 -0.1551895</span></span>
+<span><span class="co">#&gt; (Z) Z2       0.4604181  0.4852921</span></span>
+<span><span class="co">#&gt; (alphaW) W2  0.6869696  0.7892897</span></span>
+<span><span class="co">#&gt; (betaW) W1  -0.3593313 -0.3395785</span></span>
+<span><span class="co">#&gt; (betaW) W2  -0.2177358 -0.1838933</span></span></code></pre></div>
+<p>The <strong>dyad jackknife</strong> is deliberately conservative:
+deleting a whole actor is a large perturbation (especially with only
+<code>m = 14</code> actors), so its intervals run several times wider,
+most of all for the bilinear influence weights. Read it as a worst-case
+bound, not a competing precise estimate:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, boot <span class="op">=</span> <span class="va">br_dyad</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                  2.5 %     97.5 %</span></span>
 <span><span class="co">#&gt; (Z) Z1      -0.1995158 -0.1344302</span></span>
@@ -285,102 +416,55 @@ distribution:</p>
 <span><span class="co">#&gt; (alphaW) W2  0.1715643  1.2976798</span></span>
 <span><span class="co">#&gt; (betaW) W1  -0.6713188 -0.0287776</span></span>
 <span><span class="co">#&gt; (betaW) W2  -0.3759329 -0.0295200</span></span></code></pre></div>
-<p>For reporting, synthesize the uncertainty checks in one table instead
-of presenting four disconnected printouts. The rendered version below is
-a mechanics check: the block bootstrap used only <code>R = 20</code> to
-keep the vignette fast. Re-run the same table with
-<code>R = 500</code>–<code>1000</code> before treating the block
-intervals as evidence.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">ci_classical</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, se.type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span></span>
-<span><span class="va">ci_cluster</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
-<span><span class="va">ci_block</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, boot <span class="op">=</span> <span class="va">br</span><span class="op">)</span></span>
-<span><span class="va">ci_dyad</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, boot <span class="op">=</span> <span class="va">br_dyad</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">sign_stable</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">ci</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/sign.html" class="external-link">sign</a></span><span class="op">(</span><span class="va">ci</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span><span class="op">)</span> <span class="op">==</span> <span class="fu"><a href="https://rdrr.io/r/base/sign.html" class="external-link">sign</a></span><span class="op">(</span><span class="va">ci</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="va">interval_pattern</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span></span>
-<span>    <span class="fu">sign_stable</span><span class="op">(</span><span class="va">ci_cluster</span><span class="op">)</span> <span class="op">&amp;</span> <span class="fu">sign_stable</span><span class="op">(</span><span class="va">ci_dyad</span><span class="op">)</span>,</span>
-<span>    <span class="st">"same sign in cluster and dyad intervals"</span>,</span>
-<span>    <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="fu">sign_stable</span><span class="op">(</span><span class="va">ci_cluster</span><span class="op">)</span>, <span class="st">"same sign in cluster interval only"</span>,</span>
-<span>           <span class="st">"interval crosses zero"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
+<p>For reporting, place the intervals side by side — the classical
+(which ignores dyadic dependence), the cluster-robust default, and the
+conservative dyad jackknife:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fmt</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">ci</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"[%.3f, %.3f]"</span>, <span class="va">ci</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>, <span class="va">ci</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    term <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    estimate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    classical <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"["</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_classical</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">", "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_classical</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"]"</span><span class="op">)</span>,</span>
-<span>    cluster <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"["</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_cluster</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">", "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_cluster</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"]"</span><span class="op">)</span>,</span>
-<span>    block <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"["</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_block</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">", "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_block</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"]"</span><span class="op">)</span>,</span>
-<span>    dyad <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"["</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_dyad</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">", "</span>, <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">ci_dyad</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>, <span class="st">"]"</span><span class="op">)</span>,</span>
-<span>    cluster_over_classical <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">se_cluster</span> <span class="op">/</span> <span class="va">se_classical</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
-<span>    interval_pattern <span class="op">=</span> <span class="va">interval_pattern</span>,</span>
-<span>    block_note <span class="op">=</span> <span class="st">"R = 20; mechanics only"</span>,</span>
+<span>    term           <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    estimate       <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
+<span>    classical      <span class="op">=</span> <span class="fu">fmt</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, se.type <span class="op">=</span> <span class="st">"classical"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    cluster        <span class="op">=</span> <span class="fu">fmt</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>    dyad_jackknife <span class="op">=</span> <span class="fu">fmt</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, boot <span class="op">=</span> <span class="va">br_dyad</span><span class="op">)</span><span class="op">)</span>,</span>
 <span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;          term estimate        classical          cluster            block</span></span>
-<span><span class="co">#&gt; 1      (Z) Z1   -0.167 [-0.181, -0.153] [-0.179, -0.155] [-0.182, -0.156]</span></span>
-<span><span class="co">#&gt; 2      (Z) Z2    0.474   [0.461, 0.486]    [0.457, 0.49]   [0.455, 0.487]</span></span>
-<span><span class="co">#&gt; 3 (alphaW) W2    0.735   [0.683, 0.787]   [0.689, 0.781]   [0.677, 0.775]</span></span>
-<span><span class="co">#&gt; 4  (betaW) W1   -0.350   [-0.36, -0.34] [-0.359, -0.341] [-0.361, -0.343]</span></span>
-<span><span class="co">#&gt; 5  (betaW) W2   -0.203 [-0.218, -0.188] [-0.214, -0.192] [-0.222, -0.193]</span></span>
-<span><span class="co">#&gt;               dyad cluster_over_classical</span></span>
-<span><span class="co">#&gt; 1   [-0.2, -0.134]                   0.88</span></span>
-<span><span class="co">#&gt; 2    [0.427, 0.52]                   1.26</span></span>
-<span><span class="co">#&gt; 3   [0.172, 1.298]                   0.89</span></span>
-<span><span class="co">#&gt; 4 [-0.671, -0.029]                   0.93</span></span>
-<span><span class="co">#&gt; 5  [-0.376, -0.03]                   0.72</span></span>
-<span><span class="co">#&gt;                          interval_pattern             block_note</span></span>
-<span><span class="co">#&gt; 1 same sign in cluster and dyad intervals R = 20; mechanics only</span></span>
-<span><span class="co">#&gt; 2 same sign in cluster and dyad intervals R = 20; mechanics only</span></span>
-<span><span class="co">#&gt; 3 same sign in cluster and dyad intervals R = 20; mechanics only</span></span>
-<span><span class="co">#&gt; 4 same sign in cluster and dyad intervals R = 20; mechanics only</span></span>
-<span><span class="co">#&gt; 5 same sign in cluster and dyad intervals R = 20; mechanics only</span></span></code></pre></div>
-<p>Each bootstrap replicate refits the full model; non-converged
-replicates are dropped and reported, so check the valid-replicate count.
-Use <code>R = 500</code>–<code>1000</code> for publication-quality block
-or parametric bootstrap intervals. The dyad jackknife ignores
-<code>R</code> and instead uses one refit per deleted actor (or sender
-and receiver actor for rectangular fits).</p>
+<span><span class="co">#&gt;          term estimate        classical          cluster   dyad_jackknife</span></span>
+<span><span class="co">#&gt; 1      (Z) Z1   -0.167 [-0.181, -0.153] [-0.189, -0.145] [-0.200, -0.134]</span></span>
+<span><span class="co">#&gt; 2      (Z) Z2    0.474   [0.461, 0.486]   [0.447, 0.500]   [0.427, 0.520]</span></span>
+<span><span class="co">#&gt; 3 (alphaW) W2    0.735   [0.683, 0.787]   [0.675, 0.794]   [0.172, 1.298]</span></span>
+<span><span class="co">#&gt; 4  (betaW) W1   -0.350 [-0.360, -0.340] [-0.366, -0.335] [-0.671, -0.029]</span></span>
+<span><span class="co">#&gt; 5  (betaW) W2   -0.203 [-0.218, -0.188] [-0.222, -0.183] [-0.376, -0.030]</span></span></code></pre></div>
+<p>The estimate is shared across the columns (one fit); what changes is
+the interval. Classical is the narrowest (it assumes independent dyads),
+the cluster default widens it for shared-actor dependence, and the
+jackknife is the conservative outer bound. Report the cluster interval
+and use the jackknife as a robustness check. Use
+<code>R = 500</code>–<code>1000</code> for publication-quality bootstrap
+intervals.</p>
 </div>
 <div class="section level2">
-<h2 id="important-caveats-on-dependence">Important caveats on dependence<a class="anchor" aria-label="anchor" href="#important-caveats-on-dependence"></a>
+<h2 id="choosing-an-approach">Choosing an approach<a class="anchor" aria-label="anchor" href="#choosing-an-approach"></a>
 </h2>
-<p>The classical and HC0-robust SE types assume <strong>independence
-across dyads</strong>. Relational data violate this: the
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>i</mi><mo>,</mo><mi>j</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(i, j)</annotation></semantics></math>
-and
-<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo stretchy="false" form="prefix">(</mo><mi>j</mi><mo>,</mo><mi>i</mi><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">(j, i)</annotation></semantics></math>
-directed dyads share members, and degree heterogeneity correlates every
-tie involving the same actor. The HC0-robust SEs only correct for
-heteroskedasticity/overdispersion (note how little they moved above).
-The period/block bootstrap resamples whole time periods as independent
-blocks: it preserves within-period network dependence, but not serial
-dependence across adjacent periods.</p>
-<p>The package ships two dyad-aware tools that <em>do</em> address it,
-both shown earlier in this vignette:</p>
+<p>The choice reduces to three rules:</p>
 <ul>
 <li>
-<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code> / <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code> — a multiway
-cluster-robust sandwich (sender + receiver + time), the default
-reporting interval for supported static directed-network fits with a
-stable Hessian.</li>
+<strong>Report cluster-robust intervals</strong>
+(<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code> / <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>, the default) for
+supported static directed and symmetric fits with a stable Hessian
+(<code>se_reliable = TRUE</code>).</li>
 <li>
-<code>boot_sir(type = "dyad")</code> — a delete-one-actor jackknife
-(also the only inference path for full-bilinear bipartite fits).</li>
-</ul>
-<p>In practice:</p>
-<ul>
-<li>Report <strong>cluster-robust</strong> SEs (<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>) for
-supported static fits with reliable analytic covariance, and use the
-bootstrap/jackknife as a cross-check.</li>
-<li>For dynamic <code>W</code>, unstable Hessians, or full-bilinear
-bipartite fits, prefer the dyad jackknife and response-scale sensitivity
-checks over cluster SEs.</li>
-<li>Do not use dyad-independent
+<strong>Fall back to the dyad jackknife</strong>
+(<code>boot_sir(type = "dyad")</code>) when analytic SEs are unavailable
+— full-bilinear bipartite fits, dynamic <code>W</code>, or an unstable
+Hessian (<code>se_reliable = FALSE</code>) — and as a worst-case
+cross-check otherwise.</li>
+<li>
+<strong>Do not</strong> report dyad-independent classical
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>-values
-as the primary reporting target for influence coefficients; report
-cluster or dyad-jackknife intervals and the response-scale scenario
-table.</li>
+as the headline result for influence coefficients; pair the cluster
+interval with a response-scale scenario (below).</li>
 </ul>
 </div>
 <div class="section level2">
@@ -388,37 +472,27 @@ table.</li>
 </h2>
 <p>Setting <code>fix_receiver = TRUE</code> constrains
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mo>=</mo><mi>I</mi></mrow><annotation encoding="application/x-tex">B = I</annotation></semantics></math>
-and estimates only sender-side influence. This removes the alpha/beta
-scaling ambiguity by dropping the receiver-side channel, but the
-remaining coefficients still need adequate design rank and signal. It is
-faster and better-conditioned, and is a useful descriptive baseline to
-compare against the full bilinear model on the same response and
-mask.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+and estimates only sender-side influence. It is faster and
+better-conditioned, and serves as a constrained baseline. Because our
+simulation has a genuine receiver-side channel that this constraint
+drops, we expect the full model to fit better — so the useful question
+is not what the constrained model’s influence coefficients are, but
+whether dropping the receiver side costs fit. We answer that with
+information criteria rather than by reading the constrained
+coefficients:</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fit_fr</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sir.html">sir</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span>, W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>, X <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span>, Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span>,</span>
-<span>              family <span class="op">=</span> <span class="st">"poisson"</span>, fix_receiver <span class="op">=</span> <span class="cn">TRUE</span>, calc_se <span class="op">=</span> <span class="cn">TRUE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="va">fr_ci</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit_fr</span>, se.type <span class="op">=</span> <span class="st">"cluster"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>    term <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit_fr</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>    estimate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/coef.html" class="external-link">coef</a></span><span class="op">(</span><span class="va">fit_fr</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    cluster_low <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fr_ci</span><span class="op">[</span>, <span class="fl">1</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    cluster_high <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="va">fr_ci</span><span class="op">[</span>, <span class="fl">2</span><span class="op">]</span>, <span class="fl">3</span><span class="op">)</span>,</span>
-<span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
-<span><span class="op">)</span></span>
-<span><span class="co">#&gt;          term estimate cluster_low cluster_high</span></span>
-<span><span class="co">#&gt; 1      (Z) Z1   -0.202      -0.239       -0.164</span></span>
-<span><span class="co">#&gt; 2      (Z) Z2    0.554       0.491        0.617</span></span>
-<span><span class="co">#&gt; 3 (alphaW) W1   -0.192      -1.221        0.838</span></span>
-<span><span class="co">#&gt; 4 (alphaW) W2   -0.260      -0.782        0.262</span></span></code></pre></div>
-<p>Compare specifications with fit criteria, convergence diagnostics,
-and a common response-scale scenario. Here the scenario shifts the first
-direct covariate by one standard deviation under each fitted model:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<span>              family <span class="op">=</span> <span class="st">"poisson"</span>, fix_receiver <span class="op">=</span> <span class="cn">TRUE</span>, calc_se <span class="op">=</span> <span class="cn">TRUE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span></code></pre></div>
+<p>Compare specifications with fit criteria and a common response-scale
+scenario. Because the two models differ in how the <em>lagged
+network</em> propagates, we shift the lagged signal <code>X</code> up by
+one standard deviation and read how each model’s predicted mean
+responds:</p>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">scenario_change</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">model</span><span class="op">)</span> <span class="op">{</span></span>
-<span>    <span class="va">Zcf</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span></span>
-<span>    <span class="va">Zcf</span><span class="op">[</span>, , <span class="fl">1</span>, <span class="op">]</span> <span class="op">&lt;-</span> <span class="va">Zcf</span><span class="op">[</span>, , <span class="fl">1</span>, <span class="op">]</span> <span class="op">+</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd</a></span><span class="op">(</span><span class="va">Zcf</span><span class="op">[</span>, , <span class="fl">1</span>, <span class="op">]</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span>    <span class="va">Xcf</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span> <span class="op">+</span> <span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">X</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span>    <span class="va">mu0</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model</span><span class="op">)</span></span>
-<span>    <span class="va">mu1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model</span>, newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>, X <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span>, Z <span class="op">=</span> <span class="va">Zcf</span><span class="op">)</span><span class="op">)</span></span>
+<span>    <span class="va">mu1</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">model</span>, newdata <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>, X <span class="op">=</span> <span class="va">Xcf</span>, Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span><span class="op">)</span><span class="op">)</span></span>
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean</a></span><span class="op">(</span><span class="va">mu1</span> <span class="op">-</span> <span class="va">mu0</span>, na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="op">}</span></span>
 <span></span>
@@ -427,18 +501,28 @@ direct covariate by one standard deviation under each fitted model:</p>
 <span>    logLik <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/logLik.html" class="external-link">logLik</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/logLik.html" class="external-link">logLik</a></span><span class="op">(</span><span class="va">fit_fr</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
 <span>    AIC   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">AIC</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">AIC</a></span><span class="op">(</span><span class="va">fit_fr</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
 <span>    BIC   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">BIC</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/stats/AIC.html" class="external-link">BIC</a></span><span class="op">(</span><span class="va">fit_fr</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
-<span>    converged <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">convergence</span>, <span class="va">fit_fr</span><span class="op">$</span><span class="va">convergence</span><span class="op">)</span>,</span>
 <span>    se_reliable <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">fit</span><span class="op">$</span><span class="va">se_reliable</span>, <span class="va">fit_fr</span><span class="op">$</span><span class="va">se_reliable</span><span class="op">)</span>,</span>
-<span>    mean_scenario_change <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">scenario_change</span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>, <span class="fu">scenario_change</span><span class="op">(</span><span class="va">fit_fr</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
+<span>    mean_response_to_X <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fu">scenario_change</span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>, <span class="fu">scenario_change</span><span class="op">(</span><span class="va">fit_fr</span><span class="op">)</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;           model    logLik      AIC      BIC converged se_reliable</span></span>
-<span><span class="co">#&gt; 1 full bilinear -19482.18 38974.36 39012.29      TRUE        TRUE</span></span>
-<span><span class="co">#&gt; 2  fix_receiver -22712.67 45433.34 45463.68      TRUE        TRUE</span></span>
-<span><span class="co">#&gt;   mean_scenario_change</span></span>
-<span><span class="co">#&gt; 1               -0.209</span></span>
-<span><span class="co">#&gt; 2               -0.219</span></span></code></pre></div>
-<p>Lower AIC/BIC is better, but model choice should also ask whether the
-simpler model changes the substantive response-scale conclusion.</p>
+<span><span class="co">#&gt;           model    logLik      AIC      BIC se_reliable mean_response_to_X</span></span>
+<span><span class="co">#&gt; 1 full bilinear -19482.18 38974.36 39012.29        TRUE              0.650</span></span>
+<span><span class="co">#&gt; 2  fix_receiver -22712.67 45433.34 45463.68        TRUE              0.001</span></span></code></pre></div>
+<p>The <code>se_reliable</code> column flags whether the Hessian was
+well-conditioned enough to trust the analytic SEs (both fits here are
+reliable). Lower AIC/BIC is better, and the full bilinear model wins
+decisively — confirming the receiver-side channel carries real signal.
+The scenario makes the difference concrete: shifting the lagged network
+moves the full model’s predicted mean noticeably, but barely moves the
+fixed-receiver model’s. Forcing
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mo>=</mo><mi>I</mi></mrow><annotation encoding="application/x-tex">B = I</annotation></semantics></math>
+leaves a sender map (the <code>A</code> matrix) that is both weaker in
+spread and nearly self-cancelling, so a uniform shift in the lagged
+network produces almost no net change in its predicted mean, whereas the
+full model’s stronger, coherent influence structure responds. The much
+larger drop in log-likelihood for the constrained model confirms the
+receiver side carries signal it cannot recover.
+<code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code> covers
+<code>predict(newdata = )</code> scenarios in full.</p>
 </div>
 <div class="section level2">
 <h2 id="out-of-sample-evaluation">Out-of-sample evaluation<a class="anchor" aria-label="anchor" href="#out-of-sample-evaluation"></a>
@@ -453,7 +537,7 @@ naive baseline. <code><a href="../reference/cv_sir.html">cv_sir()</a></code> con
 object, so treat its scores as a conditional validation target: the
 future covariates must be known, pre-specified, or generated from a
 scenario available at the forecast origin.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># conditional one-step forecast: fit through T-1, then pass a Z_T slice that is</span></span>
 <span><span class="co"># known, fixed, or scenario-generated at the forecast origin. In this simulated</span></span>
 <span><span class="co"># example, the held-out Z_T is used to show the API.</span></span>
@@ -462,8 +546,7 @@ scenario available at the forecast origin.</p>
 <span>                 W <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>,</span>
 <span>                 X <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">X</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">:</span><span class="va">T_hold</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>,</span>
 <span>                 Z <span class="op">=</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span><span class="op">[</span>, , , <span class="fl">1</span><span class="op">:</span><span class="va">T_hold</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>,</span>
-<span>                 family <span class="op">=</span> <span class="st">"poisson"</span>, fix_receiver <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>                 calc_se <span class="op">=</span> <span class="cn">FALSE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span>                 family <span class="op">=</span> <span class="st">"poisson"</span>, calc_se <span class="op">=</span> <span class="cn">FALSE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="va">Z_hold</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">Z</span><span class="op">[</span>, , , <span class="va">T_hold</span> <span class="op">+</span> <span class="fl">1</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span></span>
 <span><span class="va">fc</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://generics.r-lib.org/reference/forecast.html" class="external-link">forecast</a></span><span class="op">(</span><span class="va">fit_train</span>, h <span class="op">=</span> <span class="fl">1</span>, Z_future <span class="op">=</span> <span class="va">Z_hold</span><span class="op">)</span></span>
 <span><span class="va">model_score</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/score_sir.html">score_sir</a></span><span class="op">(</span><span class="va">dat</span><span class="op">$</span><span class="va">Y</span><span class="op">[</span>, , <span class="va">T_hold</span> <span class="op">+</span> <span class="fl">1</span>, drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>, <span class="va">fc</span>, <span class="st">"poisson"</span><span class="op">)</span></span>
@@ -480,12 +563,13 @@ scenario available at the forecast origin.</p>
 <span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;     metric model  naive improvement</span></span>
-<span><span class="co">#&gt; 1     rmse 1.399  2.008       0.609</span></span>
-<span><span class="co">#&gt; 2      mae 0.976  1.385       0.409</span></span>
-<span><span class="co">#&gt; 3 deviance 1.379 32.591      31.213</span></span>
+<span><span class="co">#&gt; 1     rmse 1.130  2.008       0.878</span></span>
+<span><span class="co">#&gt; 2      mae 0.846  1.385       0.539</span></span>
+<span><span class="co">#&gt; 3 deviance 1.077 32.591      31.515</span></span>
 <span></span>
-<span><span class="co"># rolling-origin conditional cross-validation: refit on 1..o, score period o + 1</span></span>
-<span><span class="va">cv</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cv_sir.html">cv_sir</a></span><span class="op">(</span><span class="va">fit_fr</span>, initial <span class="op">=</span> <span class="fl">60</span>, origins <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">70</span>, <span class="fl">79</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co"># rolling-origin conditional cross-validation: initial is the minimum training</span></span>
+<span><span class="co"># length and origins are the cut-points o (each refits on 1..o and scores o + 1)</span></span>
+<span><span class="va">cv</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cv_sir.html">cv_sir</a></span><span class="op">(</span><span class="va">fit</span>, initial <span class="op">=</span> <span class="fl">60</span>, origins <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">60</span>, <span class="fl">70</span>, <span class="fl">79</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>    metric <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rmse"</span>, <span class="st">"mae"</span>, <span class="st">"deviance"</span><span class="op">)</span>,</span>
 <span>    model <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">cv</span><span class="op">$</span><span class="va">aggregate</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"rmse"</span>, <span class="st">"mae"</span>, <span class="st">"deviance"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
@@ -496,13 +580,16 @@ scenario available at the forecast origin.</p>
 <span>    row.names <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;     metric model  naive improvement effective_origins</span></span>
-<span><span class="co">#&gt; 1     rmse 1.565  2.073       0.508                 3</span></span>
-<span><span class="co">#&gt; 2      mae 1.023  1.374       0.351                 3</span></span>
-<span><span class="co">#&gt; 3 deviance 1.511 31.466      29.955                 3</span></span></code></pre></div>
-<p>Lower RMSE/MAE/deviance scores are better. This example uses only
-three origins, so it demonstrates the workflow rather than providing a
-final validation study; with real applications, use more origins or a
-substantively chosen rolling schedule.</p>
+<span><span class="co">#&gt; 1     rmse 1.146  2.073       0.927                 3</span></span>
+<span><span class="co">#&gt; 2      mae 0.867  1.374       0.506                 3</span></span>
+<span><span class="co">#&gt; 3 deviance 1.139 31.466      30.327                 3</span></span></code></pre></div>
+<p>Lower RMSE/MAE/deviance scores are better. The model improves all
+three over the naive last-value baseline; the deviance gap is the
+largest because Poisson deviance penalizes the naive predictor heavily
+when its carried-forward counts miss, while RMSE and MAE are gentler.
+This example uses only three origins, so it demonstrates the workflow
+rather than providing a final validation study; with real applications,
+use more origins or a substantively chosen rolling schedule.</p>
 <p><code><a href="../reference/score_sir.html">score_sir()</a></code> exposes the same family-appropriate scores
 (RMSE / MAE plus the Poisson deviance) for any observed/predicted pair,
 so you can assemble custom backtests.</p>

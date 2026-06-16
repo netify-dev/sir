@@ -10,7 +10,7 @@ undercover.
 
 ``` r
 # S3 method for class 'sir'
-vcov(object, type = c("cluster", "classical", "robust", "twoway", "dyad"), ...)
+vcov(object, type = c("cluster", "classical", "robust"), ...)
 ```
 
 ## Arguments
@@ -24,23 +24,26 @@ vcov(object, type = c("cluster", "classical", "robust", "twoway", "dyad"), ...)
 
   Character string:
 
-  - `"cluster"` (default) — multiway cluster-robust covariance on
-    sender, receiver, and time margins for directed-network data when
-    the Hessian bread is stable.
+  - `"cluster"` (default) — actor-clustered cluster-robust covariance:
+    each cell's score is stacked onto both endpoint actors and summed
+    within actor, with an HC1 small-sample factor. This is a
+    conservative actor-margin sandwich (not textbook two-way CGM), used
+    identically for directed and symmetric fits. The returned matrix
+    carries a `"cluster_df"` attribute (number of actor clusters minus
+    one) that `confint`/`tidy` use for the `t(G - 1)` reference.
 
-  - `"classical"` — inverse-Hessian covariance.
+  - `"classical"` — inverse-Hessian covariance; valid when dyads are
+    independent, and tighter, but it undercovers under dyadic
+    dependence.
 
-  - `"robust"` — HC0 sandwich; corrects heteroskedasticity /
-    overdispersion only, *not* dyadic dependence.
+  - `"robust"` — the HC0 sandwich for directed fits; for symmetric fits
+    (which have no separate HC0 path) it aliases to `"cluster"`.
 
-  - `"twoway"` — alias for `"cluster"`.
-
-  - `"dyad"` — clusters the directed dyad across time.
-
-  The cluster types require the classical covariance as their bread
-  (`calc_se = TRUE`, the default) and are unavailable for dynamic (4D)
+  The cluster type requires the classical covariance as its bread
+  (`calc_se = TRUE`, the default) and is unavailable for dynamic (4D)
   `W` and for full-bilinear bipartite fits (use
-  `boot_sir(type = "dyad")` there).
+  `boot_sir(type = "dyad")` there). `confint` pairs it with a `t(G - 1)`
+  reference (G = number of actors).
 
 - ...:
 

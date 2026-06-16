@@ -47,6 +47,13 @@ prefer `brier`/`auc` there; `auc` is `NA` when the held-out cells
 contain a single class. Binary `actual` must be coded 0/1 and poisson
 `actual` must be non-negative integer counts, else an error is raised.
 
+## See also
+
+[`cv_sir`](https://netify-dev.github.io/sir/reference/cv_sir.md) for
+cross-validated scoring,
+[`forecast.sir_fit`](https://netify-dev.github.io/sir/reference/forecast.sir_fit.md)
+for producing the predictions to score.
+
 ## Examples
 
 ``` r

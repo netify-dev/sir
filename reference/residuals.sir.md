@@ -31,4 +31,8 @@ residuals(object, type = c("deviance", "pearson", "response"), ...)
 ## Value
 
 An array with the same dimensions as `Y` containing the requested
-residuals. Contains NA where `Y` is missing.
+residuals. Contains NA where `Y` is missing. For a symmetric fit only
+the upper-triangle off-diagonal cells (the ones in the likelihood) are
+populated; the lower triangle and diagonal are NA, whereas
+[`fitted()`](https://rdrr.io/r/stats/fitted.values.html) returns the
+full symmetric matrix.

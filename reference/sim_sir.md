@@ -21,6 +21,8 @@ sim_sir(
   W = NULL,
   sigma = 1,
   seed = NULL,
+  symmetric = FALSE,
+  gain = NULL,
   ...
 )
 ```
@@ -50,10 +52,11 @@ sim_sir(
 
 - alpha:
 
-  Numeric vector of length p for sender influence weights. The first
-  element (alpha_1) is fixed at 1 for identifiability; only alpha_2:p
-  are free. If NULL (default), drawn from N(0, 0.3). Use `seed` for
-  reproducibility.
+  Numeric vector of length p for sender influence weights. For a
+  directed process the first element (alpha_1) is fixed at 1 for
+  identifiability; for `symmetric = TRUE` all elements are kept as given
+  (the anchor need not be 1). If NULL (default), drawn from N(0, 0.3)
+  with alpha_1 = 1. Use `seed` for reproducibility.
 
 - beta:
 
@@ -81,6 +84,29 @@ sim_sir(
   Optional integer for reproducibility. When supplied, the seed is set
   locally and the caller's global RNG state is restored on exit, so a
   subsequent draw (e.g. `runif`) in the caller is left unperturbed.
+
+- symmetric:
+
+  Logical. If TRUE, simulate a genuine **undirected** network: `W` is
+  symmetrized, `beta` is tied to `alpha` so `B = A`, and each `Y`/`Z`
+  slice is symmetric. For the count/continuous recursion the influence
+  covariates are rescaled (when auto-generated) so the symmetric gain
+  \\\rho(A)^2/(m-1)\\ stays below 1. Pairs with
+  `sir(..., symmetric = TRUE)`, which fits and reports the shared
+  operator as `gamma`; `sim_sir` stores that same vector in `$alpha`
+  (which equals `$beta` here). Default FALSE.
+
+- gain:
+
+  Optional numeric in (0, 1). Target spectral gain
+  \\\rho(A)\rho(B)/(m-1)\\ for the Poisson/Normal lagged recursion. When
+  supplied, the influence operators are rescaled to hit it exactly
+  (scaling `beta`/`B` for directed fits, the shared operator for
+  symmetric, leaving `alpha_1 = 1` intact), so the influence term
+  carries a chosen, strong-but-stationary share of the dynamics. Use a
+  larger value (e.g. 0.9) for a strong, recoverable influence signal;
+  values near 1 approach non-stationarity. NULL (default) keeps the
+  conservative auto-rescaling. Ignored for `family = "binomial"`.
 
 - ...:
 
@@ -111,7 +137,9 @@ A list with components:
 
 - alpha:
 
-  True alpha vector (length p, with alpha_1 = 1).
+  True alpha vector (length p; alpha_1 = 1 for directed, kept as
+  supplied for symmetric). For symmetric fits this equals `beta` and is
+  the shared operator reported by the fit as gamma.
 
 - beta:
 
@@ -144,6 +172,19 @@ influence parameters unrecoverable. The returned `X` already includes
 this scaling, so a plain
 [`sir`](https://netify-dev.github.io/sir/reference/sir.md) fit on
 `(Y, W, X, Z)` recovers the same `A`, `B` used to generate the data.
+
+For the Poisson and Normal families the lagged recursion is stationary
+only when the spectral gain \\\rho(A)\rho(B)/(m-1)\\ is below 1. By
+default, auto-generated coefficients are rescaled to a conservative gain
+(at most 0.8) so simulations are reliably stable, and user-supplied
+coefficients are used exactly as given (a gain \\\ge 1\\ triggers an
+explosive-series warning). Set `gain` to target a specific value: the
+influence operators are then rescaled so \\\rho(A)\rho(B)/(m-1)\\ equals
+`gain` exactly, letting the bilinear term carry a chosen,
+strong-but-stationary share of the dynamics. A larger `gain` (say 0.9)
+makes the influence mechanism dominate the lagged dynamics while still
+recovering cleanly; values near 1 approach non-stationarity. Binomial
+outcomes are bounded, so `gain` does not apply.
 
 ## Examples
 

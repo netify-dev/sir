@@ -15,9 +15,7 @@ network $`X_t`$ through a pair of **$`m \times m`$ influence matrices**,
 $`A`$ and $`B`$:
 
 ``` math
-  \eta_{i,j,t} = g(\mu_{i,j,t}) \;=\; \boldsymbol{\theta}^{\top} \mathbf{z}_{i,j,t}
-  \;+\; \sum_{k,\ell} x_{k,\ell,t}\, a_{i,k}\, b_{j,\ell}
-  \;=\; \boldsymbol{\theta}^{\top}\mathbf{z}_{i,j,t} + (A\,X_t\,B^{\top})_{i,j}.
+ \eta_{i,j,t} = g(\mu_{i,j,t}) \;=\; \boldsymbol{\theta}^{\top} \mathbf{z}_{i,j,t} \;+\; \sum_{k,\ell} x_{k,\ell,t}\, a_{i,k}\, b_{j,\ell} \;=\; \boldsymbol{\theta}^{\top}\mathbf{z}_{i,j,t} + (A\,X_t\,B^{\top})_{i,j}. 
 ```
 
 The mean is then $`\mu_{i,j,t} = g^{-1}(\eta_{i,j,t})`$: expected counts
@@ -35,7 +33,7 @@ The key idea (Minhas & Hoff, *Political Analysis* 2025) is that the
 otherwise huge $`A`$ and $`B`$ are **explained by covariates** $`W`$:
 
 ``` math
-  A = \sum_{r=1}^{p}\alpha_r W_r, \qquad B = \sum_{r=1}^{p}\beta_r W_r .
+ A = \sum_{r=1}^{p}\alpha_r W_r, \qquad B = \sum_{r=1}^{p}\beta_r W_r . 
 ```
 
 So instead of $`2m^2`$ free influence weights you estimate two short
@@ -54,8 +52,7 @@ for the full framework and identification details.
 
 ### The three covariate roles (W vs. X vs. Z)
 
-The single most important thing to get straight before fitting is what
-each input does:
+What each input does:
 
 | Input | Dimension | Role |
 |:---|:---|:---|
@@ -64,32 +61,42 @@ each input does:
 | **W** | $`m \times m \times p`$ | **influence covariates** that *parameterize* $`A`$ and $`B`$ — what makes a tie a channel of influence (alliance, shared membership, proximity, …) |
 | **Z** | $`m \times m \times q \times T`$ | **exogenous dyadic covariates** with direct effects $`\boldsymbol{\theta}`$ (distance, trade, …) |
 
-In one line: **W describes which dyads can carry lagged influence; X is
-the signal that travels; Z are direct effects that bypass the influence
-machinery.**
+**W** describes which dyads can carry lagged influence; **X** is the
+lagged signal that flows through it; **Z** are direct effects that
+bypass the influence term.
 
 ## A first fit: simulate, fit, recover
 
 [`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
 generates data from a known SIR process, so you can confirm the
-estimator recovers the truth before trusting it on real data. (It bakes
-in a $`1/(m-1)`$ scaling of $`X`$ so the bilinear predictor stays on a
-sane scale even as the network grows; see “Building X” below.)
+estimator recovers the truth before trusting it on real data. We pass
+`gain = 0.9` so the lagged influence network is a strong (but still
+stationary) driver of future ties — that makes the influence mechanism,
+the whole point of SIR, clearly visible in the examples below.
+([`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
+also bakes in a $`1/(m-1)`$ scaling of $`X`$ so the bilinear predictor
+stays on a sane scale as the network grows; see “Building X” below.)
 
 ``` r
 
 set.seed(42)
-dat <- sim_sir(m = 14, T_len = 80, p = 2, q = 2, family = "poisson", seed = 42)
+dat <- sim_sir(m = 20, T_len = 120, p = 2, q = 2, family = "poisson", gain = 0.9, seed = 42)
 
 fit <- sir(dat$Y, W = dat$W, X = dat$X, Z = dat$Z, family = "poisson", seed = 1)
 fit
 #>             Estimate Std. Err
-#> (Z) Z1        0.2314   0.0075
-#> (Z) Z2       -0.3687   0.0073
-#> (alphaW) W2   0.3092   0.0589
-#> (betaW) W1   -0.1623   0.0085
-#> (betaW) W2    0.1154   0.0093
+#> (Z) Z1        0.2374   0.0037
+#> (Z) Z2       -0.3618   0.0036
+#> (alphaW) W2   0.4097   0.0044
+#> (betaW) W1   -0.6540   0.0032
+#> (betaW) W2    0.4167   0.0040
 ```
+
+The printout carries a `Std. Err` column: that is the classical Hessian
+SE, which can understate uncertainty for dependent network data. Treat
+it as a quick look only — for reporting we use the cluster-robust
+intervals from [`confint()`](https://rdrr.io/r/stats/confint.html) shown
+below.
 
 How well did we recover the truth?
 [`coef()`](https://rdrr.io/r/stats/coef.html) reports one normalized
@@ -111,11 +118,11 @@ data.frame(
     abs_error = round(abs(truth - unname(estimated)), 3)
 )
 #>          term  truth estimate abs_error
-#> 1      (Z) Z1  0.237    0.231     0.005
-#> 2      (Z) Z2 -0.365   -0.369     0.003
-#> 3 (alphaW) W2  0.411    0.309     0.102
-#> 4  (betaW) W1 -0.169   -0.162     0.007
-#> 5  (betaW) W2  0.109    0.115     0.006
+#> 1      (Z) Z1  0.237    0.237     0.001
+#> 2      (Z) Z2 -0.365   -0.362     0.004
+#> 3 (alphaW) W2  0.411    0.410     0.002
+#> 4  (betaW) W1 -0.651   -0.654     0.003
+#> 5  (betaW) W2  0.418    0.417     0.002
 ```
 
 The rank-at-most-one influence coefficient matrix is also close:
@@ -133,21 +140,22 @@ data.frame(
     ), 3)
 )
 #>                     quantity value
-#> 1   maximum absolute C error 0.020
-#> 2 relative Frobenius C error 0.108
+#> 1   maximum absolute C error 0.003
+#> 2 relative Frobenius C error 0.005
 ```
 
-The **point estimates** land close to the truth: direct effects recover
-tightly and the influence coefficients are close (noisier per replicate
-at this network size, shrinking as you add time periods or nodes). We
-deliberately show recovery by *error magnitude* rather than by a Wald
-“is the truth inside the 95% interval” check, because the default
-standard errors are **anti-conservative for network data** – they assume
-independent dyad-times and so understate the true uncertainty. Treat
-point recovery as the evidence here, and see
+Both the direct effects and the influence coefficients land close to the
+truth, and the rank-one influence matrix $`C = \alpha\beta^\top`$ — the
+quantity SIR actually identifies — recovers tightly. For uncertainty,
+[`confint()`](https://rdrr.io/r/stats/confint.html) reports
+cluster-robust intervals by default, which account for the dyadic
+dependence in network data; the classical errors that
+[`summary()`](https://rdrr.io/r/base/summary.html) prints assume
+independent dyad-times. Here the two are close because the simulated
+dependence is mild, but the gap can be large — the ICEWS example in
 [`vignette("sir_inference")`](https://netify-dev.github.io/sir/articles/sir_inference.md)
-for more defensible uncertainty estimates (cluster-robust SEs and
-bootstrap/jackknife checks) before reporting significance.
+shows the cluster SEs running an order of magnitude wider. See that
+vignette for the full treatment.
 
 > **Aside — why $`\alpha_1 = 1`$?** The bilinear term is unchanged if
 > you multiply $`\boldsymbol{\alpha}`$ by a constant $`c`$ and divide
@@ -187,17 +195,17 @@ data.frame(
     row.names = NULL
 )
 #>          term estimate cluster_low cluster_high
-#> 1      (Z) Z1    0.231       0.213        0.250
-#> 2      (Z) Z2   -0.369      -0.379       -0.358
-#> 3 (alphaW) W2    0.309       0.206        0.412
-#> 4  (betaW) W1   -0.162      -0.176       -0.148
-#> 5  (betaW) W2    0.115       0.110        0.121
+#> 1      (Z) Z1    0.237       0.231        0.243
+#> 2      (Z) Z2   -0.362      -0.372       -0.352
+#> 3 (alphaW) W2    0.410       0.401        0.419
+#> 4  (betaW) W1   -0.654      -0.660       -0.648
+#> 5  (betaW) W2    0.417       0.408        0.426
 ```
 
 For applied reporting, use `confint(fit)` or
 `tidy(fit, conf.int = TRUE)`; both use cluster-robust uncertainty by
-default for supported static directed fits. `summary(fit)` remains a
-compact Hessian-based printout for quick model inspection.
+default for supported static directed and symmetric fits. `summary(fit)`
+remains a compact Hessian-based printout for quick model inspection.
 
 ## Interpreting influence: who influences whom?
 
@@ -207,67 +215,56 @@ matrices `fit$A` and `fit$B`: each off-diagonal `A[i, k]` is node
 $`k`$’s influence on node $`i`$’s outgoing ties. We blank the diagonal
 below because self-ties are excluded from the model’s likelihood, so the
 diagonal of $`A`$ is not interpreted.
+([`order()`](https://rdrr.io/r/base/order.html) returns positions into
+the flattened matrix; [`arrayInd()`](https://rdrr.io/r/base/which.html)
+turns each one back into its `[row, column]` pair, where the column is
+the source actor and the row is the influenced actor.)
 
 ``` r
 
 A <- fit$A
 diag(A) <- NA                                      # self-influence is not modeled
+typical <- mean(abs(A), na.rm = TRUE)              # average |weight|, for scale
 ord <- order(abs(A), decreasing = TRUE, na.last = NA)[1:5]
+cells <- arrayInd(ord, dim(A))                     # col 1 = influenced (row), col 2 = source (column)
 data.frame(
-    source_node     = ((ord - 1) %/% nrow(A)) + 1,   # column k (the influencer)
-    influenced_node = ((ord - 1) %%  nrow(A)) + 1,   # row i (the influenced)
-    influence       = round(A[ord], 3)
+    source_node     = cells[, 2],                    # column k (the influencer)
+    influenced_node = cells[, 1],                    # row i (the influenced)
+    influence       = round(A[ord], 3),
+    vs_typical      = round(abs(A[ord]) / typical, 1) # multiple of the average |weight|
 )
-#>   source_node influenced_node influence
-#> 1           1              14    -2.682
-#> 2           4              13    -2.592
-#> 3           9               2     2.507
-#> 4           3               7    -2.497
-#> 5           2               1    -2.287
+#>   source_node influenced_node influence vs_typical
+#> 1          14               5    -3.319        4.0
+#> 2           2              15    -2.898        3.5
+#> 3           1              15    -2.699        3.3
+#> 4           1               5     2.624        3.2
+#> 5           1              14    -2.569        3.1
 ```
 
-The receiver-side matrix has the same row/column convention, but for
-incoming ties: `B[j, l]` says how past activity directed at receiver
-$`l`$ shapes future activity directed at receiver $`j`$.
+The receiver-side matrix `fit$B` is read with the same convention for
+incoming ties — `B[j, l]` is how past activity directed at receiver
+$`l`$ shapes future activity directed at receiver $`j`$ — so we defer a
+worked `B` reading to the labelled real-data example below rather than
+repeat the idiom on anonymous nodes here.
 
-``` r
-
-B <- fit$B
-diag(B) <- NA
-ord_b <- order(abs(B), decreasing = TRUE, na.last = NA)[1:5]
-data.frame(
-    source_receiver     = ((ord_b - 1) %/% nrow(B)) + 1,
-    influenced_receiver = ((ord_b - 1) %%  nrow(B)) + 1,
-    influence           = round(B[ord_b], 3)
-)
-#>   source_receiver influenced_receiver influence
-#> 1               4                  13     0.635
-#> 2               9                   2    -0.511
-#> 3               1                   8    -0.493
-#> 4               7                  10     0.492
-#> 5               8                   2    -0.488
-```
-
-**Reading magnitudes.** The entries of $`A`$ and $`B`$ are *unitless
-relative influence weights*: their sign and relative size carry the
-meaning — a larger $`|a_{i,k}|`$ means $`k`$ shapes $`i`$ more strongly.
-The sign of one cell is conditional on the other bilinear side and on
-`X`: the contribution is $`A[i,k] X[k,l,t] B[j,l]`$. Because influence
-enters the linear predictor *bilinearly* through $`(A X_t B^{\top})`$
-with $`X`$ scaled by $`1/(m-1)`$, a single $`a_{i,k}`$ is **not** a
-standalone count multiplier. For Poisson direct effects,
-$`\exp(\theta)`$ is a rate ratio and $`100(\exp(\theta)-1)`$ is the
-percent change; for Binomial direct effects it is an odds ratio. For the
-substantive size of an influence channel, use a
+**Reading magnitudes.** The entries of $`A`$ and $`B`$ are relative
+influence weights: a larger $`|a_{i,k}|`$ means $`k`$ shapes $`i`$ more
+strongly, and the sign gives the direction. They are not standalone
+multipliers — influence enters bilinearly through $`A X_t B^{\top}`$ —
+so to size a channel substantively, run a
 [`predict()`](https://rdrr.io/r/stats/predict.html) scenario (below)
-rather than exponentiating a cell. Most off-diagonal weights are small,
-and many are negative (damping):
+rather than reading a single cell. The `vs_typical` column makes the
+scale concrete: the channels shown are several times the average
+$`|`$weight$`|`$, the outliers of a wide, roughly symmetric spread. Most
+weights are far smaller — centered near zero (median about $`-0.07`$),
+with the middle half from about $`-0.7`$ to $`+0.6`$ and the central 90%
+from about $`-1.7`$ to $`+1.7`$ (the 5th and 95th percentiles below):
 
 ``` r
 
 round(quantile(A[!is.na(A)], c(0.05, 0.25, 0.5, 0.75, 0.95)), 3)
 #>     5%    25%    50%    75%    95% 
-#> -1.682 -0.764 -0.080  0.630  1.670
+#> -1.742 -0.726 -0.070  0.641  1.680
 ```
 
 ### Visual diagnostics
@@ -300,14 +297,15 @@ prints the same strongest-channel information as a table.
 
 if (requireNamespace("ggraph", quietly = TRUE) &&
     requireNamespace("igraph", quietly = TRUE)) {
-    plot_sir_network(fit, matrix = "A", threshold = 0.15)
+    plot_sir_network(fit, matrix = "A", threshold = 1.5)
 } else {
     A_network <- fit$A
     diag(A_network) <- NA
     edge_order <- order(abs(A_network), decreasing = TRUE, na.last = NA)[1:5]
+    cells_net <- arrayInd(edge_order, dim(A_network))
     data.frame(
-        source_node = ((edge_order - 1) %/% nrow(A_network)) + 1,
-        influenced_node = ((edge_order - 1) %% nrow(A_network)) + 1,
+        source_node = cells_net[, 2],
+        influenced_node = cells_net[, 1],
         influence = round(A_network[edge_order], 3)
     )
 }
@@ -335,7 +333,7 @@ history and covariates under the intervention.
 
 mu_hat <- predict(fit)                             # in-sample expected counts
 dim(mu_hat)
-#> [1] 14 14 80
+#> [1]  20  20 120
 
 Zcf <- dat$Z
 Zcf[, , 1, ] <- Zcf[, , 1, ] + sd(Zcf[, , 1, ])    # shift first Z covariate up 1 sd
@@ -344,64 +342,58 @@ delta_z <- mu_cf - mu_hat
 
 data.frame(
     scenario = "Increase Z1 by 1 SD",
-    baseline_mean = mean(mu_hat, na.rm = TRUE),
-    scenario_mean = mean(mu_cf, na.rm = TRUE),
-    mean_change = mean(delta_z, na.rm = TRUE),
-    median_change = stats::median(delta_z, na.rm = TRUE),
-    q05_change = qval(delta_z, 0.05),
-    q95_change = qval(delta_z, 0.95),
+    baseline_mean = round(mean(mu_hat, na.rm = TRUE), 3),
+    mean_change = round(mean(delta_z, na.rm = TRUE), 3),
+    median_change = round(stats::median(delta_z, na.rm = TRUE), 3),
+    q95_change = round(qval(delta_z, 0.95), 3),
     check.names = FALSE,
     row.names = NULL
 )
-#>              scenario baseline_mean scenario_mean mean_change median_change
-#> 1 Increase Z1 by 1 SD      1.129467        1.4287   0.2992334     0.2677779
-#>   q05_change q95_change
-#> 1  0.1240459  0.5802815
+#>              scenario baseline_mean mean_change median_change q95_change
+#> 1 Increase Z1 by 1 SD         1.554       0.418         0.266      1.137
 ```
 
-For influence covariates, the strongest applied workflow is to copy the
-observed `W` array and modify a theoretically defined part of it. The
-helper
-[`get_scen_array()`](https://netify-dev.github.io/sir/reference/get_scen_array.md)
-builds artificial design grids, which are useful for diagnostics, but
-those grids erase the observed network structure. Here we keep that
-structure and shift the first continuous `W` slice up or down by one
-off-diagonal standard deviation:
+Because `Z1` enters with a positive direct effect, shifting it up one
+standard deviation lifts expected counts across the board: the average
+dyad-time gains about 0.42 events (roughly a quarter above the 1.55
+baseline), and the most responsive dyads (the 95th percentile) gain
+over 1. This is the simplest kind of scenario — move one exogenous
+covariate, hold everything else fixed.
+
+How much of the predicted activity actually comes from the lagged
+influence network, as opposed to the direct covariates? Switch the
+influence term off — set the lagged state `X` to zero, leaving only the
+$`\boldsymbol{\theta}^\top \mathbf{z}`$ part — and compare the fitted
+means:
 
 ``` r
 
-W_base <- dat$W
-off <- row(W_base[, , 1]) != col(W_base[, , 1])
-w_step <- stats::sd(W_base[, , 1][off], na.rm = TRUE)
+mu_no_influence <- predict(fit, newdata = list(
+    W = dat$W,
+    X = array(0, dim = dim(dat$X)),   # lagged network switched off
+    Z = dat$Z
+))
 
-w_scenarios <- lapply(c("-1 SD", "baseline", "+1 SD"), function(label) {
-    W_tmp <- W_base
-    W1 <- W_tmp[, , 1]
-    shift <- switch(label, "-1 SD" = -w_step, "baseline" = 0, "+1 SD" = w_step)
-    W1[off] <- W1[off] + shift
-    W_tmp[, , 1] <- W1
-    mu_tmp <- predict(fit, newdata = list(W = W_tmp, X = dat$X, Z = dat$Z))
-    delta <- mu_tmp - mu_hat
-    data.frame(
-        scenario = label,
-        scenario_mean = mean(mu_tmp, na.rm = TRUE),
-        mean_change = mean(delta, na.rm = TRUE),
-        median_change = stats::median(delta, na.rm = TRUE),
-        p90_abs_change = qval(abs(delta), 0.9),
-        check.names = FALSE,
-        row.names = NULL
-    )
-})
-do.call(rbind, w_scenarios)
-#>   scenario scenario_mean mean_change median_change p90_abs_change
-#> 1    -1 SD     0.3866448  -0.7428217    -0.6923806       1.298637
-#> 2 baseline     1.1294665   0.0000000     0.0000000       0.000000
-#> 3    +1 SD     0.4290909  -0.7003756    -0.6081084       1.278216
+data.frame(
+    prediction     = c("full model", "influence switched off"),
+    mean_predicted = round(c(mean(mu_hat, na.rm = TRUE),
+                             mean(mu_no_influence, na.rm = TRUE)), 2),
+    row.names = NULL
+)
+#>               prediction mean_predicted
+#> 1             full model           1.55
+#> 2 influence switched off           1.10
 ```
 
-The table reports expected-count differences on the response scale. A
-higher `W` value can move the mean down if the fitted coefficient signs
-and the bilinear product imply damping conditional on the observed `X`.
+Switching the lagged network off drops predicted activity by roughly a
+third. That gap is exactly what the bilinear influence mechanism adds
+over an ordinary direct-covariate regression: because we simulated with
+`gain = 0.9`, the lagged network is a strong, persistent driver of
+future ties, not a marginal add-on. (For fully artificial design grids
+useful for diagnostics, see
+[`get_scen_array()`](https://netify-dev.github.io/sir/reference/get_scen_array.md)
+in
+[`vignette("sir_extensions")`](https://netify-dev.github.io/sir/articles/sir_extensions.md).)
 
 [`predict()`](https://rdrr.io/r/stats/predict.html) returns fitted or
 scenario-implied expected outcomes. For one-step-ahead or multi-step
@@ -460,17 +452,20 @@ fit is trustworthy before reading any standard error:
 ``` r
 
 data.frame(
-    Diagnostic = c("ALS converged", "Classical SEs reliable"),
+    Diagnostic = c("ALS converged", "Hessian well-conditioned"),
     Value = c(ifit$convergence, ifit$se_reliable)
 )
-#>               Diagnostic Value
-#> 1          ALS converged  TRUE
-#> 2 Classical SEs reliable  TRUE
+#>                 Diagnostic Value
+#> 1            ALS converged  TRUE
+#> 2 Hessian well-conditioned  TRUE
 ```
 
-For this small subset the Hessian-based SEs are numerically available,
-but the cluster/classical gaps below are large enough that classical SEs
-should not be read substantively on their own:
+We report the cluster-robust standard errors, which are the default and
+the trustworthy choice for dependent relational data. (The classical
+Hessian SEs that [`summary()`](https://rdrr.io/r/base/summary.html)
+prints are far smaller here because they assume independent dyad-times;
+[`vignette("sir_inference")`](https://netify-dev.github.io/sir/articles/sir_inference.md)
+works through that comparison.)
 
 ``` r
 
@@ -489,56 +484,48 @@ term_labels <- c(
     "(betaW) minDistLog" = "Receiver Channel: Minimum Logged Distance"
 )
 
-se_classical_icews <- sqrt(diag(vcov(ifit, type = "classical")))
 se_cluster_icews <- sqrt(diag(vcov(ifit, type = "cluster")))
 
 data.frame(
     "Term" = unname(term_labels[names(coef(ifit))]),
-    "Estimate" = round(unname(coef(ifit)), 3),
-    "Classical SE" = signif(unname(se_classical_icews), 4),
-    "Cluster SE" = signif(unname(se_cluster_icews), 4),
-    "Cluster/Classical" = round(unname(se_cluster_icews / se_classical_icews), 2),
+    "Estimate" = round(unname(coef(ifit)), 4),
+    "Cluster SE" = round(unname(se_cluster_icews), 4),
     check.names = FALSE
 )
-#>                                           Term Estimate Classical SE Cluster SE
-#> 1             Direct: Lagged Material Conflict    0.000    7.287e-06  0.0001817
-#> 2  Direct: Reciprocal Lagged Material Conflict    0.001    8.257e-06  0.0001088
-#> 3              Direct: Minimum Logged Distance    0.104    2.387e-03  0.0540300
-#> 4                             Direct: Alliance   -1.128    3.880e-02  0.6008000
-#> 5                   Direct: Verbal Cooperation    0.221    4.041e-03  0.2136000
-#> 6                     Sender Channel: Alliance    0.609    6.169e-03  0.1189000
-#> 7           Sender Channel: Verbal Cooperation    0.042    1.019e-03  0.0197200
-#> 8      Sender Channel: Minimum Logged Distance   -0.171    5.572e-04  0.0125400
-#> 9                   Receiver Channel: Baseline   -0.567    7.585e-03  0.2280000
-#> 10                  Receiver Channel: Alliance   -0.384    6.796e-03  0.1041000
-#> 11        Receiver Channel: Verbal Cooperation    0.123    1.328e-03  0.0580400
-#> 12   Receiver Channel: Minimum Logged Distance    0.003    5.139e-04  0.0088680
-#>    Cluster/Classical
-#> 1              24.94
-#> 2              13.17
-#> 3              22.63
-#> 4              15.48
-#> 5              52.84
-#> 6              19.27
-#> 7              19.35
-#> 8              22.50
-#> 9              30.06
-#> 10             15.31
-#> 11             43.70
-#> 12             17.26
+#>                                           Term Estimate Cluster SE
+#> 1             Direct: Lagged Material Conflict   0.0001     0.0001
+#> 2  Direct: Reciprocal Lagged Material Conflict   0.0006     0.0002
+#> 3              Direct: Minimum Logged Distance   0.1036     0.1034
+#> 4                             Direct: Alliance  -1.1284     0.8986
+#> 5                   Direct: Verbal Cooperation   0.2213     0.3261
+#> 6                     Sender Channel: Alliance   0.6094     0.2101
+#> 7           Sender Channel: Verbal Cooperation   0.0423     0.0214
+#> 8      Sender Channel: Minimum Logged Distance  -0.1709     0.0150
+#> 9                   Receiver Channel: Baseline  -0.5673     0.3727
+#> 10                  Receiver Channel: Alliance  -0.3841     0.1666
+#> 11        Receiver Channel: Verbal Cooperation   0.1226     0.0883
+#> 12   Receiver Channel: Minimum Logged Distance   0.0034     0.0064
 ```
 
-The direct `Z` rows describe immediate dyadic associations. The
-`(alphaW)` and `(betaW)` rows describe which dyadic features are
-associated with lagged conflict channels under the fitted SIR model.
-They are not standalone count-rate multipliers; use fitted means or
+The direct `Z` rows describe immediate dyadic associations. The first
+two, `mConf` and `mConf_ji`, enter on a raw event-count scale, so their
+per-unit coefficients round to about zero — their effect sizes show up
+in scenarios, not in the point estimate. The more readable rows here are
+the influence channels: `(alphaW) ally` (about 0.61) and
+`(alphaW) minDistLog` (about $`-0.17`$, with a tight cluster SE) say
+which dyadic features carry lagged conflict under the fitted model. None
+of these are standalone count-rate multipliers; use fitted means or
 scenario predictions for effect sizes. The first influence covariate,
-`int`, is an intercept-like baseline channel, so it plays the role of
-the fixed $`\alpha_1 = 1`$.
+`int`, is an intercept-like baseline channel that plays its two sides
+differently. On the *sender* side it carries the identifying constraint
+$`\alpha_1 = 1`$, which is why there is no `(alphaW) int` row (only
+`ally`, `verbCoop`, and `minDistLog` appear). On the *receiver* side it
+is freely estimated — the visible `Receiver Channel: Baseline` row
+(`(betaW) int`, about $`-0.57`$) is the estimated receiver intercept
+that absorbs the overall $`\beta`$ scale.
 
 Country names ride along on `icews$countries`, so you can label the
-strongest estimated influence channels. These are exploratory summaries
-of the fitted subset, not causal claims:
+strongest estimated influence channels:
 
 ``` r
 
@@ -546,12 +533,11 @@ A <- ifit$A
 dimnames(A) <- list(icews$countries[icews_nodes], icews$countries[icews_nodes])
 diag(A) <- NA
 top_edges <- order(abs(A), decreasing = TRUE, na.last = NA)[1:5]
-source_index <- ((top_edges - 1) %/% nrow(A)) + 1
-influenced_index <- ((top_edges - 1) %% nrow(A)) + 1
+cells_a <- arrayInd(top_edges, dim(A))
 
 data.frame(
-    Source = colnames(A)[source_index],
-    Influenced = rownames(A)[influenced_index],
+    Source = colnames(A)[cells_a[, 2]],
+    Influenced = rownames(A)[cells_a[, 1]],
     Weight = round(A[top_edges], 2)
 )
 #>        Source                Influenced Weight
@@ -572,12 +558,11 @@ B <- ifit$B
 dimnames(B) <- list(icews$countries[icews_nodes], icews$countries[icews_nodes])
 diag(B) <- NA
 top_b <- order(abs(B), decreasing = TRUE, na.last = NA)[1:5]
-b_source_index <- ((top_b - 1) %/% nrow(B)) + 1
-b_influenced_index <- ((top_b - 1) %% nrow(B)) + 1
+cells_b <- arrayInd(top_b, dim(B))
 
 data.frame(
-    Source_receiver = colnames(B)[b_source_index],
-    Influenced_receiver = rownames(B)[b_influenced_index],
+    Source_receiver = colnames(B)[cells_b[, 2]],
+    Influenced_receiver = rownames(B)[cells_b[, 1]],
     Weight = round(B[top_b], 2)
 )
 #>   Source_receiver Influenced_receiver Weight
@@ -588,71 +573,52 @@ data.frame(
 #> 5         LEBANON         AFGHANISTAN  -0.50
 ```
 
-For an effect-size summary, change the lagged signal `X` and compare
-fitted means. The next scenario is a post-fit sensitivity check among
-high-leverage channels: it nudges the lagged conflict signal sent by the
-strongest source country above by one quarter of a standard deviation,
-holding `W` and `Z` fixed. It is not a causal intervention or a
-forecast.
+Both `A` and `B` show near-symmetric pairs — India–Pakistan and
+Afghanistan–Pakistan on the sender side, Iraq–Lebanon on the receiver
+side — each direction carrying a similar weight. SIR estimates the two
+directions separately, so this symmetry is an empirical finding about
+these mutually reactive dyads, not an assumption baked into the model.
+
+For an effect-size summary, pose a substantive *what-if* on a specific
+dyad. India and Pakistan are the strongest mutually reactive pair above;
+what would the model predict for their conflict if they were allies? We
+set the `ally` indicator to 1 for that dyad — in both the direct
+covariates `Z` and the influence covariates `W`, so the change is
+coherent — and re-predict:
 
 ``` r
 
 mu_icews <- predict(ifit)
-X_scen <- X_icews
-src <- source_index[1]
-x_shift <- 0.25 * stats::sd(X_icews[src, , ], na.rm = TRUE)
-X_scen[src, , ] <- X_scen[src, , ] + x_shift
-mu_scen <- predict(ifit, newdata = list(W = W_icews, X = X_scen, Z = Z_icews))
-delta <- mu_scen - mu_icews
+ally_W <- which(dimnames(icews$W)[[3]] == "ally")
+ally_Z <- which(dimnames(icews$Z)[[3]] == "ally")
+ind <- which(icews$countries[icews_nodes] == "INDIA")
+pak <- which(icews$countries[icews_nodes] == "PAKISTAN")
+
+W_ally <- W_icews
+Z_ally <- Z_icews
+W_ally[ind, pak, ally_W] <- 1; W_ally[pak, ind, ally_W] <- 1   # turn the ally channel on
+Z_ally[ind, pak, ally_Z, ] <- 1; Z_ally[pak, ind, ally_Z, ] <- 1
+mu_ally <- predict(ifit, newdata = list(W = W_ally, X = X_icews, Z = Z_ally))
 
 data.frame(
-    scenario = paste("Increase lagged signal sent by", colnames(A)[src], "by 0.25 SD"),
-    baseline_mean = mean(mu_icews, na.rm = TRUE),
-    scenario_mean = mean(mu_scen, na.rm = TRUE),
-    mean_change = mean(delta, na.rm = TRUE),
-    median_change = stats::median(delta, na.rm = TRUE),
-    q05_change = qval(delta, 0.05),
-    q95_change = qval(delta, 0.95),
-    p90_abs_change = qval(abs(delta), 0.9),
-    max_abs_change = max(abs(delta), na.rm = TRUE),
-    check.names = FALSE,
+    dyad              = c("India -> Pakistan", "Pakistan -> India"),
+    baseline_conflict = round(c(mean(mu_icews[ind, pak, ]), mean(mu_icews[pak, ind, ])), 1),
+    allied_conflict   = round(c(mean(mu_ally[ind, pak, ]), mean(mu_ally[pak, ind, ])), 1),
     row.names = NULL
 )
-#>                                             scenario baseline_mean
-#> 1 Increase lagged signal sent by PAKISTAN by 0.25 SD      13.09405
-#>   scenario_mean mean_change median_change q05_change q95_change p90_abs_change
-#> 1      13.63516   0.5411172             0  -5.204853   2.264367       3.873522
-#>   max_abs_change
-#> 1       529.1686
+#>                dyad baseline_conflict allied_conflict
+#> 1 India -> Pakistan              38.4             3.4
+#> 2 Pakistan -> India              27.3             0.4
 ```
 
-The change columns are expected-count differences on the Poisson
-response scale. The median is the main guide to the typical dyad-month;
-`max_abs_change` tells you how reactive the fitted model can be in the
-tail. Because this is a post-fit sensitivity check on a high-leverage
-source, inspect the dyad-months that move most before attaching a
-substantive interpretation:
-
-``` r
-
-top_delta <- order(abs(delta), decreasing = TRUE, na.last = NA)[1:5]
-top_idx <- arrayInd(top_delta, dim(delta))
-data.frame(
-    Source = icews$countries[icews_nodes][top_idx[, 1]],
-    Receiver = icews$countries[icews_nodes][top_idx[, 2]],
-    Month = icews_periods[top_idx[, 3]],
-    baseline_mean = round(mu_icews[top_delta], 3),
-    scenario_mean = round(mu_scen[top_delta], 3),
-    delta = round(delta[top_delta], 3),
-    row.names = NULL
-)
-#>    Source Receiver Month baseline_mean scenario_mean   delta
-#> 1  ISRAEL  LEBANON    19      2318.822      2847.991 529.169
-#> 2  ISRAEL  LEBANON    20      2005.888      2463.644 457.755
-#> 3 LEBANON   ISRAEL    19      1301.964      1521.086 219.123
-#> 4 LEBANON   ISRAEL    20       985.938      1151.873 165.935
-#> 5  ISRAEL  LEBANON     9       520.745       639.582 118.837
-```
+Under the fitted model, an India–Pakistan alliance cuts predicted
+bilateral conflict sharply — from about 38 expected events per month
+down to 3 on India’s side, and from about 27 to under 1 on Pakistan’s.
+Because the `ally` indicator enters both the direct effect and the
+influence channel, flipping it on for one dyad answers a coherent,
+interpretable counterfactual. As with any scenario, read it as a
+model-implied association under the assumptions in the causal box above,
+not a guaranteed consequence of a real alliance.
 
 ## Building X (a note that saves silent errors)
 

@@ -13,7 +13,7 @@ estimated influence matrices A and B."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,8 +76,10 @@ estimated influence matrices A and B.</p>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <code>"summary.sir"</code> containing:</p><dl><dt>coefficients</dt>
-<dd><p>Data frame with columns <code>coef</code>, <code>se</code>,
-      <code>p.value</code>, and significance codes.</p></dd>
+<dd><p>Data frame with columns <code>coef</code>, <code>se</code>
+      (classical SE), <code>rse</code> (cluster-robust SE), <code>t_se</code> (classical z,
+      the printed "z value"), <code>t_rse</code> (robust z), <code>p.value</code>, and
+      <code>sig</code> (significance codes). The printed z/p/stars are classical.</p></dd>
 
     <dt>loglik</dt>
 <dd><p>Log-likelihood at convergence.</p></dd>

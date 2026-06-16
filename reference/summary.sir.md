@@ -29,8 +29,10 @@ An object of class `"summary.sir"` containing:
 
 - coefficients:
 
-  Data frame with columns `coef`, `se`, `p.value`, and significance
-  codes.
+  Data frame with columns `coef`, `se` (classical SE), `rse`
+  (cluster-robust SE), `t_se` (classical z, the printed "z value"),
+  `t_rse` (robust z), `p.value`, and `sig` (significance codes). The
+  printed z/p/stars are classical.
 
 - loglik:
 

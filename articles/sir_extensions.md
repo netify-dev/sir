@@ -9,25 +9,27 @@ the data-preparation utilities. For basic fitting see
 
 ## Distribution families
 
-The distribution-family examples below use
-[`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md), so
-each fits data with a *known* influence signal and the coefficients are
-interpretable. The later sections (symmetric, bipartite, dynamic) use
-small illustrative networks to show the *call mechanics* of each
-structure; there the simulated outcome is plain noise, so the fitted
-coefficients are not meaningful.
+Every example below recovers a known influence operator so you can see
+the estimator work for each family and network type. The
+[`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
+examples generate the data directly; the bipartite and dynamic-`W`
+sections instead build small networks by hand from a known operator —
+[`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
+makes only square, one-mode data, so those shapes have to be constructed
+manually — and then check that the fit recovers it.
 
 ### Normal (continuous outcomes)
 
-For continuous relational data (trade volumes, sentiment scores) the
-Normal family uses an identity link. The influence parameters are
-interpreted exactly as in the Poisson case: $`\alpha`$ and $`\beta`$
-identify which covariates account for sender and receiver influence,
-with effects entering the linear predictor.
+For continuous relational data (sentiment scores, net flows, log trade
+ratios) the Normal family uses an identity link. The influence
+parameters are interpreted exactly as in the Poisson case: $`\alpha`$
+and $`\beta`$ identify which covariates account for sender and receiver
+influence, with effects entering the linear predictor.
 
 ``` r
 
-dn  <- sim_sir(m = 14, T_len = 80, p = 2, q = 2, family = "normal", seed = 11)
+dn  <- sim_sir(m = 14, T_len = 90, p = 2, q = 2, family = "normal",
+               gain = 0.9, seed = 11)
 fit_norm <- sir(dn$Y, W = dn$W, X = dn$X, Z = dn$Z,
                 family = "normal", calc_se = FALSE, seed = 1)
 target_norm <- c(dn$theta, dn$alpha[-1], dn$beta)
@@ -39,26 +41,33 @@ data.frame(
     row.names = NULL
 )
 #>          term estimate target abs_error
-#> 1      (Z) Z1   -0.411 -0.414     0.002
-#> 2      (Z) Z2   -0.207 -0.210     0.003
-#> 3 (alphaW) W2   -0.156 -0.177     0.022
-#> 4  (betaW) W1    0.000  0.008     0.008
-#> 5  (betaW) W2   -0.461 -0.455     0.006
+#> 1      (Z) Z1   -0.400 -0.414     0.014
+#> 2      (Z) Z2   -0.200 -0.210     0.010
+#> 3 (alphaW) W2   -0.179 -0.177     0.001
+#> 4  (betaW) W1    0.006  0.015     0.009
+#> 5  (betaW) W2   -0.880 -0.883     0.003
 ```
 
-The synthetic data were generated from a known Normal SIR process, so
-the coefficient signs and magnitudes are meaningful for this example. We
-show recovery against the generating values rather than a star table
-because this section is about family behavior, not inference.
+The sender block shows only `(alphaW) W2` because the first sender
+weight is fixed at 1 for identification (the $`\alpha_1 = 1`$ anchor)
+and so is not estimated; the receiver block shows both `(betaW) W1` and
+`(betaW) W2`. All five estimated coefficients land close to their
+generating values with the correct signs, so the Normal family recovers
+sender and receiver influence just as the Poisson fit in the overview
+did.
 
-On the response scale, the Normal family returns fitted means directly:
+On the response scale,
+[`predict()`](https://rdrr.io/r/stats/predict.html) returns fitted means
+directly. Because we simulated a strong influence signal (`gain = 0.9`),
+those fitted means track the observed network closely — the correlation
+between fitted and observed is high, so the model is capturing the real
+structure, not just the average level:
 
 ``` r
 
-mu_norm <- predict(fit_norm)
-round(quantile(mu_norm[!is.na(mu_norm)], c(0.05, 0.5, 0.95)), 3)
-#>     5%    50%    95% 
-#> -1.177 -0.028  1.138
+mu_norm <- predict(fit_norm)                 # fitted means (identity link)
+round(cor(c(mu_norm), c(dn$Y), use = "complete.obs"), 3)
+#> [1] 0.849
 ```
 
 ### Binomial (binary outcomes)
@@ -72,7 +81,8 @@ and the covariate scale.
 
 ``` r
 
-db  <- sim_sir(m = 16, T_len = 120, p = 2, q = 1, family = "binomial", seed = 12)
+db  <- sim_sir(m = 16, T_len = 130, p = 2, q = 2, family = "binomial",
+               alpha = c(1, 0.8), beta = c(0.7, -0.6), seed = 12)
 fit_bin <- sir(db$Y, W = db$W, X = db$X, Z = db$Z,
                family = "binomial", calc_se = FALSE, seed = 1)
 target_bin <- c(db$theta, db$alpha[-1], db$beta)
@@ -84,127 +94,144 @@ data.frame(
     row.names = NULL
 )
 #>          term estimate target abs_error
-#> 1      (Z) Z1   -0.304 -0.321     0.018
-#> 2 (alphaW) W2   -0.484 -0.444     0.040
-#> 3  (betaW) W1    0.488  0.473     0.014
-#> 4  (betaW) W2   -0.272 -0.287     0.015
+#> 1      (Z) Z1   -0.440 -0.431     0.010
+#> 2      (Z) Z2    0.334  0.318     0.017
+#> 3 (alphaW) W2    0.783  0.800     0.017
+#> 4  (betaW) W1    0.684  0.700     0.016
+#> 5  (betaW) W2   -0.598 -0.600     0.002
 ```
 
-Again, these are simulated data with a known generating process, so
-recovery and response-scale probabilities are the useful outputs.
+Despite the binary outcome, every coefficient lands within about 0.02 of
+its generating value (see `abs_error`) — the influence weights recover
+as cleanly as the direct effects.
 
 [`predict()`](https://rdrr.io/r/stats/predict.html) returns fitted tie
-probabilities by default. Use `predict(type = "link")` and then
-[`plogis()`](https://rdrr.io/r/stats/Logistic.html) only when you
-explicitly request the log-odds scale:
+probabilities by default. Pass `type = "link"` instead if you want the
+log-odds (linear-predictor) scale; apply
+[`plogis()`](https://rdrr.io/r/stats/Logistic.html) to those values to
+convert back to probabilities. A more telling check than the overall tie
+rate is whether the model *discriminates* — does it assign higher
+probabilities to dyads that actually tied than to those that did not?
 
 ``` r
 
-mu_bin <- predict(fit_bin)                 # fitted tie probabilities
-round(quantile(mu_bin[!is.na(mu_bin)], c(0.05, 0.5, 0.95)), 3)
-#>    5%   50%   95% 
-#> 0.290 0.496 0.703
+p_hat <- predict(fit_bin)                    # fitted tie probabilities
+c(mean_prob_at_observed_ties     = round(mean(p_hat[db$Y == 1], na.rm = TRUE), 3),
+  mean_prob_at_observed_non_ties = round(mean(p_hat[db$Y == 0], na.rm = TRUE), 3))
+#>     mean_prob_at_observed_ties mean_prob_at_observed_non_ties 
+#>                          0.563                          0.426
 ```
+
+The model assigns a clearly higher probability to dyads that tied than
+to those that did not, so the influence structure carries real
+predictive signal — not just the right marginal rate.
 
 ## Symmetric (undirected) networks
 
-For undirected networks where $`y_{i,j} = y_{j,i}`$, set
-`symmetric = TRUE`. The model fits the upper triangle and constrains
-$`B = I`$. This is an upper-triangle, sender-side representation of
-undirected data, not a fully order-invariant undirected bilinear model.
-For Poisson and Binomial outcomes, provide a symmetric `Y` directly;
-averaging asymmetric discrete matrices can create invalid non-integer or
-non-binary observations. The influence covariates in `W` must also be
-symmetric and meaningful for unordered pairs. This suits undirected
-trade, alliance, or co-sponsorship networks when that representation is
-substantively acceptable.
+For undirected networks where $`y_{i,j} = y_{j,i}`$ (alliances, trade,
+co-sponsorship) set `symmetric = TRUE`. The sender and receiver roles
+collapse into one operator, $`A = B = \sum_k \gamma_k W_k`$, so the
+bilinear term becomes the **quadratic form** $`A X A'`$ and there is a
+single set of influence weights $`\gamma`$, estimated freely with no
+fixed anchor. `sim_sir(symmetric = TRUE)` generates a matching
+undirected process, so we can check recovery of a known $`\gamma`$:
 
 ``` r
 
-set.seed(1)
-m <- 14; T_len <- 60; p <- 2
-W <- array(0, dim = c(m, m, p))
-for (k in seq_len(p)) {
-    W_k <- matrix(rnorm(m * m), m, m)
-    W[, , k] <- (W_k + t(W_k)) / 2
-    diag(W[, , k]) <- 0
-}
+ds <- sim_sir(m = 14, T_len = 70, p = 3, q = 1, family = "normal",
+              symmetric = TRUE, alpha = c(1.5, 0.9, -0.6), seed = 7)
 
-Y_sym <- array(0, dim = c(m, m, T_len))
-for (t in 1:T_len) {
-    Y_t <- matrix(0, m, m)
-    upper <- upper.tri(Y_t)
-    Y_t[upper] <- rpois(sum(upper), 2)
-    Y_t <- Y_t + t(Y_t)
-    diag(Y_t) <- NA
-    Y_sym[, , t] <- Y_t
-}
-X_sym <- array(0, dim = c(m, m, T_len))
-for (t in 2:T_len) {
-    X_sym[, , t] <- log(Y_sym[, , t - 1] + 1)
-    X_sym[, , t][is.na(X_sym[, , t])] <- 0
-}
+fit_sym <- sir(ds$Y, W = ds$W, X = ds$X, Z = ds$Z,
+               family = "normal", symmetric = TRUE, seed = 1)
 
-fit_sym <- sir(Y_sym, W = W, X = X_sym, family = "poisson",
-               symmetric = TRUE, calc_se = FALSE, seed = 1)
 data.frame(
-    converged = fit_sym$convergence,
-    symmetric = fit_sym$symmetric,
-    fix_receiver = fit_sym$fix_receiver
+    term       = names(coef(fit_sym)),
+    estimate   = round(unname(coef(fit_sym)), 3),
+    target     = round(c(ds$theta, ds$alpha), 3),
+    se_cluster = round(sqrt(diag(vcov(fit_sym))), 3),
+    row.names = NULL
 )
-#>   converged symmetric fix_receiver
-#> 1      TRUE      TRUE         TRUE
+#>          term estimate target se_cluster
+#> 1      (Z) Z1   -0.173  -0.16      0.020
+#> 2 (gammaW) W1    1.552   1.50      0.114
+#> 3 (gammaW) W2    0.808   0.90      0.135
+#> 4 (gammaW) W3   -0.629  -0.60      0.088
+cat("operator A == B:", isTRUE(all.equal(fit_sym$A, fit_sym$B)),
+    "| diag(A) == 0:", max(abs(diag(fit_sym$A))) < 1e-10, "\n")
+#> operator A == B: TRUE | diag(A) == 0: TRUE
 ```
 
-This chunk demonstrates the API and structural checks. The outcome was
-generated as simple noise, so the fitted coefficient values are not
-substantively interpretable.
+The estimates track the true shared weights (the `target` column, stored
+sim-side in `ds$alpha`), and the fitted network is exactly symmetric
+with a zero diagonal. Unlike the directed case there is no fixed anchor
+— every $`\gamma_k`$ is estimated, including the first (target 1.5, not
+pinned at 1).
 
-> These illustrative chunks build `X` as a plain `log(Y_prev + 1)` for
-> brevity. When you intend to forecast, build `X` the way
-> [`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
-> and [`forecast()`](https://generics.r-lib.org/reference/forecast.html)
-> assume — divide the lag by `max(m - 1, 1)` (the number of partners
-> summed over) — or pass a matching `infl_scale` to
-> [`forecast()`](https://generics.r-lib.org/reference/forecast.html).
+A few specifics for applied use: $`A`$ is identified only up to overall
+sign (since $`A X A' = (-A) X (-A)'`$), fixed so the largest
+$`|\gamma_k|`$ is positive — match signs before pooling $`\gamma`$
+across separate fits
+([`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
+already realigns its resamples). Inputs must be a square network with
+symmetric, zero-diagonal `W`; Poisson/Binomial `Y` must already be
+symmetric, and continuous `Y` is averaged across triangles. As for
+directed fits, [`confint()`](https://rdrr.io/r/stats/confint.html) and
+[`vcov()`](https://rdrr.io/r/stats/vcov.html) default to the
+cluster-robust SE (see
+[`vignette("sir_inference")`](https://netify-dev.github.io/sir/articles/sir_inference.md)).
 
 ## Bipartite networks
 
 When senders and receivers are **distinct populations** (a rectangular
-$`Y`$, e.g. countries $`\to`$ NGOs, or legislators co-sponsoring others’
+$`Y`$, e.g. countries $`\to`$ NGOs, or legislators co-sponsoring others’
 bills), bipartite structure is detected automatically and
 `fix_receiver = TRUE` is enforced.
 
-The detail that trips people up: **influence flows on the sender side,
-so `W` describes the senders.** For an $`n_1 \times n_2`$ outcome, `W`
-must be $`n_1 \times n_1 \times p`$ (sender-by-sender), *not* keyed to
-the receivers. `X` matches `Y` at $`n_1 \times n_2`$.
+**Influence flows on the sender side, so `W` describes the senders.**
+For an $`n_1 \times n_2`$ outcome, `W` must be
+$`n_1 \times n_1 \times p`$ (sender-by-sender), *not* keyed to the
+receivers. `X` matches `Y` at $`n_1 \times n_2`$. Exogenous covariates
+`Z` are optional and, like `X`, are keyed to the outcome — supply them
+as $`n_1 \times n_2 \times q \times T`$ (the example below omits `Z` for
+brevity). Because
+[`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
+generates only square networks, we build this rectangular example by
+hand from a known sender operator and confirm the fit recovers it.
 
 ``` r
 
-set.seed(2)
-n1 <- 10; n2 <- 15; T_len <- 40; p <- 2
-Y_bp <- array(rpois(n1 * n2 * T_len, 2), dim = c(n1, n2, T_len))
+set.seed(7)
+n1 <- 12; n2 <- 8; T_len <- 80; p <- 2
 W_bp <- array(rnorm(n1 * n1 * p), dim = c(n1, n1, p))   # sender-by-sender
-X_bp <- array(0, dim = c(n1, n2, T_len))
-for (t in 2:T_len) X_bp[, , t] <- log(Y_bp[, , t - 1] + 1)
-Z_bp <- array(rnorm(n1 * n2 * 1 * T_len), dim = c(n1, n2, 1, T_len))
+A_bp <- W_bp[, , 1] + 0.6 * W_bp[, , 2]                 # true sender operator (alpha = 1, 0.6)
 
-fit_bp <- sir(Y_bp, W = W_bp, X = X_bp, Z = Z_bp,
-              family = "poisson", fix_receiver = TRUE, calc_se = FALSE, seed = 1)
+Y_bp <- array(0, dim = c(n1, n2, T_len))
+X_bp <- array(0, dim = c(n1, n2, T_len))
+for (t in 2:T_len) {
+    X_bp[, , t] <- Y_bp[, , t - 1] / (n1 - 1)            # lagged signal, /(n1-1) keeps the bilinear sum on scale
+    Y_bp[, , t] <- A_bp %*% X_bp[, , t] + matrix(rnorm(n1 * n2, sd = 0.4), n1, n2)
+}
+
+fit_bp <- sir(Y_bp, W = W_bp, X = X_bp,
+              family = "normal", fix_receiver = TRUE, calc_se = FALSE, seed = 1)
 data.frame(
-    converged = fit_bp$convergence,
-    bipartite = fit_bp$bipartite,
-    fix_receiver = fit_bp$fix_receiver,
-    senders = fit_bp$n1,
-    receivers = fit_bp$n2
+    bipartite        = fit_bp$bipartite,
+    fix_receiver     = fit_bp$fix_receiver,
+    senders          = fit_bp$n1,
+    receivers        = fit_bp$n2,
+    alphaW2_estimate = round(unname(fit_bp$alpha[2]), 3),
+    alphaW2_target   = 0.6,
+    row.names = NULL
 )
-#>   converged bipartite fix_receiver senders receivers
-#> 1      TRUE      TRUE         TRUE      10        15
+#>   bipartite fix_receiver senders receivers alphaW2_estimate alphaW2_target
+#> 1      TRUE         TRUE      12         8            0.587            0.6
 ```
 
-Again, this is an API demonstration: the simulated outcome is plain
-noise, so only the structural output should be read.
+The output confirms both that the call did the right thing structurally
+— the rectangular outcome was recognized as bipartite and the receiver
+side was fixed — and that the sender-side influence weight is recovered
+(the estimate lands near its true value of 0.6). The full-bilinear
+example below adds a separate receiver-side channel.
 
 For a *square* array whose rows and columns are nonetheless distinct
 populations, set `bipartite = TRUE` explicitly so the receiver side is
@@ -220,9 +247,8 @@ built from `W` and the receiver influence `B` from `W_recv`, fit by
 alternating GLM with `alpha_1 = 1` pinning the scale.
 
 Here we simulate a two-mode network *with* genuine bilinear structure so
-the fit has something to recover (the earlier `Y_bp` was pure noise,
-useful only to show the API). True sender weights are `alpha = (1, 0.6)`
-and receiver weights `beta = (0.8, -0.5)`:
+the fit has something to recover. True sender weights are
+`alpha = (1, 0.6)` and receiver weights `beta = (0.8, -0.5)`:
 
 ``` r
 
@@ -258,76 +284,94 @@ data.frame(
 #> 3 (betaWr) Wr2   -0.502   -0.5
 ```
 
+All three estimates land essentially on their generating values, so the
+full bilinear model recovers the separate sender and receiver influence
+channels at once — the most demanding recovery in this vignette.
+
 Analytic standard errors are not available on this path; use the
 delete-one-actor dyad jackknife for inference:
 
 ``` r
 
 bj <- boot_sir(fit_full, type = "dyad", seed = 1)
-confint(bj)
-#>                   2.5 %     97.5 %
-#> (alphaW) W2   0.5010128  0.6984382
-#> (betaWr) Wr1  0.6968568  0.9125953
-#> (betaWr) Wr2 -0.5841368 -0.4197630
+round(confint(bj), 3)
+#>               2.5 % 97.5 %
+#> (alphaW) W2   0.501  0.698
+#> (betaWr) Wr1  0.697  0.913
+#> (betaWr) Wr2 -0.584 -0.420
 ```
+
+All three jackknife intervals comfortably cover the true weights (0.6,
+0.8, -0.5), giving the full-bilinear fit a clean inferential payoff.
 
 ## Dynamic influence covariates
 
 Often the factors that mediate influence change over time — alliances
 evolve, trade shifts. Supply `W` as a 4D array
-($`m \times m \times p \times T`$). The coefficients
-$`\boldsymbol{\alpha}`$ and $`\boldsymbol{\beta}`$ are still estimated
-as time-invariant, but the reconstructed influence matrices $`A_t`$ now
-vary with $`t`$ because the covariates do.
+($`m \times m \times p \times T`$). The influence *coefficients* are
+estimated as time-invariant, but the reconstructed operators $`A_t`$
+vary with $`t`$ because the covariates do. Dynamic 4D `W` is supported
+with a fixed receiver side (`fix_receiver = TRUE`, so $`B = I`$ and only
+the sender weights $`\boldsymbol{\alpha}`$ are estimated). Below we let
+the covariates evolve gradually — an AR(1) drift across periods, like
+alliances shifting slowly — and check that the fit still recovers the
+shared $`\alpha`$:
 
 ``` r
 
-set.seed(3)
-m <- 14; T_len <- 40; p <- 2
-Y_dyn <- array(rpois(m * m * T_len, 2), dim = c(m, m, T_len))
-for (t in 1:T_len) diag(Y_dyn[, , t]) <- NA
-X_dyn <- array(0, dim = c(m, m, T_len))
-for (t in 2:T_len) X_dyn[, , t] <- log(Y_dyn[, , t - 1] + 1)
-X_dyn[is.na(X_dyn)] <- 0
-W_dyn <- array(rnorm(m * m * p * T_len), dim = c(m, m, p, T_len))   # 4D, time-varying
+set.seed(11)
+m <- 14; T_len <- 80; p <- 2
 
-fit_dyn <- sir(Y_dyn, W = W_dyn, X = X_dyn, family = "poisson",
-               fix_receiver = TRUE, calc_se = FALSE, max_iter = 10, seed = 1)
-
-dim(fit_dyn$A)        # A is now m x m x T
-#> [1] 14 14 40
-fit_dyn$dynamic_W
-#> [1] TRUE
-```
-
-The coefficients are fixed across time, but the realized channels change
-with `W_t`. Because this example uses simulated noise to demonstrate the
-API, the right rendered output is a structural check rather than a
-ranked channel table:
-
-``` r
-
-dynamic_period_check <- function(period) {
-    A_t <- fit_dyn$A[, , period]
-    W_t <- W_dyn[, , , period]
-    diag(A_t) <- NA
-    data.frame(
-        period = period,
-        A_dimensions = paste(dim(A_t), collapse = " x "),
-        finite_off_diagonal = sum(is.finite(A_t)),
-        mean_abs_A = round(mean(abs(A_t), na.rm = TRUE), 3),
-        mean_abs_W = round(mean(abs(W_t), na.rm = TRUE), 3),
-        row.names = NULL
-    )
+# influence covariates that drift gradually: AR(1) across periods (rho = 0.9)
+W_dyn <- array(0, dim = c(m, m, p, T_len))
+W_dyn[, , , 1] <- rnorm(m * m * p)
+for (t in 2:T_len) {
+    W_dyn[, , , t] <- 0.9 * W_dyn[, , , t - 1] +
+        sqrt(1 - 0.9^2) * array(rnorm(m * m * p), dim = c(m, m, p))
 }
-rbind(
-    dynamic_period_check(1),
-    dynamic_period_check(T_len)
+A_dyn <- function(t) W_dyn[, , 1, t] + 0.7 * W_dyn[, , 2, t]   # true operator (alpha = 1, 0.7)
+
+Y_dyn <- array(0, dim = c(m, m, T_len))
+X_dyn <- array(0, dim = c(m, m, T_len))
+for (t in seq_len(T_len)) {
+    if (t > 1) {
+        lag <- Y_dyn[, , t - 1]; lag[is.na(lag)] <- 0
+        X_dyn[, , t] <- lag / (m - 1)                  # lagged signal
+    }
+    Y_dyn[, , t] <- A_dyn(t) %*% X_dyn[, , t] + matrix(rnorm(m * m, sd = 0.4), m, m)
+    diag(Y_dyn[, , t]) <- NA
+}
+
+fit_dyn <- sir(Y_dyn, W = W_dyn, X = X_dyn, family = "normal",
+               fix_receiver = TRUE, calc_se = FALSE, seed = 1)
+data.frame(
+    alphaW2_estimate = round(unname(fit_dyn$alpha[2]), 3),
+    alphaW2_target   = 0.7,
+    A_dimensions     = paste(dim(fit_dyn$A), collapse = " x "),
+    dynamic_W        = fit_dyn$dynamic_W,
+    row.names = NULL
 )
-#>   period A_dimensions finite_off_diagonal mean_abs_A mean_abs_W
-#> 1      1      14 x 14                 182      0.014      0.834
-#> 2     40      14 x 14                 182      0.013      0.798
+#>   alphaW2_estimate alphaW2_target A_dimensions dynamic_W
+#> 1            0.724            0.7 14 x 14 x 80      TRUE
 ```
+
+The shared coefficient is recovered (the `alpha_2` estimate lands near
+its true 0.7), and `A` is returned as an $`m \times m \times T`$ array.
+Because the covariates drift gradually, so does the operator — we can
+see this in the across-period correlation of the fitted $`A_t`$:
+
+``` r
+
+c(cor_A1_vs_A2 = round(cor(c(fit_dyn$A[, , 1]), c(fit_dyn$A[, , 2])), 2),
+  cor_A1_vs_AT = round(cor(c(fit_dyn$A[, , 1]), c(fit_dyn$A[, , T_len])), 2))
+#> cor_A1_vs_A2 cor_A1_vs_AT 
+#>         0.88         0.09
+```
+
+Adjacent periods are highly correlated (the operator barely moves from
+one step to the next) while the first and last periods are nearly
+uncorrelated — the influence structure drifts smoothly over time rather
+than staying fixed or jumping at random.
 
 ## Data preparation
 
@@ -344,22 +388,39 @@ converts it to the arrays
 set.seed(4)
 edge_list <- expand.grid(i = paste0("n", 1:5), j = paste0("n", 1:5), t = 1:3)
 edge_list <- edge_list[edge_list$i != edge_list$j, ]
-edge_list$conflict <- rpois(nrow(edge_list), lambda = 2)
+edge_list$conflict <- rpois(nrow(edge_list), lambda = 3)
+edge_list <- edge_list[!(edge_list$i == "n1" & edge_list$j == "n2"), ]   # n1 -> n2 never observed
 
 Y_from_el <- cast_array(edge_list, var = "conflict")
 dim(Y_from_el)
 #> [1] 5 5 3
-dimnames(Y_from_el)[[1]]
-#> [1] "n1" "n2" "n3" "n4" "n5"
+Y_from_el[1:4, 1:4, 1]      # diagonal and the unobserved n1 -> n2 cell both default to 0
+#>    n1 n2 n3 n4
+#> n1  0  0  6  1
+#> n2  3  0  1  6
+#> n3  0  2  0  2
+#> n4  2  4  4  0
 ```
+
+[`cast_array()`](https://netify-dev.github.io/sir/reference/cast_array.md)
+lays the observed counts into the $`m \times m \times T`$ array
+[`sir()`](https://netify-dev.github.io/sir/reference/sir.md) expects and
+fills any pair absent from the edge list with 0 — here both the
+self-ties on the diagonal and the `n1 -> n2` dyad we dropped.
+[`sir()`](https://netify-dev.github.io/sir/reference/sir.md) ignores the
+diagonal when fitting, so self-ties never enter the likelihood. Note
+that for count outcomes an absent pair becomes an observed 0,
+indistinguishable from a genuine zero count, so make sure your edge list
+includes the dyads you intend to treat as observed.
 
 ### Constructing relational covariates
 
 [`rel_covar()`](https://netify-dev.github.io/sir/reference/rel_covar.md)
 builds main ($`z_{ij}`$), reciprocal ($`z_{ji}`$), and transitive
-($`\sum_k s_{ik} s_{kj}`$ on the symmetrized network) effects from a
-base dyadic variable. These capture common relational mechanisms and
-drop straight into the exogenous covariate array $`Z`$.
+($`\sum_k s_{ik} s_{kj}`$, where $`s_{ik}`$ is the symmetrized tie
+between $`i`$ and $`k`$) effects from a base dyadic variable. These
+capture common relational mechanisms and drop straight into the
+exogenous covariate array $`Z`$.
 
 ``` r
 
@@ -372,6 +433,10 @@ dimnames(Z_trade)[[3]]
 #> [1] "trade"       "trade_recip" "trade_trans"
 ```
 
+The output is $`8 \times 8 \times 3 \times 4`$: the third dimension
+holds the three layers just named (main, reciprocal, transitive) and the
+fourth carries the original four time slices.
+
 ### Simulating SIR data
 
 [`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
@@ -382,13 +447,37 @@ parameter recovery under controlled conditions.
 ``` r
 
 dat <- sim_sir(m = 10, T_len = 8, p = 2, q = 1, family = "poisson", seed = 42)
-str(dat[c("Y", "W", "X", "Z", "alpha", "beta", "theta")], max.level = 1)
-#> List of 7
-#>  $ Y    : num [1:10, 1:10, 1:8] 0 1 1 1 0 2 2 0 3 1 ...
-#>  $ W    : num [1:10, 1:10, 1:2] 0 0.539 0.58 -0.658 1.555 ...
-#>  $ X    : num [1:10, 1:10, 1:8] 0 0 0 0 0 0 0 0 0 0 ...
-#>  $ Z    : num [1:10, 1:10, 1, 1:8] -0.628 -0.29 0.206 0.588 -1.024 ...
-#>  $ alpha: num [1:2] 1 0.411
-#>  $ beta : num [1:2] -0.169 0.109
-#>  $ theta: num 0.237
+
+# component shapes returned by sim_sir()
+sapply(dat[c("Y", "X", "W", "Z")], function(a) paste(dim(a), collapse = " x "))
+#>                 Y                 X                 W                 Z 
+#>     "10 x 10 x 8"     "10 x 10 x 8"     "10 x 10 x 2" "10 x 10 x 1 x 8"
+
+# the generating coefficients a fit should recover
+list(alpha = round(dat$alpha, 2), beta = round(dat$beta, 2), theta = round(dat$theta, 2))
+#> $alpha
+#> [1] 1.00 0.41
+#> 
+#> $beta
+#> [1] -0.17  0.11
+#> 
+#> $theta
+#> [1] 0.24
 ```
+
+[`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md)
+returns the arrays in the shapes
+[`sir()`](https://netify-dev.github.io/sir/reference/sir.md) expects,
+together with the generating coefficients `alpha`, `beta`, and `theta`.
+With
+[`cast_array()`](https://netify-dev.github.io/sir/reference/cast_array.md)
+and
+[`rel_covar()`](https://netify-dev.github.io/sir/reference/rel_covar.md)
+to build `Y`/`X`/`Z` from your own edge lists and covariates, and
+[`sim_sir()`](https://netify-dev.github.io/sir/reference/sim_sir.md) to
+prototype and run power analyses, you have the full toolkit to take a
+SIR model from raw data to a fitted, interpretable result — see
+[`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md)
+and
+[`vignette("sir_inference")`](https://netify-dev.github.io/sir/articles/sir_inference.md)
+to put it to work.

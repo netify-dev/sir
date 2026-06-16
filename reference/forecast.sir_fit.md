@@ -105,6 +105,15 @@ multi-step path is a biased approximation of the true conditional mean
 (self-ties) is not a meaningful forecast for a square one-mode network
 and is returned as `NA`.
 
+## See also
+
+[`cv_sir`](https://netify-dev.github.io/sir/reference/cv_sir.md) for
+rolling-origin cross-validation,
+[`score_sir`](https://netify-dev.github.io/sir/reference/score_sir.md)
+for scoring forecasts,
+[`predict.sir`](https://netify-dev.github.io/sir/reference/predict.sir.md)
+for in-sample / scenario predictions.
+
 ## Examples
 
 ``` r

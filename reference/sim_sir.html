@@ -13,7 +13,7 @@ covariates W, lagged network state X, and optional exogenous covariates Z."></he
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -69,6 +69,8 @@ covariates W, lagged network state X, and optional exogenous covariates Z.</p>
 <span>  W <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  sigma <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  seed <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  symmetric <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>  gain <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -100,10 +102,11 @@ or <code>"binomial"</code>.</p></dd>
 
 
 <dt id="arg-alpha">alpha<a class="anchor" aria-label="anchor" href="#arg-alpha"></a></dt>
-<dd><p>Numeric vector of length p for sender influence weights.
-The first element (alpha_1) is fixed at 1 for identifiability; only
-alpha_2:p are free. If NULL (default), drawn from N(0, 0.3).
-Use <code>seed</code> for reproducibility.</p></dd>
+<dd><p>Numeric vector of length p for sender influence weights. For a
+directed process the first element (alpha_1) is fixed at 1 for
+identifiability; for <code>symmetric = TRUE</code> all elements are kept as given
+(the anchor need not be 1). If NULL (default), drawn from N(0, 0.3) with
+alpha_1 = 1. Use <code>seed</code> for reproducibility.</p></dd>
 
 
 <dt id="arg-beta">beta<a class="anchor" aria-label="anchor" href="#arg-beta"></a></dt>
@@ -133,6 +136,29 @@ set locally and the caller's global RNG state is restored on exit, so a
 subsequent draw (e.g. <code>runif</code>) in the caller is left unperturbed.</p></dd>
 
 
+<dt id="arg-symmetric">symmetric<a class="anchor" aria-label="anchor" href="#arg-symmetric"></a></dt>
+<dd><p>Logical. If TRUE, simulate a genuine <strong>undirected</strong>
+network: <code>W</code> is symmetrized, <code>beta</code> is tied to <code>alpha</code> so
+<code>B = A</code>, and each <code>Y</code>/<code>Z</code> slice is symmetric. For the
+count/continuous recursion the influence covariates are rescaled (when
+auto-generated) so the symmetric gain \(\rho(A)^2/(m-1)\) stays below 1.
+Pairs with <code>sir(..., symmetric = TRUE)</code>, which fits and reports the
+shared operator as <code>gamma</code>; <code>sim_sir</code> stores that same vector in
+<code>$alpha</code> (which equals <code>$beta</code> here). Default FALSE.</p></dd>
+
+
+<dt id="arg-gain">gain<a class="anchor" aria-label="anchor" href="#arg-gain"></a></dt>
+<dd><p>Optional numeric in (0, 1). Target spectral gain
+\(\rho(A)\rho(B)/(m-1)\) for the Poisson/Normal lagged recursion. When
+supplied, the influence operators are rescaled to hit it exactly (scaling
+<code>beta</code>/<code>B</code> for directed fits, the shared operator for symmetric,
+leaving <code>alpha_1 = 1</code> intact), so the influence term carries a chosen,
+strong-but-stationary share of the dynamics. Use a larger value (e.g. 0.9)
+for a strong, recoverable influence signal; values near 1 approach
+non-stationarity. NULL (default) keeps the conservative auto-rescaling.
+Ignored for <code>family = "binomial"</code>.</p></dd>
+
+
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
 <dd><p>Unused; catches mistyped arguments and reports a clear error.</p></dd>
 
@@ -155,7 +181,9 @@ subsequent draw (e.g. <code>runif</code>) in the caller is left unperturbed.</p>
       NULL if q = 0.</p></dd>
 
     <dt>alpha</dt>
-<dd><p>True alpha vector (length p, with alpha_1 = 1).</p></dd>
+<dd><p>True alpha vector (length p; alpha_1 = 1 for directed, kept
+      as supplied for symmetric). For symmetric fits this equals <code>beta</code>
+      and is the shared operator reported by the fit as gamma.</p></dd>
 
     <dt>beta</dt>
 <dd><p>True beta vector (length p).</p></dd>
@@ -184,6 +212,17 @@ the conditional mean would saturate, making the influence parameters
 unrecoverable. The returned <code>X</code> already includes this scaling, so a plain
 <code><a href="sir.html">sir</a></code> fit on <code>(Y, W, X, Z)</code> recovers the same <code>A</code>, <code>B</code>
 used to generate the data.</p>
+<p>For the Poisson and Normal families the lagged recursion is stationary only
+when the spectral gain \(\rho(A)\rho(B)/(m-1)\) is below 1. By default,
+auto-generated coefficients are rescaled to a conservative gain (at most 0.8) so
+simulations are reliably stable, and user-supplied coefficients are used exactly
+as given (a gain \(\ge 1\) triggers an explosive-series warning). Set
+<code>gain</code> to target a specific value: the influence operators are then
+rescaled so \(\rho(A)\rho(B)/(m-1)\) equals <code>gain</code> exactly, letting the
+bilinear term carry a chosen, strong-but-stationary share of the dynamics. A
+larger <code>gain</code> (say 0.9) makes the influence mechanism dominate the lagged
+dynamics while still recovering cleanly; values near 1 approach
+non-stationarity. Binomial outcomes are bounded, so <code>gain</code> does not apply.</p>
     </div>
 
     <div class="section level2">

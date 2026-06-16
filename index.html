@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -144,11 +144,11 @@
 <span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="va">coef_table</span>, row.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;         term estimate cluster_low cluster_high</span></span>
-<span><span class="co">#&gt;       (Z) Z1    0.231       0.213        0.250</span></span>
-<span><span class="co">#&gt;       (Z) Z2   -0.369      -0.379       -0.358</span></span>
-<span><span class="co">#&gt;  (alphaW) W2    0.309       0.206        0.412</span></span>
-<span><span class="co">#&gt;   (betaW) W1   -0.162      -0.176       -0.148</span></span>
-<span><span class="co">#&gt;   (betaW) W2    0.115       0.110        0.121</span></span>
+<span><span class="co">#&gt;       (Z) Z1    0.231       0.205        0.258</span></span>
+<span><span class="co">#&gt;       (Z) Z2   -0.369      -0.386       -0.352</span></span>
+<span><span class="co">#&gt;  (alphaW) W2    0.309       0.141        0.477</span></span>
+<span><span class="co">#&gt;   (betaW) W1   -0.162      -0.188       -0.136</span></span>
+<span><span class="co">#&gt;   (betaW) W2    0.115       0.098        0.133</span></span>
 <span></span>
 <span><span class="va">mu0</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span>             <span class="co"># fitted expected counts</span></span>
 <span><span class="va">W_scen</span> <span class="op">&lt;-</span> <span class="va">dat</span><span class="op">$</span><span class="va">W</span>                 <span class="co"># preserve the observed W structure</span></span>
@@ -190,7 +190,7 @@
 <div class="float">
 <img src="reference/figures/readme-diagnostics.png" alt="SIR diagnostic plots"><div class="figcaption">SIR diagnostic plots</div>
 </div>
-<p><code>vcov(fit)</code>, <code>confint(fit)</code>, and <code>tidy(fit, conf.int = TRUE)</code> use cluster-robust uncertainty by default for supported static directed fits. If a fit cannot support analytic cluster-robust inference, the accessor errors directly; use <code>boot_sir(fit, type = "dyad")</code> for full-bilinear bipartite fits.</p>
+<p><code>vcov(fit)</code>, <code>confint(fit)</code>, and <code>tidy(fit, conf.int = TRUE)</code> use cluster-robust uncertainty by default for supported static fits, both directed and symmetric (undirected). For dynamic (4D) <code>W</code> the default accessors fall back to classical Wald inference (an explicit <code>type = "cluster"</code> still errors); use <code>boot_sir(fit, type = "dyad")</code> for dynamic <code>W</code> and for full-bilinear bipartite fits. Request classical intervals anytime with <code>se.type = "classical"</code>.</p>
 <p>The bundled <code>icews</code> dataset (50 countries x 95 months of inter-state conflict) provides a larger real-data example:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">icews</span><span class="op">)</span></span>
