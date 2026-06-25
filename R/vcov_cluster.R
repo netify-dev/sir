@@ -12,12 +12,8 @@
 	family <- object$family; tab <- object$tab
 	fix_receiver <- isTRUE(object$fix_receiver)
 
-	if (!is.null(W) && length(dim(W)) == 4) {
-		cli::cli_abort(c(
-			"Cluster-robust SEs are not implemented for dynamic (4D) W.",
-			"i" = "Use {.code boot_sir()} for inference with time-varying influence covariates."
-		))
-	}
+	# static W is m x m x p; dynamic W is m x m x p x T, so a_t/b_t vary by period
+	W_dynamic <- !is.null(W) && length(dim(W)) == 4
 
 	# symmetric (A = B) fits use a dedicated score with d eta / d gamma_r =
 	# W_r X A' + A X W_r' over the upper-triangle off-diagonal cells
@@ -47,14 +43,23 @@
 		P <- q + max(p - 1, 0) + p
 	}
 
-	A <- matrix(0, n1, n1)
-	if (p > 0) for (r in seq_len(p)) A <- A + alpha[r] * W[, , r]
-	if (fix_receiver) {
-		B <- diag(n2)
-	} else {
-		B <- matrix(0, n2, n2)
-		if (p > 0) for (r in seq_len(p)) B <- B + beta[r] * W[, , r]
+	# W_r for covariate r at period t: static W reuses one slice every t, dynamic
+	# W indexes the period
+	wget <- function(r, t) if (W_dynamic) W[, , r, t] else W[, , r]
+	# A_t = sum_r alpha_r W_r(t); B_t = sum_r beta_r W_r(t) (B = I when fix_receiver)
+	build_AB <- function(t) {
+		A <- matrix(0, n1, n1)
+		if (p > 0) for (r in seq_len(p)) A <- A + alpha[r] * wget(r, t)
+		if (fix_receiver) {
+			B <- diag(n2)
+		} else {
+			B <- matrix(0, n2, n2)
+			if (p > 0) for (r in seq_len(p)) B <- B + beta[r] * wget(r, t)
+		}
+		list(A = A, B = B)
 	}
+	# static A/B are constant, so build once; dynamic rebuilds inside the loop
+	if (!W_dynamic) { AB <- build_AB(1L); A <- AB$A; B <- AB$B }
 
 	zget <- function(k, t) if (zdim == 4) Z[, , k, t] else Z[, , t]
 
@@ -63,6 +68,7 @@
 	recv_chunks  <- vector("list", T_len)
 
 	for (t in seq_len(T_len)) {
+		if (W_dynamic) { AB <- build_AB(t); A <- AB$A; B <- AB$B }
 		Xt <- X[, , t]; Yt <- Y[, , t]
 		eta <- matrix(0, n1, n2)
 		if (q > 0) for (k in seq_len(q)) eta <- eta + theta[k] * zget(k, t)
@@ -79,12 +85,12 @@
 		if (q > 0) for (k in seq_len(q)) { deta[[cc]] <- zget(k, t); cc <- cc + 1L }
 		if (fix_receiver) {
 			# alpha_r (r = 1..p): d eta / d alpha_r = W_r X_t   (B = I)
-			if (p > 0) for (r in seq_len(p)) { deta[[cc]] <- W[, , r] %*% Xt; cc <- cc + 1L }
+			if (p > 0) for (r in seq_len(p)) { deta[[cc]] <- wget(r, t) %*% Xt; cc <- cc + 1L }
 		} else {
 			# alpha_r (r = 2..p): d eta / d alpha_r = W_r X_t B'
-			if (p > 1) for (r in 2:p) { deta[[cc]] <- W[, , r] %*% Xt %*% t(B); cc <- cc + 1L }
+			if (p > 1) for (r in 2:p) { deta[[cc]] <- wget(r, t) %*% Xt %*% t(B); cc <- cc + 1L }
 			# beta_r (r = 1..p): d eta / d beta_r = A X_t W_r'
-			if (p > 0) for (r in seq_len(p)) { deta[[cc]] <- AX %*% t(W[, , r]); cc <- cc + 1L }
+			if (p > 0) for (r in seq_len(p)) { deta[[cc]] <- AX %*% t(wget(r, t)); cc <- cc + 1L }
 		}
 
 		rvec <- as.vector(resid)
@@ -124,7 +130,14 @@
 	sig2 <- if (family == "normal" && !is.null(object$sigma2)) object$sigma2 else 1
 	theta <- if (q > 0) tab[seq_len(q)] else numeric(0)
 	gamma <- tab[q + seq_len(p)]
-	A <- matrix(matrix(W, n * n, p) %*% gamma, n, n)
+	W_dynamic <- length(dim(W)) == 4
+	wget <- function(r, t) if (W_dynamic) W[, , r, t] else W[, , r]
+	# A_t = sum_r gamma_r W_r(t); constant across t for static W
+	build_A <- function(t) {
+		Wt <- if (W_dynamic) W[, , , t] else W
+		matrix(matrix(Wt, n * n, p) %*% gamma, n, n)
+	}
+	if (!W_dynamic) A <- build_A(1L)
 	zget <- function(k, t) if (zdim == 4) Z[, , k, t] else Z[, , t]
 	P <- q + p
 	um <- upper.tri(matrix(0, n, n))
@@ -134,6 +147,7 @@
 	chunks <- vector("list", T_len)
 	keepL <- vector("list", T_len)
 	for (t in seq_len(T_len)) {
+		if (W_dynamic) A <- build_A(t)
 		Xt <- X[, , t]; Yt <- Y[, , t]
 		eta <- A %*% Xt %*% t(A)
 		if (q > 0) for (k in seq_len(q)) eta <- eta + theta[k] * zget(k, t)
@@ -146,7 +160,7 @@
 		if (q > 0) for (k in seq_len(q)) { deta[[cc]] <- zget(k, t); cc <- cc + 1L }
 		AX <- A %*% Xt; XtA <- Xt %*% t(A)
 		for (r in seq_len(p)) {
-			Wr <- W[, , r]
+			Wr <- wget(r, t)
 			deta[[cc]] <- Wr %*% XtA + AX %*% t(Wr); cc <- cc + 1L
 		}
 		sc <- matrix(0, length(ut), P)

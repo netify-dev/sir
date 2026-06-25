@@ -1,7 +1,7 @@
 Package: sir
 Type: Package
 Title: Social Influence Regression Models
-Version: 1.0.0
+Version: 1.1.0
 Authors@R: c(
     person("Shahryar", "Minhas", email = "shahryar.minhas@gmail.com", role = c("aut", "cre")),
     person("Peter", "Hoff", email = "peter.hoff@duke.edu", role = "aut"))

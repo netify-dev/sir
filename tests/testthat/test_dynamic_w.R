@@ -1,3 +1,58 @@
+test_that("dynamic W with a single covariate (p = 1) fits and gives valid SEs", {
+	# regression: W[,,,t] collapses to a 2D matrix when p = 1, which used to crash
+	# cpp_amprod_W_v ("Input array must have exactly 3 dimensions") inside the A/B
+	# construction and eta_tab. it must stay 3D.
+	set.seed(33)
+	m = 10; T_len = 40
+	W = array(0, dim = c(m, m, 1, T_len))
+	W[, , 1, 1] = rnorm(m * m)
+	for (t in 2:T_len) {
+		W[, , 1, t] = 0.9 * W[, , 1, t - 1] + sqrt(0.19) * matrix(rnorm(m * m), m, m)
+	}
+	for (t in seq_len(T_len)) diag(W[, , 1, t]) = 0
+	Y = array(0, c(m, m, T_len)); X = array(0, c(m, m, T_len))
+	for (t in seq_len(T_len)) {
+		if (t > 1) { lg = Y[, , t - 1]; lg[is.na(lg)] = 0; X[, , t] = lg / (m - 1) }
+		Y[, , t] = 1.3 * W[, , 1, t] %*% X[, , t] + matrix(rnorm(m * m, sd = 0.4), m, m)
+		diag(Y[, , t]) = NA
+	}
+
+	# fix_receiver p = 1: one free alpha; must not crash and must recover
+	fit = suppressWarnings(sir(Y, W = W, X = X, family = "normal",
+							   fix_receiver = TRUE, seed = 1))
+	expect_equal(dim(fit$A), c(m, m, T_len))
+	expect_equal(length(coef(fit)), 1L)
+	expect_true(abs(coef(fit)[1] - 1.3) < 0.2)
+
+	# eta_tab reconstructs the fitted values exactly (the A/B slice stayed 3D)
+	et = sir:::eta_tab(fit$tab, fit$W, fit$X, fit$Z, fix_receiver = TRUE)
+	off = vapply(seq_len(T_len), function(t) {
+		d = abs(et[, , t] - fit$fitted.values[, , t]); diag(d) = NA
+		max(d, na.rm = TRUE)
+	}, numeric(1))
+	expect_lt(max(off), 1e-8)
+
+	# the SE machinery works: cluster sandwich is finite/PSD with a t(G-1) reference
+	V = vcov(fit, type = "cluster")
+	expect_true(all(is.finite(V)))
+	expect_equal(attr(V, "cluster_df"), m - 1L)
+	expect_true(all(is.finite(suppressMessages(confint(fit)))))
+
+	# directed p = 1 (alpha fixed at 1, one free beta) also fits
+	Z = array(rnorm(m * m * T_len), c(m, m, T_len))
+	set.seed(7); Xd = array(rnorm(m * m * T_len), c(m, m, T_len)) / (m - 1)
+	Yd = array(0, c(m, m, T_len))
+	for (t in seq_len(T_len)) {
+		Yd[, , t] = 0.5 * Z[, , t] +
+			W[, , 1, t] %*% Xd[, , t] %*% t(1.4 * W[, , 1, t]) +
+			matrix(rnorm(m * m, sd = 0.3), m, m)
+		diag(Yd[, , t]) = NA
+	}
+	fd = suppressWarnings(sir(Yd, W = W, X = Xd, Z = Z, family = "normal", seed = 1))
+	expect_equal(length(coef(fd)), 2L)
+	expect_true(all(is.finite(vcov(fd, type = "cluster"))))
+})
+
 test_that("sir() accepts 4D W (dynamic influence covariates)", {
 	set.seed(42)
 	m = 6

@@ -305,7 +305,8 @@ eta_tab <- function(tab, W, X, Z, fix_receiver=FALSE) {
 	  # dynamic W: compute A_t * X_t * B_t' per period
 	  AXB <- array(0, dim = c(n1, n2, T_len))
 	  for (t in seq_len(T_len)) {
-		  W_t <- W[,,,t]
+		  # keep the period slice 3D; W[,,,t] collapses to a matrix when p = 1
+		  W_t <- array(W[,,,t], dim = dim(W)[1:3])
 		  A_t <- cpp_amprod_W_v(W_t, alpha)
 		  if (fix_receiver) {
 			  AXB[,,t] <- A_t %*% X[,,t]

@@ -24,13 +24,17 @@ library(sir)
 
 Inference for bilinear models takes more care than for an ordinary GLM. Network data violate the independent-observations assumption behind naive Wald standard errors --- ties that share an actor are correlated --- so this vignette is mostly about getting *honest intervals* in the face of that dependence. (A separate risk, weak identification of the influence term, shows up as an ill-conditioned Hessian and is flagged by the `se_reliable` field, covered below.) It walks through classical and robust variance estimates, confidence intervals, bootstrap checks, and information-criterion model comparison. For basic fitting see `vignette("sir_overview")`.
 
+### Getting standard errors, in one paragraph
+
+Standard errors are computed by default (`calc_se = TRUE`), so you do not have to ask for them. **`summary(fit)` prints them, and `confint(fit)`, `vcov(fit)`, and `tidy(fit)` report cluster-robust intervals by default.** Cluster-robust is the right default for relational data: because ties that share an actor are correlated, classical (Hessian-based) errors that assume independent dyads can badly overstate significance. The coefficient table in `summary()`/`print()` shows the *classical* SE for a quick look (and labels it as such), but the interval you should report is the cluster-robust one from `confint()`. If the analytic standard errors cannot be formed --- a singular or ill-conditioned Hessian, or a full-bilinear bipartite fit, which has no closed-form covariance --- `sir()` **automatically falls back to the delete-one-actor jackknife**, and all four accessors use it transparently; the fit then carries `fit$se_source == "jackknife"` and says so in its printout. Everything below is the *why* behind these defaults, and how to cross-check them.
+
 | Tool | What it is useful for | Main limitation |
 |:-----|:----------------------|:----------------|
-| Classical SE | Fast model-based Wald intervals | Assumes independent dyad-period scores and a stable Hessian |
+| Classical SE | Fast model-based Wald intervals; what `summary()`/`print()` show | Assumes independent dyad-period scores and a stable Hessian; can overstate significance |
+| Cluster-robust SE (default) | Shared-actor dyadic dependence (each cell scored onto both actors); what `confint()`/`vcov()`/`tidy()` report | Still uses the Hessian as bread, so weak identification remains a problem |
 | HC0 robust SE | Heteroskedasticity or overdispersion | Does not address shared-actor network dependence |
-| Cluster-robust SE (default) | Shared-actor dyadic dependence (each cell scored onto both actors) | Still uses the Hessian as bread, so weak identification remains a problem |
 | Parametric bootstrap | Resimulates from the fitted model; confirms the model-based SEs | Assumes the model is correct, so it does not capture shared-actor dependence |
-| Dyad jackknife | Fallback when analytic SEs are unavailable (bipartite, unstable Hessian) | A deliberately wide worst-case bound, not a precise interval |
+| Dyad jackknife | The automatic fallback when no analytic covariance exists (full-bilinear bipartite, ill-conditioned Hessian); also a conservative robustness check | Wider than the cluster interval; with few actors, deleting one is a large perturbation |
 
 ## Setup
 
@@ -188,9 +192,13 @@ The estimate is shared across the columns (one fit); what changes is the interva
 
 The choice reduces to three rules:
 
-* **Report cluster-robust intervals** (`vcov()` / `confint()`, the default) for supported static directed and symmetric fits with a stable Hessian (`se_reliable = TRUE`).
-* **Fall back to the dyad jackknife** (`boot_sir(type = "dyad")`) when analytic SEs are unavailable --- full-bilinear bipartite fits, dynamic `W`, or an unstable Hessian (`se_reliable = FALSE`) --- and as a worst-case cross-check otherwise.
+* **Report cluster-robust intervals** (`vcov()` / `confint()`, the default) for directed, symmetric, and dynamic (4D) `W` fits with a stable Hessian (`se_reliable = TRUE`).
+* **Let the jackknife fallback handle the hard cases.** When no analytic covariance exists --- full-bilinear bipartite fits, or an ill-conditioned Hessian --- `sir()` already attaches the delete-one-actor jackknife automatically, so `confint()`/`vcov()`/`tidy()` keep working and `fit$se_source` reads `"jackknife"`; you do not need to call `boot_sir()` yourself. (You still can, e.g. `boot_sir(type = "dyad")` then `confint(fit, boot = bs)`, if you want to inspect the resampling.)
 * **Do not** report dyad-independent classical $p$-values as the headline result for influence coefficients; pair the cluster interval with a response-scale scenario (below).
+
+### How to tell which standard errors you have
+
+`fit$se_source` is `"jackknife"` when the automatic fallback fired, and absent (NULL) otherwise --- meaning analytic SEs are available and `confint()`/`vcov()`/`tidy()` report the cluster-robust sandwich (including for dynamic, 4D `W`). The `summary(fit)` and `print(fit)` printouts also label the standard errors they show (classical in the table, jackknife when the fallback fired), so you are never left guessing which kind you are looking at.
 
 ## Fixed-receiver model and model comparison
 

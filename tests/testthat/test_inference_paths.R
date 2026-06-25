@@ -25,7 +25,7 @@ test_that("parametric bootstrap still works for directed fits (regression)", {
 	expect_gte(bp$n_valid, 2)
 })
 
-test_that("dynamic (4D) W: default SE accessors fall back to classical, explicit cluster aborts", {
+test_that("dynamic (4D) W: default SE accessors use the cluster-robust sandwich", {
 	m = 8; T_len = 15; p = 3
 	Wt = array(0, dim = c(m, m, p, T_len))
 	set.seed(11)
@@ -38,18 +38,25 @@ test_that("dynamic (4D) W: default SE accessors fall back to classical, explicit
 				 symmetric = TRUE, seed = 9)
 	fdyn = suppressWarnings(sir(dd$Y, W = Wt, X = dd$X, Z = dd$Z,
 							    family = "normal", symmetric = TRUE, seed = 1))
-	# default no-arg calls degrade gracefully to classical instead of aborting
+	# analytic SEs are available, so the jackknife fallback did not fire
+	expect_null(fdyn$se_source)
+	# default no-arg accessors all return finite SEs from the cluster sandwich
 	suppressMessages({
 		expect_true(all(is.finite(vcov(fdyn))))
 		expect_true(all(is.finite(confint(fdyn))))
 		expect_true(all(is.finite(tidy(fdyn, conf.int = TRUE)$conf.low)))
 	})
-	# default equals an explicit classical request
+	# the default IS the cluster-robust sandwich (not classical) for dynamic W
 	suppressMessages(v_def <- vcov(fdyn))
-	expect_equal(v_def, vcov(fdyn, type = "classical"))
-	# an explicit cluster request still aborts (no silent downgrade)
-	expect_error(vcov(fdyn, type = "cluster"), "dynamic")
-	expect_error(confint(fdyn, se.type = "cluster"), "dynamic")
+	expect_equal(v_def, vcov(fdyn, type = "cluster"))
+	expect_equal(attr(vcov(fdyn, type = "cluster"), "cluster_df"), m - 1L)
+	# an explicit cluster request now succeeds instead of aborting
+	suppressMessages(Vc <- vcov(fdyn, type = "cluster"))
+	expect_true(all(is.finite(Vc)))
+	# classical is still reachable and differs from the cluster sandwich
+	se_cl = sqrt(diag(vcov(fdyn, type = "classical")))
+	se_cr = sqrt(diag(Vc))
+	expect_false(isTRUE(all.equal(se_cl, se_cr)))
 })
 
 test_that("tidy() cluster p-values use the same t(G-1) reference as confint()", {
@@ -127,4 +134,56 @@ test_that("symmetric direct effects carry the (Z) tag and gamma rows cover all p
 	expect_true(any(grepl("^\\(Z\\)", rn)))
 	expect_equal(sum(grepl("\\(gammaW\\)", rn)), 3L)
 	expect_true(isTRUE(fit$stationary))      # a well-behaved fit is stationary
+})
+
+test_that("sir auto-falls-back to jackknife SEs when analytic SEs are unavailable", {
+	# full-bilinear bipartite has no closed-form covariance; sir() should attach a
+	# delete-one-actor jackknife covariance automatically so the accessors work.
+	set.seed(204)
+	n1 = 10; n2 = 6; Tn = 40
+	Wf = array(rnorm(n1 * n1 * 2), c(n1, n1, 2))
+	Wr = array(rnorm(n2 * n2 * 2), c(n2, n2, 2))
+	Xf = array(rnorm(n1 * n2 * Tn) / sqrt(n2), c(n1, n2, Tn))
+	At = Wf[, , 1] + 0.6 * Wf[, , 2]
+	Bt = 0.8 * Wr[, , 1] - 0.5 * Wr[, , 2]
+	Yf = array(0, c(n1, n2, Tn))
+	for (t in 1:Tn) Yf[, , t] = At %*% Xf[, , t] %*% t(Bt) +
+		matrix(rnorm(n1 * n2, sd = 0.3), n1, n2)
+
+	fit = suppressMessages(sir(Yf, W = Wf, X = Xf, W_recv = Wr,
+							   family = "normal", seed = 1))
+
+	expect_identical(fit$se_source, "jackknife")
+	# vcov() / confint() now return values instead of aborting
+	V = vcov(fit)
+	expect_true(is.matrix(V) && all(is.finite(diag(V))))
+	ci = confint(fit)
+	expect_true(is.matrix(ci) && nrow(ci) == length(coef(fit)))
+	# the jackknife intervals cover the generating weights
+	truth = c(0.6, 0.8, -0.5)
+	expect_true(all(ci[, 1] <= truth & truth <= ci[, 2]))
+
+	# summary() carries se_source so it prints the jackknife (not classical) footnote
+	expect_identical(summary(fit)$se_source, "jackknife")
+
+	# the attached covariance matches boot_sir(type="dyad")'s own (summed-margin)
+	# covariance, so vcov(fit) agrees with the explicit resampling path
+	bs = suppressWarnings(boot_sir(fit, type = "dyad"))
+	expect_equal(unname(diag(V)), unname(diag(bs$cov)), tolerance = 1e-2)
+
+	# tidy() returns finite SEs on the fallback fit for EVERY se.type -- the
+	# robust path used to return all-NA std.error and a false "refit with
+	# calc_se = TRUE" message
+	for (st in c("cluster", "classical", "robust")) {
+		td = suppressMessages(tidy(fit, se.type = st))
+		expect_true(all(is.finite(td$std.error)),
+					info = paste("tidy se.type =", st))
+	}
+
+	# a clean directed fit keeps its analytic SEs (no fallback)
+	dd = sim_sir(m = 14, T_len = 70, p = 2, q = 1, family = "normal", seed = 7)
+	f2 = suppressMessages(sir(dd$Y, W = dd$W, X = dd$X, Z = dd$Z,
+							  family = "normal", seed = 1))
+	expect_null(f2$se_source)
+	expect_true(all(is.finite(sqrt(diag(vcov(f2))))))
 })

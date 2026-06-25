@@ -30,9 +30,12 @@ used instead of Wald intervals.}
 \code{t(G - 1)} reference, the same estimator for directed and symmetric
 fits), \code{"classical"} (inverse-Hessian, with a normal reference -- valid
 and tighter when dyads are independent), or \code{"robust"} (HC0 for directed
-fits; maps to cluster for symmetric fits). Cluster intervals rely on the
-Hessian bread being stable. Ignored when \code{boot} is supplied; cluster is
-unavailable for dynamic (4D) \code{W}.}
+fits; maps to cluster for symmetric fits). The cluster type is supported for
+directed, symmetric, and dynamic (4D) \code{W} fits and relies on the Hessian
+bread being stable. Ignored when \code{boot} is supplied. Also ignored when
+\code{object$se_source == "jackknife"} (analytic SEs could not be formed, so
+\code{sir} attached a jackknife covariance and \code{confint} uses it for
+every \code{se.type}).}
 
 \item{...}{Additional arguments (unused).}
 }

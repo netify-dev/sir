@@ -366,6 +366,11 @@ eta_tab_symmetric <- function(tab, W, X, Z, p, q) {
 			summ$se <- se
 			summ$t_se <- summ$coef / se
 		}
+		# analytic SEs were requested but could not be produced: flag se-unreliable
+		# so sir() falls back to the jackknife covariance (see .sir_add_fallback_se).
+		if (is.null(vcov_mat) || !isTRUE(any(is.finite(summ$se)))) {
+			if (is.na(se_reliable)) se_reliable <- FALSE
+		}
 	}
 
 	result <- list(

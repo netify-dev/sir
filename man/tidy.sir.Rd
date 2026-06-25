@@ -22,8 +22,11 @@ Wald interval columns. Default \code{FALSE}.}
 
 \item{se.type}{Which standard errors to report: \code{"cluster"} (default;
 actor-clustered sandwich, each cell scored onto both endpoint actors, for
-supported static fits), \code{"classical"} (inverse-Hessian), or
-\code{"robust"} (HC0 sandwich).}
+directed, symmetric, and dynamic (4D) \code{W} fits), \code{"classical"}
+(inverse-Hessian), or \code{"robust"} (HC0 sandwich). Ignored when the fit
+carries
+\code{se_source == "jackknife"} (analytic SEs were unavailable, so the
+delete-one-actor jackknife standard errors are reported for every type).}
 
 \item{...}{Unused, for generic compatibility.}
 }

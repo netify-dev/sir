@@ -148,8 +148,16 @@
 #'   for API compatibility) or \code{"optim"} (direct optimization via BFGS).
 #'   
 #' @param calc_se Logical indicating whether to calculate standard errors for the
-#'   parameters. Standard errors are computed using the observed information matrix.
-#'   Setting to FALSE speeds up computation when uncertainty quantification is not needed.
+#'   parameters (default TRUE). Standard errors are computed from the observed
+#'   information matrix. If those analytic standard errors cannot be formed --- a
+#'   singular or ill-conditioned Hessian, or a path with no closed-form covariance
+#'   such as full-bilinear bipartite fits --- and the model converged, \code{sir}
+#'   automatically falls back to the delete-one-actor jackknife covariance
+#'   (reproducible for a given \code{seed}), so \code{vcov()}, \code{confint()},
+#'   \code{summary()}, and
+#'   \code{tidy()} still return standard errors. The fit then carries
+#'   \code{se_source = "jackknife"} and prints a one-line note. Set FALSE to skip
+#'   standard errors entirely (and the fallback) when they are not needed.
 #'
 #' @param fix_receiver Logical. If TRUE, fixes B = I (identity matrix) and
 #'   estimates only (theta, alpha). This eliminates the bilinear identification
@@ -298,6 +306,12 @@
 #'     \item{sigma2}{Estimated error variance (only for \code{family = "normal"}).}
 #'     \item{se_reliable}{Logical, FALSE if the Hessian was ill-conditioned so
 #'       the classical SEs should be treated with caution.}
+#'     \item{se_source}{Character flag for the reported standard errors:
+#'       \code{"jackknife"} when analytic SEs could not be formed and \code{sir}
+#'       fell back to the delete-one-actor jackknife (see \code{calc_se}); NULL
+#'       (absent) otherwise, meaning analytic SEs are available and
+#'       \code{\link{vcov}}/\code{\link{confint}}/\code{\link[=tidy.sir]{tidy}}
+#'       report the cluster-robust sandwich by default.}
 #'     \item{dynamic_W}{Logical, TRUE if W was time-varying (4D).}
 #'     \item{symmetric/gamma/operator/rho_A/gain/stationary}{Present for symmetric
 #'       (A = B) fits: \code{symmetric = TRUE}, \code{operator = "symmetric"};
@@ -333,6 +347,10 @@
 sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 				fix_receiver=FALSE, symmetric=FALSE, bipartite=NULL,
 				W_recv=NULL, kron_mode=FALSE, seed=NULL, ...) {
+
+	# remember whether the user asked for SEs, before non-convergence logic can
+	# flip calc_se off; drives the graceful jackknife fallback at return time.
+	se_requested <- isTRUE(calc_se)
 
 	if (missing(family) || is.null(family)) {
 	  cli::cli_abort(c(
@@ -500,12 +518,6 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 			}
 		}
 
-		if (isTRUE(calc_se)) {
-			cli::cli_inform(c(
-				"Analytic standard errors are unavailable for full-bilinear bipartite fits.",
-				"i" = "Use {.fn boot_sir} with {.code type = \"dyad\"} for inference."
-			))
-		}
 		# set a local random seed
 		if (!is.null(seed)) {
 			if (!is.numeric(seed) || length(seed) != 1) {
@@ -528,6 +540,7 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 			trace = isTRUE(dots$trace))
 		res$seed <- seed
 		res$call <- match.call()
+		res <- .sir_add_fallback_se(res, se_requested)
 		return(res)
 	}
 
@@ -659,6 +672,7 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 			trace = isTRUE(dots$trace), calc_se = isTRUE(calc_se))
 		res$seed <- seed
 		res$call <- match.call()
+		res <- .sir_add_fallback_se(res, se_requested)
 		return(res)
 	}
 
@@ -1132,7 +1146,8 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 		  A <- array(0, dim = c(n1, n1, T_len))
 		  B <- array(0, dim = c(n2, n2, T_len))
 		  for (t in seq_len(T_len)) {
-			  W_t <- W[,,,t]
+			  # keep the period slice 3D; W[,,,t] collapses to a matrix when p = 1
+			  W_t <- array(W[,,,t], dim = dim(W)[1:3])
 			  A[,,t] <- cpp_amprod_W_v(W_t, alpha)
 		  if (fix_receiver) {
 			  B[,,t] <- diag(n2)
@@ -1590,5 +1605,43 @@ sir <- function(Y, W=NULL, X=NULL, Z=NULL, family, method="ALS", calc_se=TRUE,
 
 	# keep package plot dispatch ahead of igraph dispatch
 	class(result) <- c("sir_fit", "sir")
+	result <- .sir_add_fallback_se(result, se_requested)
 	return(result)
+}
+
+# graceful standard-error fallback. when analytic (Hessian-based) SEs were
+# requested but could not be produced -- a singular/ill-conditioned Hessian, or a
+# path with no closed-form covariance (e.g. full-bilinear bipartite) -- compute the
+# delete-one-actor jackknife covariance and attach it, so vcov()/confint()/summary()
+# always return standard errors instead of nothing. the dyad jackknife enumerates
+# all leave-one-actor refits and runs inside sir()'s seeded RNG context, so the
+# result is reproducible for a given seed. only runs when SEs were asked for and
+# the fit converged.
+.sir_add_fallback_se <- function(fit, se_requested) {
+	if (!isTRUE(se_requested) || !isTRUE(fit$convergence)) return(fit)
+	usable <- !is.null(fit$vcov) && isTRUE(fit$se_reliable) &&
+		!is.null(fit$summ$se) && all(is.finite(fit$summ$se))
+	if (usable) return(fit)
+	bs <- suppressWarnings(tryCatch(boot_sir(fit, type = "dyad", trace = FALSE),
+									error = function(e) NULL))
+	if (is.null(bs) || is.null(bs$cov) || nrow(bs$cov) != nrow(fit$summ) ||
+		!all(is.finite(diag(bs$cov)))) {
+		return(fit)
+	}
+	# use the jackknife covariance boot_sir already computed, so the result is
+	# identical to boot_sir(type = "dyad") + confint(fit, boot = bs)
+	V <- bs$cov
+	rn <- rownames(fit$summ)
+	dimnames(V) <- list(rn, rn)
+	se <- sqrt(pmax(diag(V), 0))
+	fit$vcov <- V
+	fit$summ$se <- se
+	fit$summ$t_se <- fit$summ$coef / se
+	fit$se_reliable <- TRUE
+	fit$se_source <- "jackknife"
+	cli::cli_inform(c(
+		"i" = "Analytic standard errors were unavailable or ill-conditioned, so {.fn sir} reports delete-one-actor jackknife standard errors instead (dyadic-dependence robust).",
+		" " = "{.fn vcov}, {.fn confint}, and {.fn tidy} use these automatically (and {.fn summary} reports them)."
+	))
+	fit
 }

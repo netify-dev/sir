@@ -27,8 +27,11 @@ generics::augment
 #' @param conf.level Confidence level for the interval. Default 0.95.
 #' @param se.type Which standard errors to report: \code{"cluster"} (default;
 #'   actor-clustered sandwich, each cell scored onto both endpoint actors, for
-#'   supported static fits), \code{"classical"} (inverse-Hessian), or
-#'   \code{"robust"} (HC0 sandwich).
+#'   directed, symmetric, and dynamic (4D) \code{W} fits), \code{"classical"}
+#'   (inverse-Hessian), or \code{"robust"} (HC0 sandwich). Ignored when the fit
+#'   carries
+#'   \code{se_source == "jackknife"} (analytic SEs were unavailable, so the
+#'   delete-one-actor jackknife standard errors are reported for every type).
 #' @param ... Unused, for generic compatibility.
 #'
 #' @return A data frame with columns \code{term}, \code{component},
@@ -44,14 +47,7 @@ generics::augment
 #' @export
 tidy.sir <- function(x, conf.int = FALSE, conf.level = 0.95,
 					 se.type = c("cluster", "classical", "robust"), ...) {
-	default_se <- missing(se.type)
 	se.type <- match.arg(se.type)
-	# dynamic w has no cluster sandwich, so the default call falls back to classical
-	if (default_se && se.type == "cluster" &&
-		!is.null(x$W) && length(dim(x$W)) == 4L) {
-		cli::cli_inform("Cluster-robust SEs are unavailable for dynamic (4D) W; using classical Wald SEs (see {.fn confint}).")
-		se.type <- "classical"
-	}
 	summ <- x$summ
 	term <- rownames(summ)
 	if (is.null(term)) term <- paste0("p", seq_len(nrow(summ)))
@@ -65,7 +61,11 @@ tidy.sir <- function(x, conf.int = FALSE, conf.level = 0.95,
 	# t(G-1) reference (df on the vcov "cluster_df" attr), classical/HC0 use normal
 	is_sym <- isTRUE(x$symmetric) && identical(x$operator, "symmetric")
 	crit_df <- Inf
-	se <- if (se.type == "classical") {
+	se <- if (identical(x$se_source, "jackknife")) {
+		# analytic SEs were unavailable, so sir() attached the delete-one-actor
+		# jackknife covariance; vcov()/confint() use it for every type, so does tidy
+		sqrt(pmax(diag(x$vcov), 0))
+	} else if (se.type == "classical") {
 		if (isFALSE(x$se_reliable)) rep(NA_real_, nrow(summ)) else summ$se
 	} else if (se.type == "robust" && !is_sym) {
 		if (isFALSE(x$se_reliable)) rep(NA_real_, nrow(summ)) else summ$rse

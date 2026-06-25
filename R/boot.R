@@ -101,7 +101,7 @@
 		point <- sir_fit$tab
 		z <- stats::qnorm(0.975)
 		list(se = se, ci_lo = point - z * se, ci_hi = point + z * se,
-			 jack_est = jack_est, n_valid = n_valid, n_total = n_total)
+			 cov = V, jack_est = jack_est, n_valid = n_valid, n_total = n_total)
 }
 
 #' Bootstrap Inference for SIR Model Parameters
@@ -127,7 +127,11 @@
 #'     axes together; for a bipartite network senders and receivers are dropped
 #'     separately and the two one-way jackknife covariances are summed. Standard
 #'     errors come from the jackknife covariance and intervals are normal
-#'     (\code{estimate +/- z * se}).}
+#'     (\code{estimate +/- z * se}). This is also the estimator \code{\link{sir}}
+#'     reuses automatically when \code{calc_se = TRUE} cannot form analytic SEs (a
+#'     singular/ill-conditioned Hessian or a full-bilinear bipartite fit): it
+#'     attaches the same \code{$cov} so \code{vcov}/\code{confint}/\code{tidy}
+#'     return jackknife inference without an explicit \code{boot_sir} call.}
 #'   \item{parametric}{Simulates new outcome arrays from the fitted model
 #'     using the estimated parameters and the specified family distribution.
 #'     Better when T is small but the model is well-specified.}
@@ -169,6 +173,8 @@
 #'     Rows for failed replicates contain NA.}
 #'   \item{se}{Named numeric vector of bootstrap standard errors (one per
 #'     parameter).}
+#'   \item{cov}{For \code{type = "dyad"}, the jackknife variance-covariance
+#'     matrix (NULL for the block/parametric bootstraps).}
 #'   \item{ci_lo}{Lower 2.5\% percentile bounds.}
 #'   \item{ci_hi}{Upper 97.5\% percentile bounds.}
 #'   \item{point_est}{Point estimates from the original fit.}
@@ -273,8 +279,9 @@ boot_sir <- function(sir_fit, R = 200, type = c("block", "parametric", "dyad"),
 		se <- jk$se; names(se) <- pnames
 		ci_lo <- jk$ci_lo; ci_hi <- jk$ci_hi
 		names(ci_lo) <- names(ci_hi) <- pnames
+		cov <- jk$cov; dimnames(cov) <- list(pnames, pnames)
 			result <- list(
-				coefs = coefs, se = se, ci_lo = ci_lo, ci_hi = ci_hi,
+				coefs = coefs, se = se, ci_lo = ci_lo, ci_hi = ci_hi, cov = cov,
 				point_est = point_est, param_names = pnames,
 				n_valid = jk$n_valid, n_total = jk$n_total,
 				type = "dyad", family = family, interval = "normal-jackknife"

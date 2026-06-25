@@ -25,10 +25,15 @@
     \code{"cluster"}.
 }
 The cluster type requires the classical covariance as its bread
-(\code{calc_se = TRUE}, the default) and is unavailable for dynamic (4D)
-\code{W} and for full-bilinear bipartite fits (use
-\code{boot_sir(type = "dyad")} there). \code{confint} pairs it with a
-\code{t(G - 1)} reference (G = number of actors).}
+(\code{calc_se = TRUE}, the default) and is supported for directed,
+symmetric, and dynamic (4D) \code{W} fits; it is unavailable only for
+full-bilinear bipartite fits. For that case (and any fit whose Hessian was
+ill-conditioned), \code{sir} attaches a delete-one-actor jackknife
+covariance automatically: when \code{object$se_source ==
+"jackknife"}, \code{vcov} returns that jackknife covariance for \emph{every}
+\code{type} (the \code{type} argument is ignored, since no analytic
+classical/HC0/cluster covariance exists). \code{confint} pairs the cluster
+type with a \code{t(G - 1)} reference (G = number of actors).}
 
 \item{...}{Additional arguments (unused).}
 }

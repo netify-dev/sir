@@ -49,6 +49,8 @@ An object of class \code{"boot_sir"} with components:
     Rows for failed replicates contain NA.}
   \item{se}{Named numeric vector of bootstrap standard errors (one per
     parameter).}
+  \item{cov}{For \code{type = "dyad"}, the jackknife variance-covariance
+    matrix (NULL for the block/parametric bootstraps).}
   \item{ci_lo}{Lower 2.5\% percentile bounds.}
   \item{ci_hi}{Upper 97.5\% percentile bounds.}
   \item{point_est}{Point estimates from the original fit.}
@@ -82,7 +84,11 @@ Three bootstrap strategies are available:
     axes together; for a bipartite network senders and receivers are dropped
     separately and the two one-way jackknife covariances are summed. Standard
     errors come from the jackknife covariance and intervals are normal
-    (\code{estimate +/- z * se}).}
+    (\code{estimate +/- z * se}). This is also the estimator \code{\link{sir}}
+    reuses automatically when \code{calc_se = TRUE} cannot form analytic SEs (a
+    singular/ill-conditioned Hessian or a full-bilinear bipartite fit): it
+    attaches the same \code{$cov} so \code{vcov}/\code{confint}/\code{tidy}
+    return jackknife inference without an explicit \code{boot_sir} call.}
   \item{parametric}{Simulates new outcome arrays from the fitted model
     using the estimated parameters and the specified family distribution.
     Better when T is small but the model is well-specified.}

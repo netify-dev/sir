@@ -71,8 +71,16 @@ nature of your outcome variable.}
 for API compatibility) or \code{"optim"} (direct optimization via BFGS).}
 
 \item{calc_se}{Logical indicating whether to calculate standard errors for the
-parameters. Standard errors are computed using the observed information matrix.
-Setting to FALSE speeds up computation when uncertainty quantification is not needed.}
+parameters (default TRUE). Standard errors are computed from the observed
+information matrix. If those analytic standard errors cannot be formed --- a
+singular or ill-conditioned Hessian, or a path with no closed-form covariance
+such as full-bilinear bipartite fits --- and the model converged, \code{sir}
+automatically falls back to the delete-one-actor jackknife covariance
+(reproducible for a given \code{seed}), so \code{vcov()}, \code{confint()},
+\code{summary()}, and
+\code{tidy()} still return standard errors. The fit then carries
+\code{se_source = "jackknife"} and prints a one-line note. Set FALSE to skip
+standard errors entirely (and the fallback) when they are not needed.}
 
 \item{fix_receiver}{Logical. If TRUE, fixes B = I (identity matrix) and
 estimates only (theta, alpha). This eliminates the bilinear identification
@@ -222,6 +230,12 @@ An object of class \code{"sir"} with the following components:
     \item{sigma2}{Estimated error variance (only for \code{family = "normal"}).}
     \item{se_reliable}{Logical, FALSE if the Hessian was ill-conditioned so
       the classical SEs should be treated with caution.}
+    \item{se_source}{Character flag for the reported standard errors:
+      \code{"jackknife"} when analytic SEs could not be formed and \code{sir}
+      fell back to the delete-one-actor jackknife (see \code{calc_se}); NULL
+      (absent) otherwise, meaning analytic SEs are available and
+      \code{\link{vcov}}/\code{\link{confint}}/\code{\link[=tidy.sir]{tidy}}
+      report the cluster-robust sandwich by default.}
     \item{dynamic_W}{Logical, TRUE if W was time-varying (4D).}
     \item{symmetric/gamma/operator/rho_A/gain/stationary}{Present for symmetric
       (A = B) fits: \code{symmetric = TRUE}, \code{operator = "symmetric"};

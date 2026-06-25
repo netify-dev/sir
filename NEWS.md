@@ -1,3 +1,23 @@
+# sir 1.1.0
+
+* `vcov()`, `confint()`, and `tidy()` now report the actor-clustered
+  cluster-robust sandwich for dynamic (4D) `W` fits too (directed, symmetric, and
+  `fix_receiver`), with the same `t(G - 1)` reference as the static case.
+  Previously these fell back to classical Wald intervals for dynamic `W`.
+
+* Standard errors are always available now. When an analytic covariance cannot be
+  formed (full-bilinear bipartite fits, or an ill-conditioned Hessian) and the
+  model converged, `sir()` automatically attaches a delete-one-actor jackknife
+  covariance, so `vcov()`, `confint()`, `summary()`, and `tidy()` keep working
+  without a manual `boot_sir()` call. The fit records `se_source = "jackknife"`
+  when this fallback fires (`NULL` otherwise), and the printouts label which kind
+  of standard error they are showing.
+
+* Fixed a crash when fitting dynamic (4D) `W` with a single influence covariate
+  (`p = 1`): the per-period slice `W[, , , t]` collapsed to a matrix and failed
+  the C++ cube conversion in the operator and fitted-value construction.
+  Single-covariate dynamic models now fit.
+
 # sir 1.0.0
 
 * `sir(symmetric = TRUE)` fits a genuine undirected model with a single shared
@@ -10,8 +30,7 @@
 * Standard errors default to an actor-clustered cluster-robust sandwich for
   `vcov()`, `confint()`, and `tidy()` (HC1 factor, `t(G - 1)` reference), for both
   directed and symmetric fits. `summary()` still prints the classical SE; request
-  it anywhere with `se.type = "classical"`. For dynamic (4D) `W` the default
-  accessors fall back to classical Wald; use `boot_sir(type = "dyad")` there.
+  it anywhere with `se.type = "classical"`.
 
 * `boot_sir()` supports symmetric fits for all bootstrap types, bipartite cluster
   SEs count senders and receivers as distinct actors, and `predict()` errors on

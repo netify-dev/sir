@@ -200,6 +200,7 @@ summary.sir <- function(object, ...) {
 	ans$symmetric <- isTRUE(object$symmetric)
 	ans$fix_receiver <- isTRUE(object$fix_receiver)
 	ans$se_reliable <- object$se_reliable
+	ans$se_source <- object$se_source
 	ans$convergence <- isTRUE(object$convergence)
 	ans$stationary <- object$stationary
 
@@ -390,7 +391,11 @@ print.summary.sir <- function(x, digits = max(3L, getOption("digits") - 3L),
 	  } else {
 		print(round(coef_mat, digits))
 	  }
-		  cli::cli_text("{.emph Std. Error, z value, Pr(>|z|) and significance stars above are classical (Hessian-based) and may overstate significance under dyadic dependence. NOTE: {.code confint(fit)}/{.code tidy(fit)} default to {.emph cluster-robust} inference (actor-clustered, t(G-1) reference) --- the same estimator for directed and symmetric fits; request classical intervals with {.code confint(se.type = \"classical\")} if dyads are independent.}")
+		  if (identical(x$se_source, "jackknife")) {
+			cli::cli_text("{.emph Std. Error, z value, Pr(>|z|) and significance stars above are delete-one-actor JACKKNIFE values: the analytic covariance was unavailable or ill-conditioned, so {.fn sir} fell back to the jackknife automatically (it is the reported standard error here, dyadic-dependence robust). {.code vcov(fit)}, {.code confint(fit)}, and {.code tidy(fit)} use it too.}")
+		  } else {
+			cli::cli_text("{.emph Std. Error, z value, Pr(>|z|) and significance stars above are classical (Hessian-based) and may overstate significance under dyadic dependence. NOTE: {.code confint(fit)}/{.code vcov(fit)}/{.code tidy(fit)} default to {.emph cluster-robust} inference (actor-clustered, t(G-1) reference) --- the same estimator for directed and symmetric fits; request classical intervals with {.code confint(se.type = \"classical\")} if dyads are independent.}")
+		  }
 		} else {
 	  # no SEs available
 	  coef_mat <- as.matrix(x$coefficients[, "coef", drop = FALSE])
@@ -557,6 +562,13 @@ print.sir <- function(x, digits = max(3L, getOption("digits") - 3L), ...) {
 	  coef_mat <- as.matrix(x$summ[, c("coef", "se")])
 	  colnames(coef_mat) <- c("Estimate", "Std. Err")
 	  print(round(coef_mat, digits))
+	  # label which SE the table shows, so users do not mistake it for the
+	  # (usually larger) cluster-robust interval that confint()/vcov() report
+	  if (identical(x$se_source, "jackknife")) {
+		cli::cli_text("{.emph Std. Err shown are delete-one-actor jackknife; confint()/vcov()/tidy() use them too. See summary().}")
+	  } else {
+		cli::cli_text("{.emph Std. Err shown are classical (Hessian); confint()/vcov()/tidy() default to cluster-robust, usually larger. See summary().}")
+	  }
 	} else {
 	  coef_mat <- as.matrix(x$summ[, "coef", drop = FALSE])
 	  colnames(coef_mat) <- "Estimate"
@@ -899,10 +911,15 @@ predict.sir <- function(object, newdata = NULL,
 #'       \code{"cluster"}.
 #'   }
 #'   The cluster type requires the classical covariance as its bread
-#'   (\code{calc_se = TRUE}, the default) and is unavailable for dynamic (4D)
-#'   \code{W} and for full-bilinear bipartite fits (use
-#'   \code{boot_sir(type = "dyad")} there). \code{confint} pairs it with a
-#'   \code{t(G - 1)} reference (G = number of actors).
+#'   (\code{calc_se = TRUE}, the default) and is supported for directed,
+#'   symmetric, and dynamic (4D) \code{W} fits; it is unavailable only for
+#'   full-bilinear bipartite fits. For that case (and any fit whose Hessian was
+#'   ill-conditioned), \code{sir} attaches a delete-one-actor jackknife
+#'   covariance automatically: when \code{object$se_source ==
+#'   "jackknife"}, \code{vcov} returns that jackknife covariance for \emph{every}
+#'   \code{type} (the \code{type} argument is ignored, since no analytic
+#'   classical/HC0/cluster covariance exists). \code{confint} pairs the cluster
+#'   type with a \code{t(G - 1)} reference (G = number of actors).
 #' @param ... Additional arguments (unused).
 #' @return A square matrix with rows and columns named by parameter.
 #'   Returns NULL if standard errors were not computed (\code{calc_se = FALSE}).
@@ -910,23 +927,12 @@ predict.sir <- function(object, newdata = NULL,
 #'   \code{\link{boot_sir}} for resampling-based inference.
 #' @export
 	vcov.sir <- function(object, type = c("cluster", "classical", "robust"), ...) {
-		default_type <- missing(type)
 		type <- match.arg(type)
-		# dynamic w has no cluster sandwich, so the default call falls back to
-		# classical wald rather than aborting (an explicit cluster request aborts)
-		if (default_type && type == "cluster" &&
-			!is.null(object$W) && length(dim(object$W)) == 4L) {
-			if (is.null(object$vcov)) {
-				cli::cli_abort(c(
-					"Cluster-robust SEs are unavailable for dynamic (4D) W, and classical SEs need {.code calc_se = TRUE}.",
-					"i" = "Refit with {.code calc_se = TRUE}, or use {.code boot_sir(type = \"dyad\")}."
-				))
-			}
-			cli::cli_inform(c(
-				"i" = "Cluster-robust SEs are unavailable for dynamic (4D) W; using classical Wald covariance.",
-				" " = "Use {.code boot_sir(type = \"dyad\")} for dyadic-dependence-robust inference."
-			))
-			type <- "classical"
+		# graceful fallback: sir() attaches a delete-one-actor jackknife covariance
+		# when analytic SEs were ill-conditioned. it is already dyadic-dependence
+		# robust, so return it directly for any requested type.
+		if (identical(object$se_source, "jackknife") && !is.null(object$vcov)) {
+			return(object$vcov)
 		}
 		if (!isTRUE(object$convergence)) {
 			cli::cli_abort(c(
@@ -997,9 +1003,12 @@ predict.sir <- function(object, newdata = NULL,
 #'   \code{t(G - 1)} reference, the same estimator for directed and symmetric
 #'   fits), \code{"classical"} (inverse-Hessian, with a normal reference -- valid
 #'   and tighter when dyads are independent), or \code{"robust"} (HC0 for directed
-#'   fits; maps to cluster for symmetric fits). Cluster intervals rely on the
-#'   Hessian bread being stable. Ignored when \code{boot} is supplied; cluster is
-#'   unavailable for dynamic (4D) \code{W}.
+#'   fits; maps to cluster for symmetric fits). The cluster type is supported for
+#'   directed, symmetric, and dynamic (4D) \code{W} fits and relies on the Hessian
+#'   bread being stable. Ignored when \code{boot} is supplied. Also ignored when
+#'   \code{object$se_source == "jackknife"} (analytic SEs could not be formed, so
+#'   \code{sir} attached a jackknife covariance and \code{confint} uses it for
+#'   every \code{se.type}).
 #' @param ... Additional arguments (unused).
 #' @return A matrix with one row per parameter and columns for the lower
 #'   and upper bounds, labeled by percentage (e.g., \code{"2.5 \%"} and
@@ -1009,24 +1018,7 @@ predict.sir <- function(object, newdata = NULL,
 #' @export
 	confint.sir <- function(object, parm = NULL, level = 0.95, boot = NULL,
 							se.type = c("cluster", "classical", "robust"), ...) {
-		default_se <- missing(se.type)
 		se.type <- match.arg(se.type)
-		# dynamic w has no cluster sandwich, so the default interval falls back to
-		# classical wald rather than aborting (an explicit cluster request aborts)
-		if (default_se && is.null(boot) && se.type == "cluster" &&
-			!is.null(object$W) && length(dim(object$W)) == 4L) {
-			if (is.null(object$vcov)) {
-				cli::cli_abort(c(
-					"Cluster-robust intervals are unavailable for dynamic (4D) W, and classical SEs need {.code calc_se = TRUE}.",
-					"i" = "Refit with {.code calc_se = TRUE}, or use {.code boot_sir(type = \"dyad\")} then {.code confint(fit, boot = ...)}."
-				))
-			}
-			cli::cli_inform(c(
-				"i" = "Cluster-robust intervals are unavailable for dynamic (4D) W; using classical Wald intervals.",
-				" " = "Use {.code boot_sir(type = \"dyad\")} then {.code confint(fit, boot = ...)} for dyadic-dependence-robust inference."
-			))
-			se.type <- "classical"
-		}
 		if (!is.numeric(level) || length(level) != 1L || !is.finite(level) ||
 			level <= 0 || level >= 1) {
 			cli::cli_abort("{.arg level} must be a single number between 0 and 1.")
@@ -1036,8 +1028,10 @@ predict.sir <- function(object, newdata = NULL,
 	a <- (1 - level) / 2
 	pct <- paste0(format(100 * c(a, 1 - a), trim = TRUE, digits = 3), " %")
 
-	# full-bilinear bipartite fits have no analytic SEs; require a boot result.
-	if (is.null(boot) && isTRUE(object$full_bilinear)) {
+	# full-bilinear bipartite fits have no analytic SEs; require a boot result --
+	# unless sir() already attached a jackknife fallback (handled below).
+	if (is.null(boot) && isTRUE(object$full_bilinear) &&
+		!identical(object$se_source, "jackknife")) {
 		cli::cli_abort(c(
 			"Wald intervals are not available for full-bilinear bipartite fits (no analytic SEs).",
 			"i" = "Run {.code b <- boot_sir(fit, type = \"dyad\")} and pass {.code confint(fit, boot = b)}."
@@ -1080,7 +1074,10 @@ predict.sir <- function(object, newdata = NULL,
 	# default reference is normal; cluster SEs use a t(G-1) reference (df carried
 	# on the vcov as the "cluster_df" attribute) for honest small-sample width.
 	crit_df <- Inf
-	if (isTRUE(object$symmetric) && identical(object$operator, "symmetric") &&
+	if (identical(object$se_source, "jackknife")) {
+	  # analytic SEs were ill-conditioned; sir() fell back to the jackknife covariance
+	  se <- sqrt(pmax(diag(object$vcov), 0))
+	} else if (isTRUE(object$symmetric) && identical(object$operator, "symmetric") &&
 		se.type != "classical") {
 	  # symmetric fits: any non-classical type is the actor cluster-robust sandwich
 	  Vc <- .sir_vcov_cluster(object)

@@ -1,23 +1,78 @@
 name: Build sir Release Binaries
 
 on:
+  push:
+    branches: [main, master]
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
+  prepare:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      should_release: ${{ steps.release.outputs.should_release }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read release version
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(awk -F': *' '$1 == "Version" { print $2; exit }' DESCRIPTION)
+          tag="v${version}"
+
+          if [ -z "$version" ]; then
+            echo "Could not read Version from DESCRIPTION." >&2
+            exit 1
+          fi
+
+          # a tag push must match the DESCRIPTION version
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "$tag" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match DESCRIPTION version ${version}." >&2
+            exit 1
+          fi
+
+          # on a branch push, only release when this version has no release yet,
+          # so ordinary commits don't re-cut a release ("as necessary")
+          should_release=true
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            if gh release view "$tag" >/dev/null 2>&1; then
+              should_release=false
+              echo "Release ${tag} already exists; skipping release build for this branch push."
+            fi
+          fi
+
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+            echo "should_release=${should_release}"
+          } >> "$GITHUB_OUTPUT"
+
   build:
     name: Build on ${{ matrix.label }}
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             label: linux
-          - os: macos-13
+          - os: macos-15-intel
             label: macos-intel
-          - os: macos-15
-            label: macos-arm64
           - os: macos-latest
-            label: macos-latest
+            label: macos-arm64
           - os: windows-latest
             label: windows
 
@@ -27,35 +82,11 @@ jobs:
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
-
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
-
-      - name: Setup Rtools (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # R setup already includes Rtools on windows-latest
-          echo "Rtools should be available via r-lib/actions/setup-r@v2"
-        shell: bash
+        with:
+          use-public-rspm: true
 
       - name: Install dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          extra-packages: |
-            any::Rcpp
-            any::RcppArmadillo
-            any::devtools
-            any::testthat
-
-      - name: Extract version from DESCRIPTION
-        id: version
-        run: |
-          version <- read.dcf("DESCRIPTION")[1, "Version"]
-          cat(sprintf("version=%s\n", version), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
-        shell: Rscript {0}
 
       - name: Build source package
         run: R CMD build .
@@ -65,15 +96,13 @@ jobs:
         run: |
           pkg_file=$(ls -1tr *.tar.gz | tail -n 1)
           R CMD INSTALL --build "$pkg_file"
-          
+
           platform=${{ matrix.label }}
           for f in *.tgz *.zip *.tar.gz *.tar.bz2; do
             if [ -f "$f" ]; then
               ext="${f##*.}"
               filename=$(basename "$f")
-              newname="sir_${{ steps.version.outputs.version }}_${platform}.${ext}"
-              mv "$f" "$newname"
-              echo "Created: $newname"
+              mv "$f" "${filename%.*}-${platform}.${ext}"
             fi
           done
         shell: bash
@@ -81,7 +110,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sir-${{ matrix.label }}-v${{ steps.version.outputs.version }}
+          name: sir-${{ matrix.label }}-v${{ needs.prepare.outputs.version }}
           path: |
             *.tgz
             *.zip
@@ -90,74 +119,40 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
 
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Move artifacts to root of artifacts directory
+      - name: Collect release assets
         run: |
-          find artifacts -type f \( -name "*.zip" -o -name "*.tgz" -o -name "*.tar.gz" \) -exec mv {} artifacts/ \;
-          ls -la artifacts/
+          mkdir -p release-assets
+          find artifacts -type f \( -name "*.zip" -o -name "*.tgz" -o -name "*.tar.gz" \) -exec cp {} release-assets/ \;
+          ls -lh release-assets
         shell: bash
 
-      - name: Extract version from DESCRIPTION
-        id: version
-        run: |
-          version <- read.dcf("DESCRIPTION")[1, "Version"]
-          cat(sprintf("version=%s\n", version), file = Sys.getenv("GITHUB_OUTPUT"), append = TRUE)
-        shell: Rscript {0}
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "sir v${{ steps.version.outputs.version }}"
-          tag_name: "v${{ steps.version.outputs.version }}"
-          body: |
-            ## Social Influence Regression (SIR) Package v${{ steps.version.outputs.version }}
-            
-            This release includes pre-built binaries for multiple platforms.
-            
-            ### Installation
-            
-            To install from a binary package, download the appropriate file for your platform and run:
-            
-            ```r
-            # For Windows (.zip):
-            install.packages("sir_${{ steps.version.outputs.version }}_windows.zip", repos = NULL, type = "binary")
-            
-            # For macOS (.tgz):
-            install.packages("sir_${{ steps.version.outputs.version }}_macos-arm64.tgz", repos = NULL, type = "binary")
-            
-            # For source package (.tar.gz):
-            install.packages("sir_${{ steps.version.outputs.version }}_linux.tar.gz", repos = NULL, type = "source")
-            ```
-            
-            ### Package Features
-            - Social Influence Regression models for network data
-            - Support for Poisson, Normal, and Binomial distributions
-            - Alternating Least Squares (ALS) and direct optimization methods
-            - Optimized C++ implementation using RcppArmadillo
-            - Comprehensive S3 methods and ggplot2 visualizations
-            
-          generate_release_notes: true
-          draft: false
-          prerelease: false
-          files: |
-            artifacts/*.tgz
-            artifacts/*.zip
-            artifacts/*.tar.gz
+      - name: Create or update GitHub Release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SIR_VERSION: ${{ needs.prepare.outputs.version }}
+          SIR_TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          if gh release view "$SIR_TAG" >/dev/null 2>&1; then
+            gh release upload "$SIR_TAG" release-assets/* --clobber
+            gh release edit "$SIR_TAG" --title "sir v${SIR_VERSION}" --latest
+          else
+            gh release create "$SIR_TAG" release-assets/* \
+              --title "sir v${SIR_VERSION}" \
+              --generate-notes \
+              --latest \
+              --target "$GITHUB_SHA"
+          fi
+        shell: bash
