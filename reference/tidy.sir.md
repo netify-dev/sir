@@ -37,9 +37,12 @@ tidy(
 - se.type:
 
   Which standard errors to report: `"cluster"` (default; actor-clustered
-  sandwich, each cell scored onto both endpoint actors, for supported
-  static fits), `"classical"` (inverse-Hessian), or `"robust"` (HC0
-  sandwich).
+  sandwich, each cell scored onto both endpoint actors, for directed,
+  symmetric, and dynamic (4D) `W` fits), `"classical"`
+  (inverse-Hessian), or `"robust"` (HC0 sandwich). Ignored when the fit
+  carries `se_source == "jackknife"` (analytic SEs were unavailable, so
+  the delete-one-actor jackknife standard errors are reported for every
+  type).
 
 - ...:
 

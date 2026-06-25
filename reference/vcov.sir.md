@@ -40,9 +40,14 @@ vcov(object, type = c("cluster", "classical", "robust"), ...)
     (which have no separate HC0 path) it aliases to `"cluster"`.
 
   The cluster type requires the classical covariance as its bread
-  (`calc_se = TRUE`, the default) and is unavailable for dynamic (4D)
-  `W` and for full-bilinear bipartite fits (use
-  `boot_sir(type = "dyad")` there). `confint` pairs it with a `t(G - 1)`
+  (`calc_se = TRUE`, the default) and is supported for directed,
+  symmetric, and dynamic (4D) `W` fits; it is unavailable only for
+  full-bilinear bipartite fits. For that case (and any fit whose Hessian
+  was ill-conditioned), `sir` attaches a delete-one-actor jackknife
+  covariance automatically: when `object$se_source == "jackknife"`,
+  `vcov` returns that jackknife covariance for *every* `type` (the
+  `type` argument is ignored, since no analytic classical/HC0/cluster
+  covariance exists). `confint` pairs the cluster type with a `t(G - 1)`
   reference (G = number of actors).
 
 - ...:

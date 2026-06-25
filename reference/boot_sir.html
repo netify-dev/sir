@@ -13,7 +13,7 @@ influence terms (i.e., when fix_receiver = FALSE)."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -121,6 +121,10 @@ there <code>cores &gt; 1</code> falls back to serial with a one-time warning.</p
 <dd><p>Named numeric vector of bootstrap standard errors (one per
     parameter).</p></dd>
 
+  <dt>cov</dt>
+<dd><p>For <code>type = "dyad"</code>, the jackknife variance-covariance
+    matrix (NULL for the block/parametric bootstraps).</p></dd>
+
   <dt>ci_lo</dt>
 <dd><p>Lower 2.5% percentile bounds.</p></dd>
 
@@ -166,7 +170,11 @@ there <code>cores &gt; 1</code> falls back to serial with a one-time warning.</p
     axes together; for a bipartite network senders and receivers are dropped
     separately and the two one-way jackknife covariances are summed. Standard
     errors come from the jackknife covariance and intervals are normal
-    (<code>estimate +/- z * se</code>).</p></dd>
+    (<code>estimate +/- z * se</code>). This is also the estimator <code><a href="sir.html">sir</a></code>
+    reuses automatically when <code>calc_se = TRUE</code> cannot form analytic SEs (a
+    singular/ill-conditioned Hessian or a full-bilinear bipartite fit): it
+    attaches the same <code>$cov</code> so <code>vcov</code>/<code>confint</code>/<code>tidy</code>
+    return jackknife inference without an explicit <code>boot_sir</code> call.</p></dd>
 
   <dt>parametric</dt>
 <dd><p>Simulates new outcome arrays from the fitted model

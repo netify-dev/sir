@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -84,6 +84,29 @@ flagged by the <code>se_reliable</code> field, covered below.) It walks
 through classical and robust variance estimates, confidence intervals,
 bootstrap checks, and information-criterion model comparison. For basic
 fitting see <code><a href="../articles/sir_overview.html">vignette("sir_overview")</a></code>.</p>
+<div class="section level3">
+<h3 id="getting-standard-errors-in-one-paragraph">Getting standard errors, in one paragraph<a class="anchor" aria-label="anchor" href="#getting-standard-errors-in-one-paragraph"></a>
+</h3>
+<p>Standard errors are computed by default
+(<code>calc_se = TRUE</code>), so you do not have to ask for them.
+<strong><code>summary(fit)</code> prints them, and
+<code>confint(fit)</code>, <code>vcov(fit)</code>, and
+<code>tidy(fit)</code> report cluster-robust intervals by
+default.</strong> Cluster-robust is the right default for relational
+data: because ties that share an actor are correlated, classical
+(Hessian-based) errors that assume independent dyads can badly overstate
+significance. The coefficient table in
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>/<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> shows the <em>classical</em>
+SE for a quick look (and labels it as such), but the interval you should
+report is the cluster-robust one from <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>. If the
+analytic standard errors cannot be formed — a singular or
+ill-conditioned Hessian, or a full-bilinear bipartite fit, which has no
+closed-form covariance — <code><a href="../reference/sir.html">sir()</a></code> <strong>automatically falls
+back to the delete-one-actor jackknife</strong>, and all four accessors
+use it transparently; the fit then carries
+<code>fit$se_source == "jackknife"</code> and says so in its printout.
+Everything below is the <em>why</em> behind these defaults, and how to
+cross-check them.</p>
 <table class="table">
 <colgroup>
 <col width="13%">
@@ -98,21 +121,24 @@ fitting see <code><a href="../articles/sir_overview.html">vignette("sir_overview
 <tbody>
 <tr class="odd">
 <td align="left">Classical SE</td>
-<td align="left">Fast model-based Wald intervals</td>
+<td align="left">Fast model-based Wald intervals; what
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>/<code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> show</td>
 <td align="left">Assumes independent dyad-period scores and a stable
-Hessian</td>
+Hessian; can overstate significance</td>
 </tr>
 <tr class="even">
+<td align="left">Cluster-robust SE (default)</td>
+<td align="left">Shared-actor dyadic dependence (each cell scored onto
+both actors); what
+<code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>/<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>/<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code>
+report</td>
+<td align="left">Still uses the Hessian as bread, so weak identification
+remains a problem</td>
+</tr>
+<tr class="odd">
 <td align="left">HC0 robust SE</td>
 <td align="left">Heteroskedasticity or overdispersion</td>
 <td align="left">Does not address shared-actor network dependence</td>
-</tr>
-<tr class="odd">
-<td align="left">Cluster-robust SE (default)</td>
-<td align="left">Shared-actor dyadic dependence (each cell scored onto
-both actors)</td>
-<td align="left">Still uses the Hessian as bread, so weak identification
-remains a problem</td>
 </tr>
 <tr class="even">
 <td align="left">Parametric bootstrap</td>
@@ -123,13 +149,15 @@ shared-actor dependence</td>
 </tr>
 <tr class="odd">
 <td align="left">Dyad jackknife</td>
-<td align="left">Fallback when analytic SEs are unavailable (bipartite,
-unstable Hessian)</td>
-<td align="left">A deliberately wide worst-case bound, not a precise
-interval</td>
+<td align="left">The automatic fallback when no analytic covariance
+exists (full-bilinear bipartite, ill-conditioned Hessian); also a
+conservative robustness check</td>
+<td align="left">Wider than the cluster interval; with few actors,
+deleting one is a large perturbation</td>
 </tr>
 </tbody>
 </table>
+</div>
 <div class="section level2">
 <h2 id="setup">Setup<a class="anchor" aria-label="anchor" href="#setup"></a>
 </h2>
@@ -179,7 +207,7 @@ dependence:</p>
 <span><span class="co">#&gt; Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</span></span>
 <span><span class="co">#&gt; <span style="font-style: italic;">Std. Error, z value, Pr(&gt;|z|) and significance stars above are classical</span></span></span>
 <span><span class="co">#&gt; <span style="font-style: italic;">(Hessian-based) and may overstate significance under dyadic dependence. NOTE:</span></span></span>
-<span><span class="co">#&gt; <span style="font-style: italic;">`confint(fit)`/`tidy(fit)` default to cluster-robust inference</span></span></span>
+<span><span class="co">#&gt; <span style="font-style: italic;">`confint(fit)`/`vcov(fit)`/`tidy(fit)` default to cluster-robust inference</span></span></span>
 <span><span class="co">#&gt; <span style="font-style: italic;">(actor-clustered, t(G-1) reference) --- the same estimator for directed and</span></span></span>
 <span><span class="co">#&gt; <span style="font-style: italic;">symmetric fits; request classical intervals with `confint(se.type =</span></span></span>
 <span><span class="co">#&gt; <span style="font-style: italic;">"classical")` if dyads are independent.</span></span></span>
@@ -398,11 +426,11 @@ estimates are well separated from zero:</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit</span>, boot <span class="op">=</span> <span class="va">br_par</span><span class="op">)</span></span>
 <span><span class="co">#&gt;                  2.5 %     97.5 %</span></span>
-<span><span class="co">#&gt; (Z) Z1      -0.1816208 -0.1551895</span></span>
-<span><span class="co">#&gt; (Z) Z2       0.4604181  0.4852921</span></span>
-<span><span class="co">#&gt; (alphaW) W2  0.6869696  0.7892897</span></span>
-<span><span class="co">#&gt; (betaW) W1  -0.3593313 -0.3395785</span></span>
-<span><span class="co">#&gt; (betaW) W2  -0.2177358 -0.1838933</span></span></code></pre></div>
+<span><span class="co">#&gt; (Z) Z1      -0.1809816 -0.1565513</span></span>
+<span><span class="co">#&gt; (Z) Z2       0.4624189  0.4887205</span></span>
+<span><span class="co">#&gt; (alphaW) W2  0.6774419  0.7810377</span></span>
+<span><span class="co">#&gt; (betaW) W1  -0.3590865 -0.3390764</span></span>
+<span><span class="co">#&gt; (betaW) W2  -0.2167343 -0.1874963</span></span></code></pre></div>
 <p>The <strong>dyad jackknife</strong> is deliberately conservative:
 deleting a whole actor is a large perturbation (especially with only
 <code>m = 14</code> actors), so its intervals run several times wider,
@@ -452,20 +480,38 @@ intervals.</p>
 <li>
 <strong>Report cluster-robust intervals</strong>
 (<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code> / <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>, the default) for
-supported static directed and symmetric fits with a stable Hessian
-(<code>se_reliable = TRUE</code>).</li>
+directed, symmetric, and dynamic (4D) <code>W</code> fits with a stable
+Hessian (<code>se_reliable = TRUE</code>).</li>
 <li>
-<strong>Fall back to the dyad jackknife</strong>
-(<code>boot_sir(type = "dyad")</code>) when analytic SEs are unavailable
-— full-bilinear bipartite fits, dynamic <code>W</code>, or an unstable
-Hessian (<code>se_reliable = FALSE</code>) — and as a worst-case
-cross-check otherwise.</li>
+<strong>Let the jackknife fallback handle the hard cases.</strong>
+When no analytic covariance exists — full-bilinear bipartite fits, or an
+ill-conditioned Hessian — <code><a href="../reference/sir.html">sir()</a></code> already attaches the
+delete-one-actor jackknife automatically, so
+<code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>/<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>/<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> keep
+working and <code>fit$se_source</code> reads <code>"jackknife"</code>;
+you do not need to call <code><a href="../reference/boot_sir.html">boot_sir()</a></code> yourself. (You still
+can, e.g. <code>boot_sir(type = "dyad")</code> then
+<code>confint(fit, boot = bs)</code>, if you want to inspect the
+resampling.)</li>
 <li>
 <strong>Do not</strong> report dyad-independent classical
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>p</mi><annotation encoding="application/x-tex">p</annotation></semantics></math>-values
 as the headline result for influence coefficients; pair the cluster
 interval with a response-scale scenario (below).</li>
 </ul>
+<div class="section level3">
+<h3 id="how-to-tell-which-standard-errors-you-have">How to tell which standard errors you have<a class="anchor" aria-label="anchor" href="#how-to-tell-which-standard-errors-you-have"></a>
+</h3>
+<p><code>fit$se_source</code> is <code>"jackknife"</code> when the
+automatic fallback fired, and absent (NULL) otherwise — meaning analytic
+SEs are available and
+<code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>/<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>/<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> report
+the cluster-robust sandwich (including for dynamic, 4D <code>W</code>).
+The <code>summary(fit)</code> and <code>print(fit)</code> printouts also
+label the standard errors they show (classical in the table, jackknife
+when the fallback fired), so you are never left guessing which kind you
+are looking at.</p>
+</div>
 </div>
 <div class="section level2">
 <h2 id="fixed-receiver-model-and-model-comparison">Fixed-receiver model and model comparison<a class="anchor" aria-label="anchor" href="#fixed-receiver-model-and-model-comparison"></a>

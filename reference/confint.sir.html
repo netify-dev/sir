@@ -17,7 +17,7 @@ be more reliable when the Hessian is ill-conditioned."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -103,9 +103,12 @@ used instead of Wald intervals.</p></dd>
 <code>t(G - 1)</code> reference, the same estimator for directed and symmetric
 fits), <code>"classical"</code> (inverse-Hessian, with a normal reference – valid
 and tighter when dyads are independent), or <code>"robust"</code> (HC0 for directed
-fits; maps to cluster for symmetric fits). Cluster intervals rely on the
-Hessian bread being stable. Ignored when <code>boot</code> is supplied; cluster is
-unavailable for dynamic (4D) <code>W</code>.</p></dd>
+fits; maps to cluster for symmetric fits). The cluster type is supported for
+directed, symmetric, and dynamic (4D) <code>W</code> fits and relies on the Hessian
+bread being stable. Ignored when <code>boot</code> is supplied. Also ignored when
+<code>object$se_source == "jackknife"</code> (analytic SEs could not be formed, so
+<code>sir</code> attached a jackknife covariance and <code>confint</code> uses it for
+every <code>se.type</code>).</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

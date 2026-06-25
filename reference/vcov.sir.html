@@ -13,7 +13,7 @@ independent dyad-periods and often undercover."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -83,10 +83,15 @@ independent dyad-periods and often undercover.</p>
     symmetric fits (which have no separate HC0 path) it aliases to
     <code>"cluster"</code>.</p></li>
 </ul><p>The cluster type requires the classical covariance as its bread
-(<code>calc_se = TRUE</code>, the default) and is unavailable for dynamic (4D)
-<code>W</code> and for full-bilinear bipartite fits (use
-<code>boot_sir(type = "dyad")</code> there). <code>confint</code> pairs it with a
-<code>t(G - 1)</code> reference (G = number of actors).</p></dd>
+(<code>calc_se = TRUE</code>, the default) and is supported for directed,
+symmetric, and dynamic (4D) <code>W</code> fits; it is unavailable only for
+full-bilinear bipartite fits. For that case (and any fit whose Hessian was
+ill-conditioned), <code>sir</code> attaches a delete-one-actor jackknife
+covariance automatically: when <code>object$se_source ==
+"jackknife"</code>, <code>vcov</code> returns that jackknife covariance for <em>every</em>
+<code>type</code> (the <code>type</code> argument is ignored, since no analytic
+classical/HC0/cluster covariance exists). <code>confint</code> pairs the cluster
+type with a <code>t(G - 1)</code> reference (G = number of actors).</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

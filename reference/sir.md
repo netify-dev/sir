@@ -105,9 +105,19 @@ sir(
 - calc_se:
 
   Logical indicating whether to calculate standard errors for the
-  parameters. Standard errors are computed using the observed
-  information matrix. Setting to FALSE speeds up computation when
-  uncertainty quantification is not needed.
+  parameters (default TRUE). Standard errors are computed from the
+  observed information matrix. If those analytic standard errors cannot
+  be formed — a singular or ill-conditioned Hessian, or a path with no
+  closed-form covariance such as full-bilinear bipartite fits — and the
+  model converged, `sir` automatically falls back to the
+  delete-one-actor jackknife covariance (reproducible for a given
+  `seed`), so [`vcov()`](https://rdrr.io/r/stats/vcov.html),
+  [`confint()`](https://rdrr.io/r/stats/confint.html),
+  [`summary()`](https://rdrr.io/r/base/summary.html), and
+  [`tidy()`](https://generics.r-lib.org/reference/tidy.html) still
+  return standard errors. The fit then carries `se_source = "jackknife"`
+  and prints a one-line note. Set FALSE to skip standard errors entirely
+  (and the fallback) when they are not needed.
 
 - fix_receiver:
 
@@ -385,6 +395,15 @@ An object of class `"sir"` with the following components:
 
   Logical, FALSE if the Hessian was ill-conditioned so the classical SEs
   should be treated with caution.
+
+- se_source:
+
+  Character flag for the reported standard errors: `"jackknife"` when
+  analytic SEs could not be formed and `sir` fell back to the
+  delete-one-actor jackknife (see `calc_se`); NULL (absent) otherwise,
+  meaning analytic SEs are available and
+  [`vcov`](https://rdrr.io/r/stats/vcov.html)/[`confint`](https://rdrr.io/r/stats/confint.html)/[`tidy`](https://netify-dev.github.io/sir/reference/tidy.sir.md)
+  report the cluster-robust sandwich by default.
 
 - dynamic_W:
 

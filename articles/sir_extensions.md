@@ -264,7 +264,7 @@ for (t in 1:Tn) Yf[, , t] <- A_t %*% Xf[, , t] %*% t(B_t) +
     matrix(rnorm(n1 * n2, sd = 0.3), n1, n2)
 
 fit_full <- sir(Yf, W = Wf, X = Xf, W_recv = Wr,
-                family = "normal", calc_se = FALSE, seed = 1)
+                family = "normal", seed = 1)
 data.frame(
     full_bilinear = isTRUE(fit_full$full_bilinear),
     converged = fit_full$convergence
@@ -288,21 +288,29 @@ All three estimates land essentially on their generating values, so the
 full bilinear model recovers the separate sender and receiver influence
 channels at once — the most demanding recovery in this vignette.
 
-Analytic standard errors are not available on this path; use the
-delete-one-actor dyad jackknife for inference:
+The full-bilinear path has no closed-form covariance, so
+[`sir()`](https://netify-dev.github.io/sir/reference/sir.md)
+automatically falls back to the delete-one-actor jackknife when you ask
+for standard errors —
+[`confint()`](https://rdrr.io/r/stats/confint.html),
+[`vcov()`](https://rdrr.io/r/stats/vcov.html), and
+[`summary()`](https://rdrr.io/r/base/summary.html) work without any
+extra step:
 
 ``` r
 
-bj <- boot_sir(fit_full, type = "dyad", seed = 1)
-round(confint(bj), 3)
+round(confint(fit_full), 3)
 #>               2.5 % 97.5 %
 #> (alphaW) W2   0.501  0.698
 #> (betaWr) Wr1  0.697  0.913
 #> (betaWr) Wr2 -0.584 -0.420
 ```
 
-All three jackknife intervals comfortably cover the true weights (0.6,
-0.8, -0.5), giving the full-bilinear fit a clean inferential payoff.
+All three intervals comfortably cover the true weights (0.6, 0.8, -0.5),
+giving the full-bilinear fit a clean inferential payoff. (If you prefer
+to run the resampling explicitly — for example to raise the replicate
+count or inspect convergence — `boot_sir(fit_full, type = "dyad")`
+followed by `confint(fit_full, boot = bs)` gives the same intervals.)
 
 ## Dynamic influence covariates
 
@@ -312,10 +320,11 @@ evolve, trade shifts. Supply `W` as a 4D array
 estimated as time-invariant, but the reconstructed operators $`A_t`$
 vary with $`t`$ because the covariates do. Dynamic 4D `W` is supported
 with a fixed receiver side (`fix_receiver = TRUE`, so $`B = I`$ and only
-the sender weights $`\boldsymbol{\alpha}`$ are estimated). Below we let
-the covariates evolve gradually — an AR(1) drift across periods, like
-alliances shifting slowly — and check that the fit still recovers the
-shared $`\alpha`$:
+the sender weights $`\boldsymbol{\alpha}`$ are estimated), and
+cluster-robust standard errors are available for it just as for static
+fits. Below we let the covariates evolve gradually — an AR(1) drift
+across periods, like alliances shifting slowly — and check that the fit
+still recovers the shared $`\alpha`$:
 
 ``` r
 
@@ -343,7 +352,7 @@ for (t in seq_len(T_len)) {
 }
 
 fit_dyn <- sir(Y_dyn, W = W_dyn, X = X_dyn, family = "normal",
-               fix_receiver = TRUE, calc_se = FALSE, seed = 1)
+               fix_receiver = TRUE, seed = 1)
 data.frame(
     alphaW2_estimate = round(unname(fit_dyn$alpha[2]), 3),
     alphaW2_target   = 0.7,
@@ -353,6 +362,21 @@ data.frame(
 )
 #>   alphaW2_estimate alphaW2_target A_dimensions dynamic_W
 #> 1            0.724            0.7 14 x 14 x 80      TRUE
+```
+
+Inference works the same as for static `W`:
+[`confint()`](https://rdrr.io/r/stats/confint.html)/[`vcov()`](https://rdrr.io/r/stats/vcov.html)/[`tidy()`](https://generics.r-lib.org/reference/tidy.html)
+default to the actor-clustered cluster-robust sandwich (each cell’s
+score is loaded onto its endpoint actors, summed within actor, with a
+$`t(G-1)`$ reference), which stays valid when the operator varies over
+time.
+
+``` r
+
+round(confint(fit_dyn), 3)
+#>             2.5 % 97.5 %
+#> (alphaW) W1 0.941  1.048
+#> (alphaW) W2 0.658  0.790
 ```
 
 The shared coefficient is recovered (the `alpha_2` estimate lands near

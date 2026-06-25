@@ -15,7 +15,7 @@ beta, or shared gamma for a symmetric fit)."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -90,8 +90,11 @@ Wald interval columns. Default <code>FALSE</code>.</p></dd>
 <dt id="arg-se-type">se.type<a class="anchor" aria-label="anchor" href="#arg-se-type"></a></dt>
 <dd><p>Which standard errors to report: <code>"cluster"</code> (default;
 actor-clustered sandwich, each cell scored onto both endpoint actors, for
-supported static fits), <code>"classical"</code> (inverse-Hessian), or
-<code>"robust"</code> (HC0 sandwich).</p></dd>
+directed, symmetric, and dynamic (4D) <code>W</code> fits), <code>"classical"</code>
+(inverse-Hessian), or <code>"robust"</code> (HC0 sandwich). Ignored when the fit
+carries
+<code>se_source == "jackknife"</code> (analytic SEs were unavailable, so the
+delete-one-actor jackknife standard errors are reported for every type).</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>

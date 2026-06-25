@@ -75,6 +75,11 @@ An object of class `"boot_sir"` with components:
 
   Named numeric vector of bootstrap standard errors (one per parameter).
 
+- cov:
+
+  For `type = "dyad"`, the jackknife variance-covariance matrix (NULL
+  for the block/parametric bootstraps).
+
 - ci_lo:
 
   Lower 2.5% percentile bounds.
@@ -130,7 +135,13 @@ Three bootstrap strategies are available:
   is dropped from both axes together; for a bipartite network senders
   and receivers are dropped separately and the two one-way jackknife
   covariances are summed. Standard errors come from the jackknife
-  covariance and intervals are normal (`estimate +/- z * se`).
+  covariance and intervals are normal (`estimate +/- z * se`). This is
+  also the estimator
+  [`sir`](https://netify-dev.github.io/sir/reference/sir.md) reuses
+  automatically when `calc_se = TRUE` cannot form analytic SEs (a
+  singular/ill-conditioned Hessian or a full-bilinear bipartite fit): it
+  attaches the same `$cov` so `vcov`/`confint`/`tidy` return jackknife
+  inference without an explicit `boot_sir` call.
 
 - parametric:
 

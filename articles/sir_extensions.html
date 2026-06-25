@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -341,7 +341,7 @@ structure so the fit has something to recover. True sender weights are
 <span>    <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n1</span> <span class="op">*</span> <span class="va">n2</span>, sd <span class="op">=</span> <span class="fl">0.3</span><span class="op">)</span>, <span class="va">n1</span>, <span class="va">n2</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">fit_full</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sir.html">sir</a></span><span class="op">(</span><span class="va">Yf</span>, W <span class="op">=</span> <span class="va">Wf</span>, X <span class="op">=</span> <span class="va">Xf</span>, W_recv <span class="op">=</span> <span class="va">Wr</span>,</span>
-<span>                family <span class="op">=</span> <span class="st">"normal"</span>, calc_se <span class="op">=</span> <span class="cn">FALSE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span>                family <span class="op">=</span> <span class="st">"normal"</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>    full_bilinear <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Logic.html" class="external-link">isTRUE</a></span><span class="op">(</span><span class="va">fit_full</span><span class="op">$</span><span class="va">full_bilinear</span><span class="op">)</span>,</span>
 <span>    converged <span class="op">=</span> <span class="va">fit_full</span><span class="op">$</span><span class="va">convergence</span></span>
@@ -363,18 +363,23 @@ structure so the fit has something to recover. True sender weights are
 the full bilinear model recovers the separate sender and receiver
 influence channels at once — the most demanding recovery in this
 vignette.</p>
-<p>Analytic standard errors are not available on this path; use the
-delete-one-actor dyad jackknife for inference:</p>
+<p>The full-bilinear path has no closed-form covariance, so
+<code><a href="../reference/sir.html">sir()</a></code> automatically falls back to the delete-one-actor
+jackknife when you ask for standard errors — <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>,
+<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, and <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> work without any extra
+step:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">bj</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/boot_sir.html">boot_sir</a></span><span class="op">(</span><span class="va">fit_full</span>, type <span class="op">=</span> <span class="st">"dyad"</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">bj</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit_full</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
 <span><span class="co">#&gt;               2.5 % 97.5 %</span></span>
 <span><span class="co">#&gt; (alphaW) W2   0.501  0.698</span></span>
 <span><span class="co">#&gt; (betaWr) Wr1  0.697  0.913</span></span>
 <span><span class="co">#&gt; (betaWr) Wr2 -0.584 -0.420</span></span></code></pre></div>
-<p>All three jackknife intervals comfortably cover the true weights
-(0.6, 0.8, -0.5), giving the full-bilinear fit a clean inferential
-payoff.</p>
+<p>All three intervals comfortably cover the true weights (0.6, 0.8,
+-0.5), giving the full-bilinear fit a clean inferential payoff. (If you
+prefer to run the resampling explicitly — for example to raise the
+replicate count or inspect convergence —
+<code>boot_sir(fit_full, type = "dyad")</code> followed by
+<code>confint(fit_full, boot = bs)</code> gives the same intervals.)</p>
 </div>
 </div>
 <div class="section level2">
@@ -393,9 +398,10 @@ fixed receiver side (<code>fix_receiver = TRUE</code>, so
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>B</mi><mo>=</mo><mi>I</mi></mrow><annotation encoding="application/x-tex">B = I</annotation></semantics></math>
 and only the sender weights
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>𝛂</mi><annotation encoding="application/x-tex">\boldsymbol{\alpha}</annotation></semantics></math>
-are estimated). Below we let the covariates evolve gradually — an AR(1)
-drift across periods, like alliances shifting slowly — and check that
-the fit still recovers the shared
+are estimated), and cluster-robust standard errors are available for it
+just as for static fits. Below we let the covariates evolve gradually —
+an AR(1) drift across periods, like alliances shifting slowly — and
+check that the fit still recovers the shared
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math>:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">11</span><span class="op">)</span></span>
@@ -422,7 +428,7 @@ the fit still recovers the shared
 <span><span class="op">}</span></span>
 <span></span>
 <span><span class="va">fit_dyn</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sir.html">sir</a></span><span class="op">(</span><span class="va">Y_dyn</span>, W <span class="op">=</span> <span class="va">W_dyn</span>, X <span class="op">=</span> <span class="va">X_dyn</span>, family <span class="op">=</span> <span class="st">"normal"</span>,</span>
-<span>               fix_receiver <span class="op">=</span> <span class="cn">TRUE</span>, calc_se <span class="op">=</span> <span class="cn">FALSE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span>               fix_receiver <span class="op">=</span> <span class="cn">TRUE</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>    alphaW2_estimate <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unname.html" class="external-link">unname</a></span><span class="op">(</span><span class="va">fit_dyn</span><span class="op">$</span><span class="va">alpha</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span>,</span>
 <span>    alphaW2_target   <span class="op">=</span> <span class="fl">0.7</span>,</span>
@@ -432,13 +438,24 @@ the fit still recovers the shared
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt;   alphaW2_estimate alphaW2_target A_dimensions dynamic_W</span></span>
 <span><span class="co">#&gt; 1            0.724            0.7 14 x 14 x 80      TRUE</span></span></code></pre></div>
+<p>Inference works the same as for static <code>W</code>:
+<code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>/<code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>/<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> default
+to the actor-clustered cluster-robust sandwich (each cell’s score is
+loaded onto its endpoint actors, summed within actor, with a
+<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>t</mi><mo stretchy="false" form="prefix">(</mo><mi>G</mi><mo>−</mo><mn>1</mn><mo stretchy="false" form="postfix">)</mo></mrow><annotation encoding="application/x-tex">t(G-1)</annotation></semantics></math>
+reference), which stays valid when the operator varies over time.</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></span><span class="op">(</span><span class="va">fit_dyn</span><span class="op">)</span>, <span class="fl">3</span><span class="op">)</span></span>
+<span><span class="co">#&gt;             2.5 % 97.5 %</span></span>
+<span><span class="co">#&gt; (alphaW) W1 0.941  1.048</span></span>
+<span><span class="co">#&gt; (alphaW) W2 0.658  0.790</span></span></code></pre></div>
 <p>The shared coefficient is recovered (the <code>alpha_2</code>
 estimate lands near its true 0.7), and <code>A</code> is returned as an
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>m</mi><mo>×</mo><mi>m</mi><mo>×</mo><mi>T</mi></mrow><annotation encoding="application/x-tex">m \times m \times T</annotation></semantics></math>
 array. Because the covariates drift gradually, so does the operator — we
 can see this in the across-period correlation of the fitted
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><msub><mi>A</mi><mi>t</mi></msub><annotation encoding="application/x-tex">A_t</annotation></semantics></math>:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>cor_A1_vs_A2 <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">fit_dyn</span><span class="op">$</span><span class="va">A</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">]</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">fit_dyn</span><span class="op">$</span><span class="va">A</span><span class="op">[</span>, , <span class="fl">2</span><span class="op">]</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span>,</span>
 <span>  cor_A1_vs_AT <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">fit_dyn</span><span class="op">$</span><span class="va">A</span><span class="op">[</span>, , <span class="fl">1</span><span class="op">]</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">fit_dyn</span><span class="op">$</span><span class="va">A</span><span class="op">[</span>, , <span class="va">T_len</span><span class="op">]</span><span class="op">)</span><span class="op">)</span>, <span class="fl">2</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; cor_A1_vs_A2 cor_A1_vs_AT </span></span>
@@ -457,7 +474,7 @@ than staying fixed or jumping at random.</p>
 <p>Network data often arrives as a long-format edge list (sender,
 receiver, time, value). <code><a href="../reference/cast_array.html">cast_array()</a></code> converts it to the
 arrays <code><a href="../reference/sir.html">sir()</a></code> expects.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">4</span><span class="op">)</span></span>
 <span><span class="va">edge_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/expand.grid.html" class="external-link">expand.grid</a></span><span class="op">(</span>i <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"n"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">)</span>, j <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"n"</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">)</span>, t <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">3</span><span class="op">)</span></span>
 <span><span class="va">edge_list</span> <span class="op">&lt;-</span> <span class="va">edge_list</span><span class="op">[</span><span class="va">edge_list</span><span class="op">$</span><span class="va">i</span> <span class="op">!=</span> <span class="va">edge_list</span><span class="op">$</span><span class="va">j</span>, <span class="op">]</span></span>
@@ -501,7 +518,7 @@ and
 effects from a base dyadic variable. These capture common relational
 mechanisms and drop straight into the exogenous covariate array
 <math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mi>Z</mi><annotation encoding="application/x-tex">Z</annotation></semantics></math>.</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">5</span><span class="op">)</span></span>
 <span><span class="va">trade</span>   <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/array.html" class="external-link">array</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">8</span> <span class="op">*</span> <span class="fl">8</span> <span class="op">*</span> <span class="fl">4</span><span class="op">)</span><span class="op">)</span>, dim <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">8</span>, <span class="fl">8</span>, <span class="fl">4</span><span class="op">)</span><span class="op">)</span>   <span class="co"># base dyadic variable</span></span>
 <span><span class="va">Z_trade</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rel_covar.html">rel_covar</a></span><span class="op">(</span><span class="va">trade</span>, <span class="st">"trade"</span><span class="op">)</span></span>
@@ -521,7 +538,7 @@ transitive) and the fourth carries the original four time slices.</p>
 synthetic data from the SIR process — useful for simulation studies,
 power analysis, and verifying parameter recovery under controlled
 conditions.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">dat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sim_sir.html">sim_sir</a></span><span class="op">(</span>m <span class="op">=</span> <span class="fl">10</span>, T_len <span class="op">=</span> <span class="fl">8</span>, p <span class="op">=</span> <span class="fl">2</span>, q <span class="op">=</span> <span class="fl">1</span>, family <span class="op">=</span> <span class="st">"poisson"</span>, seed <span class="op">=</span> <span class="fl">42</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># component shapes returned by sim_sir()</span></span>

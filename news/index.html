@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -42,13 +42,20 @@
     </div>
 
     <div class="section level2">
+<h2 class="pkg-version" data-toc-text="1.1.0" id="sir-110">sir 1.1.0<a class="anchor" aria-label="anchor" href="#sir-110"></a></h2>
+<ul><li><p><code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>, and <code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> now report the actor-clustered cluster-robust sandwich for dynamic (4D) <code>W</code> fits too (directed, symmetric, and <code>fix_receiver</code>), with the same <code>t(G - 1)</code> reference as the static case. Previously these fell back to classical Wald intervals for dynamic <code>W</code>.</p></li>
+<li><p>Standard errors are always available now. When an analytic covariance cannot be formed (full-bilinear bipartite fits, or an ill-conditioned Hessian) and the model converged, <code><a href="../reference/sir.html">sir()</a></code> automatically attaches a delete-one-actor jackknife covariance, so <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>, <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, and <code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> keep working without a manual <code><a href="../reference/boot_sir.html">boot_sir()</a></code> call. The fit records <code>se_source = "jackknife"</code> when this fallback fires (<code>NULL</code> otherwise), and the printouts label which kind of standard error they are showing.</p></li>
+<li><p>Fixed a crash when fitting dynamic (4D) <code>W</code> with a single influence covariate (<code>p = 1</code>): the per-period slice <code>W[, , , t]</code> collapsed to a matrix and failed the C++ cube conversion in the operator and fitted-value construction. Single-covariate dynamic models now fit.</p></li>
+</ul></div>
+    <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.0.0" id="sir-100">sir 1.0.0<a class="anchor" aria-label="anchor" href="#sir-100"></a></h2>
 <ul><li><p><code>sir(symmetric = TRUE)</code> fits a genuine undirected model with a single shared influence operator <code>A = B = sum_k gamma_k W_k</code> (the quadratic form <code>A X A'</code>). All <code>gamma_k</code> are estimated; the operator is identified up to global sign, fixed so the largest-magnitude <code>gamma_k</code> is positive. <code>sim_sir(symmetric = TRUE)</code> simulates a matching process. (<code>symmetric</code> and <code>fix_receiver</code> are mutually exclusive.)</p></li>
-<li><p>Standard errors default to an actor-clustered cluster-robust sandwich for <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>, and <code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> (HC1 factor, <code>t(G - 1)</code> reference), for both directed and symmetric fits. <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> still prints the classical SE; request it anywhere with <code>se.type = "classical"</code>. For dynamic (4D) <code>W</code> the default accessors fall back to classical Wald; use <code>boot_sir(type = "dyad")</code> there.</p></li>
+<li><p>Standard errors default to an actor-clustered cluster-robust sandwich for <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>, and <code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> (HC1 factor, <code>t(G - 1)</code> reference), for both directed and symmetric fits. <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> still prints the classical SE; request it anywhere with <code>se.type = "classical"</code>.</p></li>
 <li><p><code><a href="../reference/boot_sir.html">boot_sir()</a></code> supports symmetric fits for all bootstrap types, bipartite cluster SEs count senders and receivers as distinct actors, and <code><a href="https://rdrr.io/r/stats/predict.html" class="external-link">predict()</a></code> errors on covariate arrays passed outside <code>newdata</code>.</p></li>
 <li><p><code><a href="../reference/sim_sir.html">sim_sir()</a></code> warns when user-supplied influence coefficients imply a non-stationary (spectral gain &gt;= 1) Poisson/Normal process, instead of silently returning an explosive series.</p></li>
 </ul></div>
-  </main></div>
+  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
+    </nav></aside></div>
 
 
     <footer><div class="pkgdown-footer-left">

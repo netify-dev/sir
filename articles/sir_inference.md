@@ -11,13 +11,35 @@ robust variance estimates, confidence intervals, bootstrap checks, and
 information-criterion model comparison. For basic fitting see
 [`vignette("sir_overview")`](https://netify-dev.github.io/sir/articles/sir_overview.md).
 
+### Getting standard errors, in one paragraph
+
+Standard errors are computed by default (`calc_se = TRUE`), so you do
+not have to ask for them. **`summary(fit)` prints them, and
+`confint(fit)`, `vcov(fit)`, and `tidy(fit)` report cluster-robust
+intervals by default.** Cluster-robust is the right default for
+relational data: because ties that share an actor are correlated,
+classical (Hessian-based) errors that assume independent dyads can badly
+overstate significance. The coefficient table in
+[`summary()`](https://rdrr.io/r/base/summary.html)/[`print()`](https://rdrr.io/r/base/print.html)
+shows the *classical* SE for a quick look (and labels it as such), but
+the interval you should report is the cluster-robust one from
+[`confint()`](https://rdrr.io/r/stats/confint.html). If the analytic
+standard errors cannot be formed — a singular or ill-conditioned
+Hessian, or a full-bilinear bipartite fit, which has no closed-form
+covariance —
+[`sir()`](https://netify-dev.github.io/sir/reference/sir.md)
+**automatically falls back to the delete-one-actor jackknife**, and all
+four accessors use it transparently; the fit then carries
+`fit$se_source == "jackknife"` and says so in its printout. Everything
+below is the *why* behind these defaults, and how to cross-check them.
+
 | Tool | What it is useful for | Main limitation |
 |:---|:---|:---|
-| Classical SE | Fast model-based Wald intervals | Assumes independent dyad-period scores and a stable Hessian |
+| Classical SE | Fast model-based Wald intervals; what [`summary()`](https://rdrr.io/r/base/summary.html)/[`print()`](https://rdrr.io/r/base/print.html) show | Assumes independent dyad-period scores and a stable Hessian; can overstate significance |
+| Cluster-robust SE (default) | Shared-actor dyadic dependence (each cell scored onto both actors); what [`confint()`](https://rdrr.io/r/stats/confint.html)/[`vcov()`](https://rdrr.io/r/stats/vcov.html)/[`tidy()`](https://generics.r-lib.org/reference/tidy.html) report | Still uses the Hessian as bread, so weak identification remains a problem |
 | HC0 robust SE | Heteroskedasticity or overdispersion | Does not address shared-actor network dependence |
-| Cluster-robust SE (default) | Shared-actor dyadic dependence (each cell scored onto both actors) | Still uses the Hessian as bread, so weak identification remains a problem |
 | Parametric bootstrap | Resimulates from the fitted model; confirms the model-based SEs | Assumes the model is correct, so it does not capture shared-actor dependence |
-| Dyad jackknife | Fallback when analytic SEs are unavailable (bipartite, unstable Hessian) | A deliberately wide worst-case bound, not a precise interval |
+| Dyad jackknife | The automatic fallback when no analytic covariance exists (full-bilinear bipartite, ill-conditioned Hessian); also a conservative robustness check | Wider than the cluster interval; with few actors, deleting one is a large perturbation |
 
 ## Setup
 
@@ -72,7 +94,7 @@ summary(fit)
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> Std. Error, z value, Pr(>|z|) and significance stars above are classical
 #> (Hessian-based) and may overstate significance under dyadic dependence. NOTE:
-#> `confint(fit)`/`tidy(fit)` default to cluster-robust inference
+#> `confint(fit)`/`vcov(fit)`/`tidy(fit)` default to cluster-robust inference
 #> (actor-clustered, t(G-1) reference) --- the same estimator for directed and
 #> symmetric fits; request classical intervals with `confint(se.type =
 #> "classical")` if dyads are independent.
@@ -309,11 +331,11 @@ from zero:
 
 confint(fit, boot = br_par)
 #>                  2.5 %     97.5 %
-#> (Z) Z1      -0.1816208 -0.1551895
-#> (Z) Z2       0.4604181  0.4852921
-#> (alphaW) W2  0.6869696  0.7892897
-#> (betaW) W1  -0.3593313 -0.3395785
-#> (betaW) W2  -0.2177358 -0.1838933
+#> (Z) Z1      -0.1809816 -0.1565513
+#> (Z) Z2       0.4624189  0.4887205
+#> (alphaW) W2  0.6774419  0.7810377
+#> (betaW) W1  -0.3590865 -0.3390764
+#> (betaW) W2  -0.2167343 -0.1874963
 ```
 
 The **dyad jackknife** is deliberately conservative: deleting a whole
@@ -371,15 +393,32 @@ The choice reduces to three rules:
 - **Report cluster-robust intervals**
   ([`vcov()`](https://rdrr.io/r/stats/vcov.html) /
   [`confint()`](https://rdrr.io/r/stats/confint.html), the default) for
-  supported static directed and symmetric fits with a stable Hessian
+  directed, symmetric, and dynamic (4D) `W` fits with a stable Hessian
   (`se_reliable = TRUE`).
-- **Fall back to the dyad jackknife** (`boot_sir(type = "dyad")`) when
-  analytic SEs are unavailable — full-bilinear bipartite fits, dynamic
-  `W`, or an unstable Hessian (`se_reliable = FALSE`) — and as a
-  worst-case cross-check otherwise.
+- **Let the jackknife fallback handle the hard cases.** When no analytic
+  covariance exists — full-bilinear bipartite fits, or an
+  ill-conditioned Hessian —
+  [`sir()`](https://netify-dev.github.io/sir/reference/sir.md) already
+  attaches the delete-one-actor jackknife automatically, so
+  [`confint()`](https://rdrr.io/r/stats/confint.html)/[`vcov()`](https://rdrr.io/r/stats/vcov.html)/[`tidy()`](https://generics.r-lib.org/reference/tidy.html)
+  keep working and `fit$se_source` reads `"jackknife"`; you do not need
+  to call
+  [`boot_sir()`](https://netify-dev.github.io/sir/reference/boot_sir.md)
+  yourself. (You still can, e.g. `boot_sir(type = "dyad")` then
+  `confint(fit, boot = bs)`, if you want to inspect the resampling.)
 - **Do not** report dyad-independent classical $`p`$-values as the
   headline result for influence coefficients; pair the cluster interval
   with a response-scale scenario (below).
+
+### How to tell which standard errors you have
+
+`fit$se_source` is `"jackknife"` when the automatic fallback fired, and
+absent (NULL) otherwise — meaning analytic SEs are available and
+[`confint()`](https://rdrr.io/r/stats/confint.html)/[`vcov()`](https://rdrr.io/r/stats/vcov.html)/[`tidy()`](https://generics.r-lib.org/reference/tidy.html)
+report the cluster-robust sandwich (including for dynamic, 4D `W`). The
+`summary(fit)` and `print(fit)` printouts also label the standard errors
+they show (classical in the table, jackknife when the fallback fired),
+so you are never left guessing which kind you are looking at.
 
 ## Fixed-receiver model and model comparison
 

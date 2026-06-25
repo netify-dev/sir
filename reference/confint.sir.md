@@ -51,9 +51,12 @@ confint(
   `t(G - 1)` reference, the same estimator for directed and symmetric
   fits), `"classical"` (inverse-Hessian, with a normal reference – valid
   and tighter when dyads are independent), or `"robust"` (HC0 for
-  directed fits; maps to cluster for symmetric fits). Cluster intervals
-  rely on the Hessian bread being stable. Ignored when `boot` is
-  supplied; cluster is unavailable for dynamic (4D) `W`.
+  directed fits; maps to cluster for symmetric fits). The cluster type
+  is supported for directed, symmetric, and dynamic (4D) `W` fits and
+  relies on the Hessian bread being stable. Ignored when `boot` is
+  supplied. Also ignored when `object$se_source == "jackknife"`
+  (analytic SEs could not be formed, so `sir` attached a jackknife
+  covariance and `confint` uses it for every `se.type`).
 
 - ...:
 

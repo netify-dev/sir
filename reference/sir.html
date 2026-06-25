@@ -29,7 +29,7 @@ Receiver influence (B matrix): B[j,l] measures how node l's
 
     <a class="navbar-brand me-2" href="../index.html">sir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.0.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">1.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -156,8 +156,16 @@ for API compatibility) or <code>"optim"</code> (direct optimization via BFGS).</
 
 <dt id="arg-calc-se">calc_se<a class="anchor" aria-label="anchor" href="#arg-calc-se"></a></dt>
 <dd><p>Logical indicating whether to calculate standard errors for the
-parameters. Standard errors are computed using the observed information matrix.
-Setting to FALSE speeds up computation when uncertainty quantification is not needed.</p></dd>
+parameters (default TRUE). Standard errors are computed from the observed
+information matrix. If those analytic standard errors cannot be formed — a
+singular or ill-conditioned Hessian, or a path with no closed-form covariance
+such as full-bilinear bipartite fits — and the model converged, <code>sir</code>
+automatically falls back to the delete-one-actor jackknife covariance
+(reproducible for a given <code>seed</code>), so <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, <code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint()</a></code>,
+<code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>, and
+<code><a href="https://generics.r-lib.org/reference/tidy.html" class="external-link">tidy()</a></code> still return standard errors. The fit then carries
+<code>se_source = "jackknife"</code> and prints a one-line note. Set FALSE to skip
+standard errors entirely (and the fallback) when they are not needed.</p></dd>
 
 
 <dt id="arg-fix-receiver">fix_receiver<a class="anchor" aria-label="anchor" href="#arg-fix-receiver"></a></dt>
@@ -392,6 +400,14 @@ values). The global RNG state is restored on exit. Default NULL.</p></dd>
     <dt>se_reliable</dt>
 <dd><p>Logical, FALSE if the Hessian was ill-conditioned so
       the classical SEs should be treated with caution.</p></dd>
+
+    <dt>se_source</dt>
+<dd><p>Character flag for the reported standard errors:
+      <code>"jackknife"</code> when analytic SEs could not be formed and <code>sir</code>
+      fell back to the delete-one-actor jackknife (see <code>calc_se</code>); NULL
+      (absent) otherwise, meaning analytic SEs are available and
+      <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov</a></code>/<code><a href="https://rdrr.io/r/stats/confint.html" class="external-link">confint</a></code>/<code><a href="tidy.sir.html">tidy</a></code>
+      report the cluster-robust sandwich by default.</p></dd>
 
     <dt>dynamic_W</dt>
 <dd><p>Logical, TRUE if W was time-varying (4D).</p></dd>
